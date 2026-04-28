@@ -115,15 +115,41 @@ class _PartiesScreenState extends State<PartiesScreen> {
                     Text(ledger.partyName, style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 10),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: [
-                        Chip(label: Text('Receivable ${formatBdt(ledger.balances.receivableBdt)}')),
-                        Chip(label: Text('Payable ${formatBdt(ledger.balances.payableBdt)}')),
-                        Chip(label: Text('Advance In ${formatBdt(ledger.balances.advanceFromPartyBdt)}')),
-                        Chip(label: Text('Advance Out ${formatBdt(ledger.balances.advanceToPartyBdt)}')),
-                        Chip(label: Text('Net ${formatBdt(ledger.balances.netBalanceBdt)}')),
-                        Chip(label: Text('Aging ${formatBdt(ledger.balances.agingDueBdt)}')),
+                        BalancePill(
+                          label: 'Receivable',
+                          value: formatBdt(ledger.balances.receivableBdt),
+                          tone: BalancePillTone.receivable,
+                        ),
+                        BalancePill(
+                          label: 'Payable',
+                          value: formatBdt(ledger.balances.payableBdt),
+                          tone: BalancePillTone.payable,
+                        ),
+                        BalancePill(
+                          label: 'Advance In',
+                          value: formatBdt(ledger.balances.advanceFromPartyBdt),
+                          tone: BalancePillTone.advanceIn,
+                        ),
+                        BalancePill(
+                          label: 'Advance Out',
+                          value: formatBdt(ledger.balances.advanceToPartyBdt),
+                          tone: BalancePillTone.advanceOut,
+                        ),
+                        BalancePill(
+                          label: 'Net Position',
+                          value: formatBdt(ledger.balances.netBalanceBdt.abs()),
+                          tone: ledger.balances.netBalanceBdt >= 0
+                              ? BalancePillTone.netPositive
+                              : BalancePillTone.netNegative,
+                        ),
+                        BalancePill(
+                          label: 'Aging',
+                          value: formatBdt(ledger.balances.agingDueBdt),
+                          tone: BalancePillTone.aging,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),

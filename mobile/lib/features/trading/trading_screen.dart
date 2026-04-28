@@ -378,10 +378,26 @@ class _SettlementPreviewCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              Chip(label: Text('Receivable ${formatBdt(inference.current.receivableBdt)}')),
-              Chip(label: Text('Payable ${formatBdt(inference.current.payableBdt)}')),
-              Chip(label: Text('Advance In ${formatBdt(inference.current.advanceFromPartyBdt)}')),
-              Chip(label: Text('Advance Out ${formatBdt(inference.current.advanceToPartyBdt)}')),
+              BalancePill(
+                label: 'Receivable',
+                value: formatBdt(inference.current.receivableBdt),
+                tone: BalancePillTone.receivable,
+              ),
+              BalancePill(
+                label: 'Payable',
+                value: formatBdt(inference.current.payableBdt),
+                tone: BalancePillTone.payable,
+              ),
+              BalancePill(
+                label: 'Advance In',
+                value: formatBdt(inference.current.advanceFromPartyBdt),
+                tone: BalancePillTone.advanceIn,
+              ),
+              BalancePill(
+                label: 'Advance Out',
+                value: formatBdt(inference.current.advanceToPartyBdt),
+                tone: BalancePillTone.advanceOut,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -391,10 +407,26 @@ class _SettlementPreviewCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              Chip(label: Text('Receivable ${formatBdt(inference.projected.receivableBdt)}')),
-              Chip(label: Text('Payable ${formatBdt(inference.projected.payableBdt)}')),
-              Chip(label: Text('Advance In ${formatBdt(inference.projected.advanceFromPartyBdt)}')),
-              Chip(label: Text('Advance Out ${formatBdt(inference.projected.advanceToPartyBdt)}')),
+              BalancePill(
+                label: 'Receivable',
+                value: formatBdt(inference.projected.receivableBdt),
+                tone: BalancePillTone.receivable,
+              ),
+              BalancePill(
+                label: 'Payable',
+                value: formatBdt(inference.projected.payableBdt),
+                tone: BalancePillTone.payable,
+              ),
+              BalancePill(
+                label: 'Advance In',
+                value: formatBdt(inference.projected.advanceFromPartyBdt),
+                tone: BalancePillTone.advanceIn,
+              ),
+              BalancePill(
+                label: 'Advance Out',
+                value: formatBdt(inference.projected.advanceToPartyBdt),
+                tone: BalancePillTone.advanceOut,
+              ),
             ],
           ),
         ],
