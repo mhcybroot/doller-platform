@@ -27,7 +27,7 @@ public class MasterDataController {
     }
 
     @PostMapping("/users/{id}/deactivate")
-    public void deactivate(@PathVariable Long id) { service.deactivateUser(id); }
+    public void deactivate(@PathVariable("id") Long id) { service.deactivateUser(id); }
 
     @GetMapping("/parties")
     public List<Party> parties() { return service.parties(); }

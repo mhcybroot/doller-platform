@@ -1,5 +1,7 @@
 package com.doller.platform.domain;
 
+import com.doller.platform.domain.enums.SettlementBasis;
+import com.doller.platform.domain.enums.SettlementDirection;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,6 +18,12 @@ public class Settlement {
     private Party party;
     @ManyToOne
     private TradeDeal tradeDeal;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SettlementDirection direction;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SettlementBasis basis;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal bdtAmount;
     @Column(nullable = false, precision = 19, scale = 2)

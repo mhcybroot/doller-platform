@@ -1,44 +1,82 @@
 import 'package:flutter/material.dart';
-import '../services/api_client.dart';
-import 'tabs/dashboard_tab.dart';
-import 'tabs/deals_tab.dart';
-import 'tabs/expense_tab.dart';
-import 'tabs/settlement_tab.dart';
-import 'tabs/statements_tab.dart';
+
+import '../features/control/control_center_screen.dart';
+import '../features/dashboard/dashboard_screen.dart';
+import '../features/parties/parties_screen.dart';
+import '../features/statements/statements_screen.dart';
+import '../features/trading/trading_screen.dart';
+import '../features/auth/login_screen.dart';
+import '../shared/models/auth_models.dart';
+import '../shared/services/doller_repository.dart';
 
 class HomeScreen extends StatefulWidget {
-  final ApiClient api;
-  const HomeScreen({super.key, required this.api});
+  const HomeScreen({
+    super.key,
+    required this.repository,
+    required this.session,
+  });
+
+  final DollerRepository repository;
+  final AuthSession session;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int index = 0;
+  int _index = 0;
 
   @override
   Widget build(BuildContext context) {
-    final tabs = [
-      DashboardTab(api: widget.api),
-      DealsTab(api: widget.api),
-      SettlementTab(api: widget.api),
-      ExpenseTab(api: widget.api),
-      StatementsTab(api: widget.api),
+    final screens = [
+      DashboardScreen(repository: widget.repository),
+      TradingScreen(repository: widget.repository),
+      PartiesScreen(repository: widget.repository),
+      StatementsScreen(repository: widget.repository, session: widget.session),
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Doller Ledger')),
-      body: tabs[index],
+      appBar: AppBar(
+        title: const Text('Doller Platform'),
+        actions: [
+          if (widget.session.isOwner)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ControlCenterScreen(
+                      repository: widget.repository,
+                      session: widget.session,
+                    ),
+                  ),
+                );
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await widget.repository.logout();
+              if (!mounted) {
+                return;
+              }
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (_) => false,
+              );
+            },
+          ),
+        ],
+      ),
+      body: screens[_index],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => index = i),
+        selectedIndex: _index,
+        onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.swap_horiz), label: 'Deals'),
-          NavigationDestination(icon: Icon(Icons.payments), label: 'Settle'),
-          NavigationDestination(icon: Icon(Icons.receipt), label: 'Costs'),
-          NavigationDestination(icon: Icon(Icons.assessment), label: 'Statements'),
+          NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: 'Dashboard'),
+          NavigationDestination(icon: Icon(Icons.candlestick_chart), label: 'Trading'),
+          NavigationDestination(icon: Icon(Icons.people_alt_outlined), label: 'Parties'),
+          NavigationDestination(icon: Icon(Icons.description_outlined), label: 'Statements'),
         ],
       ),
     );

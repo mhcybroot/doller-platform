@@ -1,0 +1,404 @@
+import 'package:flutter/material.dart';
+
+import '../../shared/models/domain_models.dart';
+import '../../shared/services/api_client.dart';
+import '../../shared/services/doller_repository.dart';
+import '../../shared/widgets/finance_widgets.dart';
+
+class TradingScreen extends StatefulWidget {
+  const TradingScreen({super.key, required this.repository});
+
+  final DollerRepository repository;
+
+  @override
+  State<TradingScreen> createState() => _TradingScreenState();
+}
+
+class _TradingScreenState extends State<TradingScreen> {
+  final _usdController = TextEditingController();
+  final _rateController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _categoryController = TextEditingController(text: 'staff');
+  final _noteController = TextEditingController();
+  String _dealType = 'BUY';
+  String _expenseType = 'DAILY_OVERHEAD';
+  bool _allowAdvance = false;
+  int _mode = 0;
+  int? _selectedPartyId;
+  int? _selectedDealId;
+  SettlementInferenceModel? _inference;
+  String? _inferenceError;
+  List<PartyModel> _parties = const [];
+  List<DealSummary> _deals = const [];
+  bool _loading = true;
+  int _inferenceVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final parties = await widget.repository.listParties();
+      final deals = await widget.repository.listDeals();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _parties = parties;
+        _deals = deals;
+        if (parties.isEmpty) {
+          _selectedPartyId = null;
+          _selectedDealId = null;
+        } else {
+          final hasSelectedParty = parties.any((party) => party.id == _selectedPartyId);
+          _selectedPartyId = hasSelectedParty ? _selectedPartyId : parties.first.id;
+          final allowedDealIds = deals
+              .where((deal) => deal.partyName == _selectedParty?.name)
+              .map((deal) => deal.id)
+              .toSet();
+          if (_selectedDealId != null && !allowedDealIds.contains(_selectedDealId)) {
+            _selectedDealId = null;
+          }
+        }
+        _loading = false;
+      });
+      await _refreshInference();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      showAppMessage(context, error.message, isError: true);
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _refreshInference() async {
+    if (_mode != 1 || _selectedParty == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _inference = null;
+        _inferenceError = null;
+      });
+      return;
+    }
+
+    final requestId = ++_inferenceVersion;
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    try {
+      final inference = await widget.repository.settlementInference(
+        partyId: _selectedParty!.id,
+        tradeDealId: _selectedDealId,
+        amount: amount,
+      );
+      if (!mounted || requestId != _inferenceVersion) {
+        return;
+      }
+      setState(() {
+        _inference = inference;
+        _inferenceError = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted || requestId != _inferenceVersion) {
+        return;
+      }
+      setState(() {
+        _inference = null;
+        _inferenceError = error.message;
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    try {
+      if (_mode == 0) {
+        if (_selectedParty == null) {
+          throw const ApiException('Select a party first');
+        }
+        await widget.repository.createDeal(
+          dealType: _dealType,
+          partyId: _selectedParty!.id,
+          usdAmount: double.parse(_usdController.text),
+          bdtRate: double.parse(_rateController.text),
+          notes: _noteController.text.trim(),
+        );
+        showAppMessage(context, 'Deal saved');
+      } else if (_mode == 1) {
+        if (_selectedParty == null) {
+          throw const ApiException('Select a party first');
+        }
+        if (_inferenceError != null) {
+          throw ApiException(_inferenceError!);
+        }
+        await widget.repository.createSettlement(
+          partyId: _selectedParty!.id,
+          tradeDealId: _selectedDealId,
+          amount: double.parse(_amountController.text),
+          allowAdvance: _allowAdvance,
+          notes: _noteController.text.trim(),
+        );
+        showAppMessage(context, 'Settlement saved');
+      } else {
+        await widget.repository.createExpense(
+          expenseType: _expenseType,
+          tradeDealId: _selectedDealId,
+          amount: double.parse(_amountController.text),
+          category: _categoryController.text.trim(),
+          notes: _noteController.text.trim(),
+        );
+        showAppMessage(context, 'Expense saved');
+      }
+      _noteController.clear();
+      _usdController.clear();
+      _rateController.clear();
+      _amountController.clear();
+      _allowAdvance = false;
+      await _load();
+    } on ApiException catch (error) {
+      showAppMessage(context, error.message, isError: true);
+    } on FormatException {
+      showAppMessage(context, 'Please enter valid numeric values', isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_parties.isEmpty) {
+      return const EmptyStateCard(
+        title: 'Trading needs parties first',
+        message: 'Create at least one party so deal and settlement forms can use proper selectors.',
+      );
+    }
+
+    final selectedParty = _selectedParty;
+    final selectableDeals = _selectedParty == null
+        ? _deals
+        : _deals.where((deal) => deal.partyName == _selectedParty!.name).toList();
+    final selectedDeal = _selectedDeal;
+    final amountLabel = _mode == 1
+        ? (_inference?.amountLabel ?? 'Settlement Amount (BDT)')
+        : 'Expense Amount (BDT)';
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text('Trading Desk', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        Text(
+          'Guided operational capture for buys, settlements, and costs.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 18),
+        FinanceSection(
+          title: 'Action Type',
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Deal')),
+              ButtonSegment(value: 1, label: Text('Settlement')),
+              ButtonSegment(value: 2, label: Text('Expense')),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (value) {
+              setState(() => _mode = value.first);
+              _refreshInference();
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        FinanceSection(
+          title: _mode == 0 ? 'Deal Capture' : (_mode == 1 ? 'Settlement Capture' : 'Expense Capture'),
+          child: Column(
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: selectedParty?.id,
+                items: _parties
+                    .map((party) => DropdownMenuItem(value: party.id, child: Text(party.name)))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPartyId = value;
+                    _selectedDealId = null;
+                  });
+                  _refreshInference();
+                },
+                decoration: const InputDecoration(labelText: 'Party'),
+              ),
+              if (_mode == 0) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _dealType,
+                  items: const [
+                    DropdownMenuItem(value: 'BUY', child: Text('BUY')),
+                    DropdownMenuItem(value: 'SELL', child: Text('SELL')),
+                  ],
+                  onChanged: (value) => setState(() => _dealType = value!),
+                  decoration: const InputDecoration(labelText: 'Deal Type'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _usdController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'USD Amount'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _rateController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'BDT Rate'),
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int?>(
+                  initialValue: selectedDeal?.id,
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('No specific deal')),
+                    ...selectableDeals.map(
+                      (deal) => DropdownMenuItem(
+                        value: deal.id,
+                        child: Text('#${deal.id} ${deal.dealType} ${formatUsd(deal.usdAmount)}'),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedDealId = value);
+                    _refreshInference();
+                  },
+                  decoration: const InputDecoration(labelText: 'Related Deal'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => _refreshInference(),
+                  decoration: InputDecoration(
+                    labelText: amountLabel,
+                  ),
+                ),
+                if (_mode == 1) ...[
+                  const SizedBox(height: 12),
+                  if (_inference != null) _SettlementPreviewCard(inference: _inference!),
+                  if (_inferenceError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _inferenceError!,
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  const SizedBox(height: 6),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _allowAdvance,
+                    onChanged: (value) => setState(() => _allowAdvance = value),
+                    title: Text(
+                      _inference != null && _inference!.advanceAmount > 0
+                          ? 'Allow ${formatBdt(_inference!.advanceAmount)} to become advance'
+                          : 'Allow overpayment as advance',
+                    ),
+                  ),
+                ],
+                if (_mode == 2) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _expenseType,
+                    items: const [
+                      DropdownMenuItem(value: 'DAILY_OVERHEAD', child: Text('DAILY_OVERHEAD')),
+                      DropdownMenuItem(value: 'TRANSACTION', child: Text('TRANSACTION')),
+                    ],
+                    onChanged: (value) => setState(() => _expenseType = value!),
+                    decoration: const InputDecoration(labelText: 'Expense Type'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _categoryController,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _noteController,
+                decoration: const InputDecoration(labelText: 'Notes'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton(
+                onPressed: _submit,
+                child: Text(_mode == 0 ? 'Save Deal' : (_mode == 1 ? 'Save Settlement' : 'Save Expense')),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  PartyModel? get _selectedParty {
+    for (final party in _parties) {
+      if (party.id == _selectedPartyId) {
+        return party;
+      }
+    }
+    return null;
+  }
+
+  DealSummary? get _selectedDeal {
+    for (final deal in _deals) {
+      if (deal.id == _selectedDealId) {
+        return deal;
+      }
+    }
+    return null;
+  }
+}
+
+class _SettlementPreviewCard extends StatelessWidget {
+  const _SettlementPreviewCard({required this.inference});
+
+  final SettlementInferenceModel inference;
+
+  @override
+  Widget build(BuildContext context) {
+    return FinanceSection(
+      title: 'Settlement Preview',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(inference.summary, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              Chip(label: Text('Receivable ${formatBdt(inference.current.receivableBdt)}')),
+              Chip(label: Text('Payable ${formatBdt(inference.current.payableBdt)}')),
+              Chip(label: Text('Advance In ${formatBdt(inference.current.advanceFromPartyBdt)}')),
+              Chip(label: Text('Advance Out ${formatBdt(inference.current.advanceToPartyBdt)}')),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text('After save', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              Chip(label: Text('Receivable ${formatBdt(inference.projected.receivableBdt)}')),
+              Chip(label: Text('Payable ${formatBdt(inference.projected.payableBdt)}')),
+              Chip(label: Text('Advance In ${formatBdt(inference.projected.advanceFromPartyBdt)}')),
+              Chip(label: Text('Advance Out ${formatBdt(inference.projected.advanceToPartyBdt)}')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

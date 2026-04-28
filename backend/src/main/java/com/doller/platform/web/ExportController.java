@@ -28,7 +28,7 @@ public class ExportController {
     }
 
     @GetMapping("/csv")
-    public ResponseEntity<byte[]> csv(@RequestParam LocalDate from, @RequestParam LocalDate to) {
+    public ResponseEntity<byte[]> csv(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) {
         List<TradingDtos.StatementLine> lines = service.statementRange(from, to);
         StringBuilder sb = new StringBuilder("date,openingCash,closingCash,openingUsd,closingUsd,pnl\n");
         lines.forEach(l -> sb.append(l.date()).append(',').append(l.openingCash()).append(',').append(l.closingCash()).append(',')
@@ -41,7 +41,7 @@ public class ExportController {
     }
 
     @GetMapping("/pdf")
-    public ResponseEntity<byte[]> pdf(@RequestParam LocalDate from, @RequestParam LocalDate to) throws Exception {
+    public ResponseEntity<byte[]> pdf(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) throws Exception {
         List<TradingDtos.StatementLine> lines = service.statementRange(from, to);
         byte[] out = renderPdf(lines, from, to);
         return ResponseEntity.ok()

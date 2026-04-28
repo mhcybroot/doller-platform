@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class TradingServiceTest {
@@ -46,12 +47,62 @@ class TradingServiceTest {
     void dayCloseComputesPnL() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party p = partyRepository.save(Party.builder().name("X").build());
+        LocalDate businessDate = LocalDate.now().plusDays(30);
+        LocalDateTime stamp = businessDate.atTime(10, 0);
 
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), new BigDecimal("100"), new BigDecimal("120"), LocalDateTime.now(), "buy"));
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), new BigDecimal("50"), new BigDecimal("122"), LocalDateTime.now(), "sell"));
-        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.DAILY_OVERHEAD, null, new BigDecimal("100"), LocalDateTime.now(), "staff", ""));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
+        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.DAILY_OVERHEAD, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
 
-        var preview = tradingService.previewDayClose(LocalDate.now());
+        var preview = tradingService.previewDayClose(businessDate);
         assertEquals(new BigDecimal("-6000.00"), preview.realizedProfitLossBdt());
+    }
+
+    @Test
+    void incomingSettlementReducesReceivableAndCreatesAdvance() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p = partyRepository.save(Party.builder().name("Customer A").build());
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, p.getId(), new BigDecimal("100"), new BigDecimal("120"),
+                LocalDateTime.now(), "sell"
+        ));
+
+        var inference = tradingService.settlementInference(p.getId(), null, new BigDecimal("15000"));
+        assertEquals("INCOMING", inference.direction().name());
+        assertEquals(new BigDecimal("12000.00"), inference.appliedAmount());
+        assertEquals(new BigDecimal("3000.00"), inference.advanceAmount());
+
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                p.getId(), null, new BigDecimal("15000"), LocalDateTime.now(), "paid", true
+        ));
+
+        var ledger = tradingService.partyLedger(p.getId());
+        assertEquals(new BigDecimal("0.00"), ledger.balances().receivableBdt());
+        assertEquals(new BigDecimal("3000.00"), ledger.balances().advanceFromPartyBdt());
+        assertTrue(ledger.lines().stream().anyMatch(line -> line.kind().contains("SETTLEMENT-INCOMING")));
+    }
+
+    @Test
+    void outgoingSettlementReducesPayable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p = partyRepository.save(Party.builder().name("Supplier B").build());
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p.getId(), new BigDecimal("50"), new BigDecimal("130"),
+                LocalDateTime.now(), "buy"
+        ));
+
+        var inference = tradingService.settlementInference(p.getId(), null, new BigDecimal("2000"));
+        assertEquals("OUTGOING", inference.direction().name());
+        assertEquals("PAYABLE", inference.basis().name());
+
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                p.getId(), null, new BigDecimal("2000"), LocalDateTime.now(), "partial pay", false
+        ));
+
+        var ledger = tradingService.partyLedger(p.getId());
+        assertEquals(new BigDecimal("4500.00"), ledger.balances().payableBdt());
+        assertEquals(new BigDecimal("0.00"), ledger.balances().advanceToPartyBdt());
     }
 }
