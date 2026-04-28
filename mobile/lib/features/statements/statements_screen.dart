@@ -271,46 +271,64 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         FinanceSection(
           title: 'Balance Sheet Summary',
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Text('Liquidity', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
-                    child: MetricCard(
-                      label: 'Opening Cash',
-                      value: formatBdt(report.openingCash),
-                      caption: 'Period start cash',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: MetricCard(
-                      label: 'Closing Cash',
-                      value: formatBdt(report.closingCash),
-                      caption: 'Period end cash',
-                    ),
-                  ),
+                  _reportPill('Opening Cash', formatBdt(report.openingCash), BalancePillTone.neutral),
+                  _reportPill('Closing Cash', formatBdt(report.closingCash), BalancePillTone.neutral),
+                  _reportPill('Opening USD', formatUsd(report.openingUsd), BalancePillTone.neutral),
+                  _reportPill('Closing USD', formatUsd(report.closingUsd), BalancePillTone.neutral),
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
+              Text('Exposure', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
-                    child: MetricCard(
-                      label: 'Opening USD',
-                      value: formatUsd(report.openingUsd),
-                      caption: 'Period start USD',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: MetricCard(
-                      label: 'Closing USD',
-                      value: formatUsd(report.closingUsd),
-                      caption: 'Period end USD',
-                    ),
-                  ),
+                  _reportPill('Opening Receivable', formatBdt(report.openingReceivableBdt), BalancePillTone.receivable),
+                  _reportPill('Closing Receivable', formatBdt(report.closingReceivableBdt), BalancePillTone.receivable),
+                  _reportPill('Opening Payable', formatBdt(report.openingPayableBdt), BalancePillTone.payable),
+                  _reportPill('Closing Payable', formatBdt(report.closingPayableBdt), BalancePillTone.payable),
+                  _reportPill('Opening Advance In', formatBdt(report.openingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
+                  _reportPill('Closing Advance In', formatBdt(report.closingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
+                  _reportPill('Opening Advance Out', formatBdt(report.openingAdvanceToPartyBdt), BalancePillTone.advanceOut),
+                  _reportPill('Closing Advance Out', formatBdt(report.closingAdvanceToPartyBdt), BalancePillTone.advanceOut),
                 ],
               ),
+              const SizedBox(height: 12),
+              Text('Risk', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _reportPill('Opening Aging', formatBdt(report.openingAgingBdt), BalancePillTone.aging),
+                  _reportPill('Closing Aging', formatBdt(report.closingAgingBdt), BalancePillTone.aging),
+                ],
+              ),
+              if (report.openingAgingBuckets.totalAgingBdt > 0) ...[
+                const SizedBox(height: 12),
+                AgingBucketsCard(
+                  title: 'Opening Aging Breakdown',
+                  buckets: report.openingAgingBuckets,
+                ),
+              ],
+              if (report.closingAgingBuckets.totalAgingBdt > 0) ...[
+                const SizedBox(height: 12),
+                AgingBucketsCard(
+                  title: 'Closing Aging Breakdown',
+                  buckets: report.closingAgingBuckets,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text('Performance', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
               MetricCard(
                 label: 'Total P/L',
@@ -408,18 +426,60 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
             child: Column(
               children: report.lines
                   .map(
-                    (line) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(formatDate(line.date)),
-                      subtitle: Text(
-                        'Open cash ${formatBdt(line.openingCash)}  Close cash ${formatBdt(line.closingCash)}',
+                    (line) => Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: AppTheme.border),
+                        color: Colors.white,
                       ),
-                      trailing: Text(
-                        formatBdt(line.pnl),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: line.pnl >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        title: Text(formatDate(line.date)),
+                        subtitle: Text(
+                          'Cash ${formatBdt(line.openingCash)} -> ${formatBdt(line.closingCash)} • '
+                          'USD ${formatUsd(line.openingUsd)} -> ${formatUsd(line.closingUsd)}',
                         ),
+                        trailing: Text(
+                          formatBdt(line.pnl),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: line.pnl >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                          ),
+                        ),
+                        children: [
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _reportPill('Open Receivable', formatBdt(line.openingReceivableBdt), BalancePillTone.receivable),
+                              _reportPill('Close Receivable', formatBdt(line.closingReceivableBdt), BalancePillTone.receivable),
+                              _reportPill('Open Payable', formatBdt(line.openingPayableBdt), BalancePillTone.payable),
+                              _reportPill('Close Payable', formatBdt(line.closingPayableBdt), BalancePillTone.payable),
+                              _reportPill('Open Advance In', formatBdt(line.openingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
+                              _reportPill('Close Advance In', formatBdt(line.closingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
+                              _reportPill('Open Advance Out', formatBdt(line.openingAdvanceToPartyBdt), BalancePillTone.advanceOut),
+                              _reportPill('Close Advance Out', formatBdt(line.closingAdvanceToPartyBdt), BalancePillTone.advanceOut),
+                              _reportPill('Open Aging', formatBdt(line.openingAgingBdt), BalancePillTone.aging),
+                              _reportPill('Close Aging', formatBdt(line.closingAgingBdt), BalancePillTone.aging),
+                            ],
+                          ),
+                          if (line.openingAgingBuckets.totalAgingBdt > 0) ...[
+                            const SizedBox(height: 12),
+                            AgingBucketsCard(
+                              title: 'Opening Aging',
+                              buckets: line.openingAgingBuckets,
+                            ),
+                          ],
+                          if (line.closingAgingBuckets.totalAgingBdt > 0) ...[
+                            const SizedBox(height: 12),
+                            AgingBucketsCard(
+                              title: 'Closing Aging',
+                              buckets: line.closingAgingBuckets,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   )
@@ -429,6 +489,17 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
       ],
     );
   }
+}
+
+Widget _reportPill(String label, String value, BalancePillTone tone) {
+  return SizedBox(
+    width: 150,
+    child: BalancePill(
+      label: label,
+      value: value,
+      tone: tone,
+    ),
+  );
 }
 
 class _TransactionDetailsTab extends StatefulWidget {

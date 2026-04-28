@@ -75,7 +75,12 @@ class TradingServiceTest {
         ));
 
         var result = tradingService.confirmDayClose(businessDate);
+        var report = tradingService.balanceSheetReport("DAILY", businessDate, null, null, null, null);
         assertEquals(0, result.closingUsd().compareTo(new BigDecimal("5.000000")));
+        assertEquals(0, report.closingUsd().compareTo(new BigDecimal("5.000000")));
+        assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("650.00")));
+        assertEquals(0, report.closingPayableBdt().compareTo(new BigDecimal("1200.00")));
+        assertEquals(0, report.closingAgingBdt().compareTo(new BigDecimal("650.00")));
     }
 
     @Test

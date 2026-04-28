@@ -31,9 +31,15 @@ public class ExportController {
     @GetMapping("/csv")
     public ResponseEntity<byte[]> csv(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) {
         List<TradingDtos.StatementLine> lines = service.statementRange(from, to);
-        StringBuilder sb = new StringBuilder("date,openingCash,closingCash,openingUsd,closingUsd,pnl\n");
+        StringBuilder sb = new StringBuilder("date,openingCash,closingCash,openingUsd,closingUsd,openingReceivable,closingReceivable,openingPayable,closingPayable,openingAdvanceIn,closingAdvanceIn,openingAdvanceOut,closingAdvanceOut,openingAging,closingAging,pnl\n");
         lines.forEach(l -> sb.append(l.date()).append(',').append(l.openingCash()).append(',').append(l.closingCash()).append(',')
-                .append(l.openingUsd()).append(',').append(l.closingUsd()).append(',').append(l.pnl()).append('\n'));
+                .append(l.openingUsd()).append(',').append(l.closingUsd()).append(',')
+                .append(l.openingReceivableBdt()).append(',').append(l.closingReceivableBdt()).append(',')
+                .append(l.openingPayableBdt()).append(',').append(l.closingPayableBdt()).append(',')
+                .append(l.openingAdvanceFromPartyBdt()).append(',').append(l.closingAdvanceFromPartyBdt()).append(',')
+                .append(l.openingAdvanceToPartyBdt()).append(',').append(l.closingAdvanceToPartyBdt()).append(',')
+                .append(l.openingAgingBdt()).append(',').append(l.closingAgingBdt()).append(',')
+                .append(l.pnl()).append('\n'));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=statement.csv")
                 .header("X-Export-Range", from + "_" + to)
@@ -101,13 +107,55 @@ public class ExportController {
                         response.openingCash(), response.closingCash(), response.openingUsd(), response.closingUsd(), response.totalPnl()));
                 cs.endText();
 
-                float y = 732;
+                cs.beginText();
+                cs.newLineAtOffset(50, 740);
+                cs.showText(String.format("Open Rec=%s | Close Rec=%s | Open Pay=%s | Close Pay=%s",
+                        response.openingReceivableBdt(), response.closingReceivableBdt(),
+                        response.openingPayableBdt(), response.closingPayableBdt()));
+                cs.endText();
+
+                cs.beginText();
+                cs.newLineAtOffset(50, 724);
+                cs.showText(String.format("Open Adv In=%s | Close Adv In=%s | Open Adv Out=%s | Close Adv Out=%s",
+                        response.openingAdvanceFromPartyBdt(), response.closingAdvanceFromPartyBdt(),
+                        response.openingAdvanceToPartyBdt(), response.closingAdvanceToPartyBdt()));
+                cs.endText();
+
+                cs.beginText();
+                cs.newLineAtOffset(50, 708);
+                cs.showText(String.format("Open Aging=%s | Close Aging=%s",
+                        response.openingAgingBdt(), response.closingAgingBdt()));
+                cs.endText();
+
+                cs.beginText();
+                cs.newLineAtOffset(50, 692);
+                cs.showText(String.format("Open Aging Buckets 0-3=%s 4-7=%s 8-15=%s 15-30=%s 30+=%s",
+                        response.openingAgingBuckets().days0To3Bdt(),
+                        response.openingAgingBuckets().days4To7Bdt(),
+                        response.openingAgingBuckets().days8To15Bdt(),
+                        response.openingAgingBuckets().days15To30Bdt(),
+                        response.openingAgingBuckets().days30PlusBdt()));
+                cs.endText();
+
+                cs.beginText();
+                cs.newLineAtOffset(50, 676);
+                cs.showText(String.format("Close Aging Buckets 0-3=%s 4-7=%s 8-15=%s 15-30=%s 30+=%s",
+                        response.closingAgingBuckets().days0To3Bdt(),
+                        response.closingAgingBuckets().days4To7Bdt(),
+                        response.closingAgingBuckets().days8To15Bdt(),
+                        response.closingAgingBuckets().days15To30Bdt(),
+                        response.closingAgingBuckets().days30PlusBdt()));
+                cs.endText();
+
+                float y = 648;
                 for (TradingDtos.StatementLine line : response.lines()) {
                     if (y < 60) break;
                     cs.beginText();
                     cs.newLineAtOffset(50, y);
-                    cs.showText(String.format("%s | openCash=%s | closeCash=%s | openUsd=%s | closeUsd=%s | pnl=%s",
-                            line.date(), line.openingCash(), line.closingCash(), line.openingUsd(), line.closingUsd(), line.pnl()));
+                    cs.showText(String.format("%s | cash %s->%s | usd %s->%s | rec %s->%s | pay %s->%s | pnl=%s",
+                            line.date(), line.openingCash(), line.closingCash(), line.openingUsd(), line.closingUsd(),
+                            line.openingReceivableBdt(), line.closingReceivableBdt(),
+                            line.openingPayableBdt(), line.closingPayableBdt(), line.pnl()));
                     cs.endText();
                     y -= 16;
                 }

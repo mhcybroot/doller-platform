@@ -10,7 +10,9 @@ import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.PartyRepository;
+import com.doller.platform.repo.DailyCloseRepository;
 import com.doller.platform.repo.SettlementRepository;
+import com.doller.platform.repo.StatementSnapshotRepository;
 import com.doller.platform.repo.TradeDealRepository;
 import com.doller.platform.repo.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +38,17 @@ class TradingServiceAgingBucketsTest {
     private SettlementRepository settlementRepository;
     @Autowired
     private UserAccountRepository userAccountRepository;
+    @Autowired
+    private DailyCloseRepository dailyCloseRepository;
+    @Autowired
+    private StatementSnapshotRepository statementSnapshotRepository;
 
     private UserAccount actor;
 
     @BeforeEach
     void setUp() {
+        dailyCloseRepository.deleteAll();
+        statementSnapshotRepository.deleteAll();
         settlementRepository.deleteAll();
         tradeDealRepository.deleteAll();
         partyRepository.deleteAll();

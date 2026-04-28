@@ -168,12 +168,14 @@ public class TradingService {
         StatementSnapshot prev = snapshotRepo.findByBusinessDate(date.minusDays(1)).orElse(null);
         BigDecimal openingCash = prev == null ? BigDecimal.ZERO : prev.getClosingCashBdt();
         BigDecimal openingUsd = prev == null ? BigDecimal.ZERO : prev.getClosingUsd();
+        BalancePosition openingPosition = prev == null ? zeroBalancePosition() : closingPositionFromSnapshot(prev);
 
         var range = dayRange(date);
         BigDecimal cashNet = ledgerRepo.netForAccount("CASH", range[0], range[1]);
         BigDecimal usdNet = ledgerRepo.netForAccount("USD_INVENTORY", range[0], range[1]);
         BigDecimal closingCash = openingCash.add(cashNet);
         BigDecimal closingUsd = openingUsd.add(usdNet);
+        BalancePosition closingPosition = aggregateBusinessPositionAt(date);
 
         StatementSnapshot snap = snapshotRepo.save(StatementSnapshot.builder()
                 .businessDate(date)
@@ -181,6 +183,26 @@ public class TradingService {
                 .closingCashBdt(closingCash)
                 .openingUsd(openingUsd)
                 .closingUsd(closingUsd)
+                .openingReceivableBdt(openingPosition.receivableBdt())
+                .closingReceivableBdt(closingPosition.receivableBdt())
+                .openingPayableBdt(openingPosition.payableBdt())
+                .closingPayableBdt(closingPosition.payableBdt())
+                .openingAdvanceFromPartyBdt(openingPosition.advanceFromPartyBdt())
+                .closingAdvanceFromPartyBdt(closingPosition.advanceFromPartyBdt())
+                .openingAdvanceToPartyBdt(openingPosition.advanceToPartyBdt())
+                .closingAdvanceToPartyBdt(closingPosition.advanceToPartyBdt())
+                .openingAgingBdt(openingPosition.agingDueBdt())
+                .closingAgingBdt(closingPosition.agingDueBdt())
+                .openingAging0To3Bdt(openingPosition.agingBuckets().days0To3Bdt())
+                .closingAging0To3Bdt(closingPosition.agingBuckets().days0To3Bdt())
+                .openingAging4To7Bdt(openingPosition.agingBuckets().days4To7Bdt())
+                .closingAging4To7Bdt(closingPosition.agingBuckets().days4To7Bdt())
+                .openingAging8To15Bdt(openingPosition.agingBuckets().days8To15Bdt())
+                .closingAging8To15Bdt(closingPosition.agingBuckets().days8To15Bdt())
+                .openingAging15To30Bdt(openingPosition.agingBuckets().days15To30Bdt())
+                .closingAging15To30Bdt(closingPosition.agingBuckets().days15To30Bdt())
+                .openingAging30PlusBdt(openingPosition.agingBuckets().days30PlusBdt())
+                .closingAging30PlusBdt(closingPosition.agingBuckets().days30PlusBdt())
                 .realizedProfitLossBdt(p.realizedProfitLossBdt())
                 .build());
 
@@ -230,10 +252,8 @@ public class TradingService {
 
     public List<TradingDtos.StatementLine> statementRange(LocalDate from, LocalDate to) {
         return snapshotRepo.findByBusinessDateBetweenOrderByBusinessDateAsc(from, to).stream()
-                .map(s -> new TradingDtos.StatementLine(
-                        s.getBusinessDate(), s.getOpeningCashBdt(), s.getClosingCashBdt(),
-                        s.getOpeningUsd(), s.getClosingUsd(), s.getRealizedProfitLossBdt()
-                )).toList();
+                .map(this::toStatementLine)
+                .toList();
     }
 
     public TradingDtos.BalanceSheetResponse balanceSheetReport(String mode, LocalDate date, Integer month, Integer year, LocalDate from, LocalDate to) {
@@ -243,6 +263,18 @@ public class TradingService {
         BigDecimal closingCash = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingCash();
         BigDecimal openingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingUsd();
         BigDecimal closingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingUsd();
+        BigDecimal openingReceivable = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingReceivableBdt();
+        BigDecimal closingReceivable = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingReceivableBdt();
+        BigDecimal openingPayable = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingPayableBdt();
+        BigDecimal closingPayable = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingPayableBdt();
+        BigDecimal openingAdvanceFromParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAdvanceFromPartyBdt();
+        BigDecimal closingAdvanceFromParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAdvanceFromPartyBdt();
+        BigDecimal openingAdvanceToParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAdvanceToPartyBdt();
+        BigDecimal closingAdvanceToParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAdvanceToPartyBdt();
+        BigDecimal openingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAgingBdt();
+        BigDecimal closingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAgingBdt();
+        TradingDtos.AgingBuckets openingAgingBuckets = lines.isEmpty() ? zeroAgingBuckets() : lines.getFirst().openingAgingBuckets();
+        TradingDtos.AgingBuckets closingAgingBuckets = lines.isEmpty() ? zeroAgingBuckets() : lines.getLast().closingAgingBuckets();
         BigDecimal totalPnl = lines.stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingDtos.BalanceSheetResponse(
                 normalizeMode(mode),
@@ -252,6 +284,18 @@ public class TradingService {
                 closingCash,
                 openingUsd,
                 closingUsd,
+                openingReceivable,
+                closingReceivable,
+                openingPayable,
+                closingPayable,
+                openingAdvanceFromParty,
+                closingAdvanceFromParty,
+                openingAdvanceToParty,
+                closingAdvanceToParty,
+                openingAging,
+                closingAging,
+                openingAgingBuckets,
+                closingAgingBuckets,
                 totalPnl,
                 lines
         );
@@ -401,6 +445,10 @@ public class TradingService {
     }
 
     private TradingDtos.AgingBuckets computeAgingBuckets(Party party) {
+        return computeAgingBuckets(party, LocalDate.now());
+    }
+
+    private TradingDtos.AgingBuckets computeAgingBuckets(Party party, LocalDate asOfDate) {
         BigDecimal days0To3 = BigDecimal.ZERO;
         BigDecimal days4To7 = BigDecimal.ZERO;
         BigDecimal days8To15 = BigDecimal.ZERO;
@@ -408,15 +456,17 @@ public class TradingService {
         BigDecimal days30Plus = BigDecimal.ZERO;
 
         List<TradeDeal> sellDeals = dealRepo.findAll().stream()
-                .filter(d -> d.getParty().getId().equals(party.getId()) && d.getDealType() == DealType.SELL)
+                .filter(d -> d.getParty().getId().equals(party.getId())
+                        && d.getDealType() == DealType.SELL
+                        && !d.getDealTime().toLocalDate().isAfter(asOfDate))
                 .sorted(Comparator.comparing(TradeDeal::getDealTime))
                 .toList();
         BigDecimal remainingSettlements = settlementRepo.findByPartyOrderBySettlementTimeAsc(party).stream()
+                .filter(s -> !s.getSettlementTime().toLocalDate().isAfter(asOfDate))
                 .filter(s -> s.getDirection() == SettlementDirection.INCOMING && s.getBasis() == SettlementBasis.RECEIVABLE)
                 .map(Settlement::getAppliedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        LocalDate today = LocalDate.now();
         for (TradeDeal deal : sellDeals) {
             BigDecimal covered = remainingSettlements.min(deal.getBdtGross());
             remainingSettlements = remainingSettlements.subtract(covered);
@@ -425,7 +475,7 @@ public class TradingService {
                 continue;
             }
 
-            long ageDays = ChronoUnit.DAYS.between(deal.getDealTime().toLocalDate(), today);
+            long ageDays = ChronoUnit.DAYS.between(deal.getDealTime().toLocalDate(), asOfDate);
             if (ageDays <= 3) {
                 days0To3 = days0To3.add(outstanding);
             } else if (ageDays <= 7) {
@@ -463,10 +513,17 @@ public class TradingService {
     }
 
     private TradingDtos.PartyBalanceSummary partyBalanceSummary(Party party) {
+        return partyBalanceSummary(party, null);
+    }
+
+    private TradingDtos.PartyBalanceSummary partyBalanceSummary(Party party, LocalDate asOfDate) {
         List<TradeDeal> deals = dealRepo.findAll().stream()
                 .filter(d -> d.getParty().getId().equals(party.getId()))
+                .filter(d -> asOfDate == null || !d.getDealTime().toLocalDate().isAfter(asOfDate))
                 .toList();
-        List<Settlement> settlements = settlementRepo.findByPartyOrderBySettlementTimeAsc(party);
+        List<Settlement> settlements = settlementRepo.findByPartyOrderBySettlementTimeAsc(party).stream()
+                .filter(s -> asOfDate == null || !s.getSettlementTime().toLocalDate().isAfter(asOfDate))
+                .toList();
 
         BigDecimal receivable = deals.stream()
                 .filter(d -> d.getDealType() == DealType.SELL)
@@ -501,7 +558,9 @@ public class TradingService {
         payable = payable.max(BigDecimal.ZERO);
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
-        TradingDtos.AgingBuckets agingBuckets = computeAgingBuckets(party);
+        TradingDtos.AgingBuckets agingBuckets = asOfDate == null
+                ? computeAgingBuckets(party)
+                : computeAgingBuckets(party, asOfDate);
         BigDecimal aging = agingBuckets.totalAgingBdt();
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging, agingBuckets);
@@ -645,6 +704,130 @@ public class TradingService {
         return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, agingBuckets.totalAgingBdt(), agingBuckets);
     }
 
+    private TradingDtos.StatementLine toStatementLine(StatementSnapshot snapshot) {
+        return new TradingDtos.StatementLine(
+                snapshot.getBusinessDate(),
+                snapshot.getOpeningCashBdt(),
+                snapshot.getClosingCashBdt(),
+                snapshot.getOpeningUsd(),
+                snapshot.getClosingUsd(),
+                snapshot.getOpeningReceivableBdt(),
+                snapshot.getClosingReceivableBdt(),
+                snapshot.getOpeningPayableBdt(),
+                snapshot.getClosingPayableBdt(),
+                snapshot.getOpeningAdvanceFromPartyBdt(),
+                snapshot.getClosingAdvanceFromPartyBdt(),
+                snapshot.getOpeningAdvanceToPartyBdt(),
+                snapshot.getClosingAdvanceToPartyBdt(),
+                snapshot.getOpeningAgingBdt(),
+                snapshot.getClosingAgingBdt(),
+                agingBucketsFromSnapshot(
+                        snapshot.getOpeningAging0To3Bdt(),
+                        snapshot.getOpeningAging4To7Bdt(),
+                        snapshot.getOpeningAging8To15Bdt(),
+                        snapshot.getOpeningAging15To30Bdt(),
+                        snapshot.getOpeningAging30PlusBdt(),
+                        snapshot.getOpeningAgingBdt()
+                ),
+                agingBucketsFromSnapshot(
+                        snapshot.getClosingAging0To3Bdt(),
+                        snapshot.getClosingAging4To7Bdt(),
+                        snapshot.getClosingAging8To15Bdt(),
+                        snapshot.getClosingAging15To30Bdt(),
+                        snapshot.getClosingAging30PlusBdt(),
+                        snapshot.getClosingAgingBdt()
+                ),
+                snapshot.getRealizedProfitLossBdt()
+        );
+    }
+
+    private BalancePosition aggregateBusinessPositionAt(LocalDate asOfDate) {
+        BigDecimal receivable = BigDecimal.ZERO;
+        BigDecimal payable = BigDecimal.ZERO;
+        BigDecimal advanceFromParty = BigDecimal.ZERO;
+        BigDecimal advanceToParty = BigDecimal.ZERO;
+        TradingDtos.AgingBuckets buckets = zeroAgingBuckets();
+
+        for (Party party : partyRepo.findAll()) {
+            TradingDtos.PartyBalanceSummary summary = partyBalanceSummary(party, asOfDate);
+            receivable = receivable.add(summary.receivableBdt());
+            payable = payable.add(summary.payableBdt());
+            advanceFromParty = advanceFromParty.add(summary.advanceFromPartyBdt());
+            advanceToParty = advanceToParty.add(summary.advanceToPartyBdt());
+            buckets = sumAgingBuckets(buckets, summary.agingBuckets());
+        }
+
+        BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
+        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, buckets.totalAgingBdt(), buckets);
+    }
+
+    private BalancePosition closingPositionFromSnapshot(StatementSnapshot snapshot) {
+        return new BalancePosition(
+                snapshot.getClosingReceivableBdt(),
+                snapshot.getClosingPayableBdt(),
+                snapshot.getClosingAdvanceFromPartyBdt(),
+                snapshot.getClosingAdvanceToPartyBdt(),
+                snapshot.getClosingReceivableBdt()
+                        .add(snapshot.getClosingAdvanceToPartyBdt())
+                        .subtract(snapshot.getClosingPayableBdt())
+                        .subtract(snapshot.getClosingAdvanceFromPartyBdt()),
+                snapshot.getClosingAgingBdt(),
+                agingBucketsFromSnapshot(
+                        snapshot.getClosingAging0To3Bdt(),
+                        snapshot.getClosingAging4To7Bdt(),
+                        snapshot.getClosingAging8To15Bdt(),
+                        snapshot.getClosingAging15To30Bdt(),
+                        snapshot.getClosingAging30PlusBdt(),
+                        snapshot.getClosingAgingBdt()
+                )
+        );
+    }
+
+    private TradingDtos.AgingBuckets sumAgingBuckets(TradingDtos.AgingBuckets left, TradingDtos.AgingBuckets right) {
+        return new TradingDtos.AgingBuckets(
+                left.days0To3Bdt().add(right.days0To3Bdt()),
+                left.days4To7Bdt().add(right.days4To7Bdt()),
+                left.days8To15Bdt().add(right.days8To15Bdt()),
+                left.days15To30Bdt().add(right.days15To30Bdt()),
+                left.days30PlusBdt().add(right.days30PlusBdt()),
+                left.totalAgingBdt().add(right.totalAgingBdt())
+        );
+    }
+
+    private TradingDtos.AgingBuckets agingBucketsFromSnapshot(
+            BigDecimal days0To3,
+            BigDecimal days4To7,
+            BigDecimal days8To15,
+            BigDecimal days15To30,
+            BigDecimal days30Plus,
+            BigDecimal total
+    ) {
+        return new TradingDtos.AgingBuckets(days0To3, days4To7, days8To15, days15To30, days30Plus, total);
+    }
+
+    private TradingDtos.AgingBuckets zeroAgingBuckets() {
+        return new TradingDtos.AgingBuckets(
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+        );
+    }
+
+    private BalancePosition zeroBalancePosition() {
+        return new BalancePosition(
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                zeroAgingBuckets()
+        );
+    }
+
     private void postSettlementLedger(Settlement st, LocalDateTime at) {
         String referenceType = "SETTLEMENT";
         Long referenceId = st.getId();
@@ -708,6 +891,16 @@ public class TradingService {
                 .max(Comparator.comparing(TradeDeal::getDealTime))
                 .orElse(null);
     }
+
+    private record BalancePosition(
+            BigDecimal receivableBdt,
+            BigDecimal payableBdt,
+            BigDecimal advanceFromPartyBdt,
+            BigDecimal advanceToPartyBdt,
+            BigDecimal netBalanceBdt,
+            BigDecimal agingDueBdt,
+            TradingDtos.AgingBuckets agingBuckets
+    ) {}
 
     private record SettlementPlan(
             SettlementDirection direction,

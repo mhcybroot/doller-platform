@@ -47,7 +47,26 @@ public class TradingDtos {
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal usdPosition, BigDecimal todayPnL, BigDecimal periodPnL) {}
-    public record StatementLine(LocalDate date, BigDecimal openingCash, BigDecimal closingCash, BigDecimal openingUsd, BigDecimal closingUsd, BigDecimal pnl) {}
+    public record StatementLine(
+            LocalDate date,
+            BigDecimal openingCash,
+            BigDecimal closingCash,
+            BigDecimal openingUsd,
+            BigDecimal closingUsd,
+            BigDecimal openingReceivableBdt,
+            BigDecimal closingReceivableBdt,
+            BigDecimal openingPayableBdt,
+            BigDecimal closingPayableBdt,
+            BigDecimal openingAdvanceFromPartyBdt,
+            BigDecimal closingAdvanceFromPartyBdt,
+            BigDecimal openingAdvanceToPartyBdt,
+            BigDecimal closingAdvanceToPartyBdt,
+            BigDecimal openingAgingBdt,
+            BigDecimal closingAgingBdt,
+            AgingBuckets openingAgingBuckets,
+            AgingBuckets closingAgingBuckets,
+            BigDecimal pnl
+    ) {}
     public record BalanceSheetResponse(
             String mode,
             LocalDate from,
@@ -56,6 +75,18 @@ public class TradingDtos {
             BigDecimal closingCash,
             BigDecimal openingUsd,
             BigDecimal closingUsd,
+            BigDecimal openingReceivableBdt,
+            BigDecimal closingReceivableBdt,
+            BigDecimal openingPayableBdt,
+            BigDecimal closingPayableBdt,
+            BigDecimal openingAdvanceFromPartyBdt,
+            BigDecimal closingAdvanceFromPartyBdt,
+            BigDecimal openingAdvanceToPartyBdt,
+            BigDecimal closingAdvanceToPartyBdt,
+            BigDecimal openingAgingBdt,
+            BigDecimal closingAgingBdt,
+            AgingBuckets openingAgingBuckets,
+            AgingBuckets closingAgingBuckets,
             BigDecimal totalPnl,
             List<StatementLine> lines
     ) {}

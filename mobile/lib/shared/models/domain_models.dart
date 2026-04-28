@@ -85,6 +85,18 @@ class StatementLineModel {
   final double closingCash;
   final double openingUsd;
   final double closingUsd;
+  final double openingReceivableBdt;
+  final double closingReceivableBdt;
+  final double openingPayableBdt;
+  final double closingPayableBdt;
+  final double openingAdvanceFromPartyBdt;
+  final double closingAdvanceFromPartyBdt;
+  final double openingAdvanceToPartyBdt;
+  final double closingAdvanceToPartyBdt;
+  final double openingAgingBdt;
+  final double closingAgingBdt;
+  final AgingBucketsModel openingAgingBuckets;
+  final AgingBucketsModel closingAgingBuckets;
   final double pnl;
 
   const StatementLineModel({
@@ -93,6 +105,18 @@ class StatementLineModel {
     required this.closingCash,
     required this.openingUsd,
     required this.closingUsd,
+    required this.openingReceivableBdt,
+    required this.closingReceivableBdt,
+    required this.openingPayableBdt,
+    required this.closingPayableBdt,
+    required this.openingAdvanceFromPartyBdt,
+    required this.closingAdvanceFromPartyBdt,
+    required this.openingAdvanceToPartyBdt,
+    required this.closingAdvanceToPartyBdt,
+    required this.openingAgingBdt,
+    required this.closingAgingBdt,
+    required this.openingAgingBuckets,
+    required this.closingAgingBuckets,
     required this.pnl,
   });
 
@@ -103,6 +127,22 @@ class StatementLineModel {
       closingCash: (json["closingCash"] as num).toDouble(),
       openingUsd: (json["openingUsd"] as num).toDouble(),
       closingUsd: (json["closingUsd"] as num).toDouble(),
+      openingReceivableBdt: (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
+      closingReceivableBdt: (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
+      openingPayableBdt: (json["openingPayableBdt"] as num? ?? 0).toDouble(),
+      closingPayableBdt: (json["closingPayableBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceFromPartyBdt: (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceFromPartyBdt: (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceToPartyBdt: (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceToPartyBdt: (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      openingAgingBdt: (json["openingAgingBdt"] as num? ?? 0).toDouble(),
+      closingAgingBdt: (json["closingAgingBdt"] as num? ?? 0).toDouble(),
+      openingAgingBuckets: AgingBucketsModel.fromJson(
+        (json["openingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+      ),
+      closingAgingBuckets: AgingBucketsModel.fromJson(
+        (json["closingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+      ),
       pnl: (json["pnl"] as num).toDouble(),
     );
   }
@@ -116,6 +156,18 @@ class BalanceSheetModel {
   final double closingCash;
   final double openingUsd;
   final double closingUsd;
+  final double openingReceivableBdt;
+  final double closingReceivableBdt;
+  final double openingPayableBdt;
+  final double closingPayableBdt;
+  final double openingAdvanceFromPartyBdt;
+  final double closingAdvanceFromPartyBdt;
+  final double openingAdvanceToPartyBdt;
+  final double closingAdvanceToPartyBdt;
+  final double openingAgingBdt;
+  final double closingAgingBdt;
+  final AgingBucketsModel openingAgingBuckets;
+  final AgingBucketsModel closingAgingBuckets;
   final double totalPnl;
   final List<StatementLineModel> lines;
 
@@ -127,6 +179,18 @@ class BalanceSheetModel {
     required this.closingCash,
     required this.openingUsd,
     required this.closingUsd,
+    required this.openingReceivableBdt,
+    required this.closingReceivableBdt,
+    required this.openingPayableBdt,
+    required this.closingPayableBdt,
+    required this.openingAdvanceFromPartyBdt,
+    required this.closingAdvanceFromPartyBdt,
+    required this.openingAdvanceToPartyBdt,
+    required this.closingAdvanceToPartyBdt,
+    required this.openingAgingBdt,
+    required this.closingAgingBdt,
+    required this.openingAgingBuckets,
+    required this.closingAgingBuckets,
     required this.totalPnl,
     required this.lines,
   });
@@ -140,6 +204,22 @@ class BalanceSheetModel {
       closingCash: (json["closingCash"] as num).toDouble(),
       openingUsd: (json["openingUsd"] as num).toDouble(),
       closingUsd: (json["closingUsd"] as num).toDouble(),
+      openingReceivableBdt: (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
+      closingReceivableBdt: (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
+      openingPayableBdt: (json["openingPayableBdt"] as num? ?? 0).toDouble(),
+      closingPayableBdt: (json["closingPayableBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceFromPartyBdt: (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceFromPartyBdt: (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceToPartyBdt: (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceToPartyBdt: (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      openingAgingBdt: (json["openingAgingBdt"] as num? ?? 0).toDouble(),
+      closingAgingBdt: (json["closingAgingBdt"] as num? ?? 0).toDouble(),
+      openingAgingBuckets: AgingBucketsModel.fromJson(
+        (json["openingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+      ),
+      closingAgingBuckets: AgingBucketsModel.fromJson(
+        (json["closingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+      ),
       totalPnl: (json["totalPnl"] as num).toDouble(),
       lines: (json["lines"] as List<dynamic>)
           .map((item) => StatementLineModel.fromJson(item as Map<String, dynamic>))
@@ -147,6 +227,15 @@ class BalanceSheetModel {
     );
   }
 }
+
+Map<String, dynamic> _zeroAgingJson() => {
+      "days0To3Bdt": 0,
+      "days4To7Bdt": 0,
+      "days8To15Bdt": 0,
+      "days15To30Bdt": 0,
+      "days30PlusBdt": 0,
+      "totalAgingBdt": 0,
+    };
 
 class TransactionDetailsModel {
   final DateTime from;
