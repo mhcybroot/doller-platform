@@ -11,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
-    @Bean
+    // Swagger UI disabled - uncomment @Bean to re-enable
+    // @Bean
     public OpenAPI openAPI() {
         String schemeName = "bearerAuth";
         return new OpenAPI()
