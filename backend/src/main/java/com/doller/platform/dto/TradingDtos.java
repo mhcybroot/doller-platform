@@ -20,8 +20,17 @@ public class TradingDtos {
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
     public record SettlementCreateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
                                           @NotNull LocalDateTime settlementTime, String notes, boolean allowAdvance) {}
+    public record AgingBuckets(
+            BigDecimal days0To3Bdt,
+            BigDecimal days4To7Bdt,
+            BigDecimal days8To15Bdt,
+            BigDecimal days15To30Bdt,
+            BigDecimal days30PlusBdt,
+            BigDecimal totalAgingBdt
+    ) {}
     public record PartyBalanceSummary(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal advanceFromPartyBdt,
-                                      BigDecimal advanceToPartyBdt, BigDecimal netBalanceBdt, BigDecimal agingDueBdt) {}
+                                      BigDecimal advanceToPartyBdt, BigDecimal netBalanceBdt, BigDecimal agingDueBdt,
+                                      AgingBuckets agingBuckets) {}
     public record SettlementInferenceResponse(
             Long partyId,
             Long tradeDealId,

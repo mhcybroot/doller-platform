@@ -199,6 +199,7 @@ class PartyBalanceSummaryModel {
   final double advanceToPartyBdt;
   final double netBalanceBdt;
   final double agingDueBdt;
+  final AgingBucketsModel agingBuckets;
 
   const PartyBalanceSummaryModel({
     required this.receivableBdt,
@@ -207,6 +208,7 @@ class PartyBalanceSummaryModel {
     required this.advanceToPartyBdt,
     required this.netBalanceBdt,
     required this.agingDueBdt,
+    required this.agingBuckets,
   });
 
   factory PartyBalanceSummaryModel.fromJson(Map<String, dynamic> json) {
@@ -217,6 +219,36 @@ class PartyBalanceSummaryModel {
       advanceToPartyBdt: (json["advanceToPartyBdt"] as num).toDouble(),
       netBalanceBdt: (json["netBalanceBdt"] as num).toDouble(),
       agingDueBdt: (json["agingDueBdt"] as num).toDouble(),
+      agingBuckets: AgingBucketsModel.fromJson(json["agingBuckets"] as Map<String, dynamic>),
+    );
+  }
+}
+
+class AgingBucketsModel {
+  final double days0To3Bdt;
+  final double days4To7Bdt;
+  final double days8To15Bdt;
+  final double days15To30Bdt;
+  final double days30PlusBdt;
+  final double totalAgingBdt;
+
+  const AgingBucketsModel({
+    required this.days0To3Bdt,
+    required this.days4To7Bdt,
+    required this.days8To15Bdt,
+    required this.days15To30Bdt,
+    required this.days30PlusBdt,
+    required this.totalAgingBdt,
+  });
+
+  factory AgingBucketsModel.fromJson(Map<String, dynamic> json) {
+    return AgingBucketsModel(
+      days0To3Bdt: (json["days0To3Bdt"] as num).toDouble(),
+      days4To7Bdt: (json["days4To7Bdt"] as num).toDouble(),
+      days8To15Bdt: (json["days8To15Bdt"] as num).toDouble(),
+      days15To30Bdt: (json["days15To30Bdt"] as num).toDouble(),
+      days30PlusBdt: (json["days30PlusBdt"] as num).toDouble(),
+      totalAgingBdt: (json["totalAgingBdt"] as num).toDouble(),
     );
   }
 }

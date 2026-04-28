@@ -145,14 +145,13 @@ class _PartiesScreenState extends State<PartiesScreen> {
                               ? BalancePillTone.netPositive
                               : BalancePillTone.netNegative,
                         ),
-                        BalancePill(
-                          label: 'Aging',
-                          value: formatBdt(ledger.balances.agingDueBdt),
-                          tone: BalancePillTone.aging,
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
+                    if (ledger.balances.agingBuckets.totalAgingBdt > 0) ...[
+                      AgingBucketsCard(buckets: ledger.balances.agingBuckets),
+                      const SizedBox(height: 16),
+                    ],
                     Expanded(
                       child: ListView.builder(
                         controller: controller,

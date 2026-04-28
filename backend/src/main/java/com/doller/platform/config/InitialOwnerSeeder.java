@@ -30,7 +30,7 @@ public class InitialOwnerSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (!initEnabled || userRepo.findByUsernameAndActiveTrue("admin").isPresent()) {
+        if (!initEnabled || userRepo.findByUsername("admin").isPresent()) {
             return;
         }
         UserAccount admin = userRepo.save(UserAccount.builder()

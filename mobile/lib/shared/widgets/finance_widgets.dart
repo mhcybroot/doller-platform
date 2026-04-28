@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/app_theme.dart';
+import '../models/domain_models.dart';
 
 final _money = NumberFormat.currency(symbol: 'BDT ', decimalDigits: 2);
 final _usd = NumberFormat.currency(symbol: 'USD ', decimalDigits: 2);
@@ -145,6 +146,11 @@ enum BalancePillTone {
   advanceIn,
   advanceOut,
   aging,
+  aging0To3,
+  aging4To7,
+  aging8To15,
+  aging15To30,
+  aging30Plus,
   netPositive,
   netNegative,
   neutral,
@@ -223,6 +229,31 @@ class BalancePill extends StatelessWidget {
           const Color(0xFFF2E2A5),
           const Color(0xFF92400E),
         ),
+      BalancePillTone.aging0To3 => (
+          const Color(0xFFEFF6FF),
+          const Color(0xFFBFDBFE),
+          const Color(0xFF1D4ED8),
+        ),
+      BalancePillTone.aging4To7 => (
+          const Color(0xFFFEFCE8),
+          const Color(0xFFFDE68A),
+          const Color(0xFFA16207),
+        ),
+      BalancePillTone.aging8To15 => (
+          const Color(0xFFFFFBEB),
+          const Color(0xFFFCD34D),
+          const Color(0xFFB45309),
+        ),
+      BalancePillTone.aging15To30 => (
+          const Color(0xFFFFF7ED),
+          const Color(0xFFFDBA74),
+          const Color(0xFFC2410C),
+        ),
+      BalancePillTone.aging30Plus => (
+          const Color(0xFFFEF2F2),
+          const Color(0xFFFCA5A5),
+          const Color(0xFFB91C1C),
+        ),
       BalancePillTone.netPositive => (
           const Color(0xFFDCFCE7),
           const Color(0xFF86EFAC),
@@ -239,5 +270,59 @@ class BalancePill extends StatelessWidget {
           AppTheme.ink,
         ),
     };
+  }
+}
+
+class AgingBucketsCard extends StatelessWidget {
+  const AgingBucketsCard({
+    super.key,
+    required this.buckets,
+    this.title = 'Receivable Aging',
+  });
+
+  final AgingBucketsModel buckets;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return FinanceSection(
+      title: title,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          BalancePill(
+            label: '0-3 Days',
+            value: formatBdt(buckets.days0To3Bdt),
+            tone: BalancePillTone.aging0To3,
+          ),
+          BalancePill(
+            label: '4-7 Days',
+            value: formatBdt(buckets.days4To7Bdt),
+            tone: BalancePillTone.aging4To7,
+          ),
+          BalancePill(
+            label: '8-15 Days',
+            value: formatBdt(buckets.days8To15Bdt),
+            tone: BalancePillTone.aging8To15,
+          ),
+          BalancePill(
+            label: '15-30 Days',
+            value: formatBdt(buckets.days15To30Bdt),
+            tone: BalancePillTone.aging15To30,
+          ),
+          BalancePill(
+            label: '30+ Days',
+            value: formatBdt(buckets.days30PlusBdt),
+            tone: BalancePillTone.aging30Plus,
+          ),
+          BalancePill(
+            label: 'Total Aging',
+            value: formatBdt(buckets.totalAgingBdt),
+            tone: BalancePillTone.aging,
+          ),
+        ],
+      ),
+    );
   }
 }

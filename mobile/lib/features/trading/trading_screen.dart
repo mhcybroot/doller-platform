@@ -400,6 +400,13 @@ class _SettlementPreviewCard extends StatelessWidget {
               ),
             ],
           ),
+          if (inference.current.agingBuckets.totalAgingBdt > 0) ...[
+            const SizedBox(height: 14),
+            AgingBucketsCard(
+              buckets: inference.current.agingBuckets,
+              title: 'Current Receivable Aging',
+            ),
+          ],
           const SizedBox(height: 14),
           Text('After save', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
