@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/doller}
+    username: ${DB_USER:mhcybroot}
+    password: ${DB_PASS:MhR@2025}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  jackson:
+    time-zone: ${APP_TIMEZONE:Asia/Dhaka}
+
+app:
+  init:
+    enabled: ${APP_INIT_ENABLED:true}
+  jwt:
+    issuer: ${JWT_ISSUER:doller-platform}
+    active-secret: ${JWT_ACTIVE_SECRET:change-this-very-long-active-secret-please-change-in-prod}
+    previous-secret: ${JWT_PREVIOUS_SECRET:}
+    access-expiry-minutes: ${JWT_ACCESS_EXP_MIN:30}
+    refresh-expiry-days: ${JWT_REFRESH_EXP_DAYS:30}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
