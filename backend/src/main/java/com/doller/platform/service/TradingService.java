@@ -65,11 +65,11 @@ public class TradingService {
                 .build());
 
         if (req.dealType() == DealType.BUY) {
-            ledgerService.post(req.dealTime(), "USD_INVENTORY", gross, BigDecimal.ZERO, "DEAL", deal.getId(), "Buy USD");
+            ledgerService.post(req.dealTime(), "USD_INVENTORY", req.usdAmount(), BigDecimal.ZERO, "DEAL", deal.getId(), "Buy USD");
             ledgerService.post(req.dealTime(), "PAYABLE_" + party.getId(), BigDecimal.ZERO, gross, "DEAL", deal.getId(), "Payable to party");
         } else {
             ledgerService.post(req.dealTime(), "RECEIVABLE_" + party.getId(), gross, BigDecimal.ZERO, "DEAL", deal.getId(), "Receivable from party");
-            ledgerService.post(req.dealTime(), "USD_INVENTORY", BigDecimal.ZERO, gross, "DEAL", deal.getId(), "Sell USD");
+            ledgerService.post(req.dealTime(), "USD_INVENTORY", BigDecimal.ZERO, req.usdAmount(), "DEAL", deal.getId(), "Sell USD");
         }
         auditService.log("CREATE_DEAL", "/deals", "partyId=" + party.getId(), null, null, "deal:" + deal.getId());
         return deal;
@@ -154,12 +154,16 @@ public class TradingService {
         BigDecimal cost = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal pnl = sell.subtract(buy).subtract(cost);
-        return new TradingDtos.DayClosePreview(date, buy, sell, cost, pnl);
+        boolean closed = dailyCloseRepo.findByBusinessDate(date).filter(c -> !c.isReopened()).isPresent();
+        return new TradingDtos.DayClosePreview(date, buy, sell, cost, pnl, closed);
     }
 
     @Transactional
     public TradingDtos.DayCloseResponse confirmDayClose(LocalDate date) {
-        if (dailyCloseRepo.findByBusinessDate(date).isPresent()) throw new ApiException("Day already closed");
+        DailyClose existingClose = dailyCloseRepo.findByBusinessDate(date).orElse(null);
+        if (existingClose != null && !existingClose.isReopened()) {
+            throw new ApiException("Day already closed");
+        }
         TradingDtos.DayClosePreview p = previewDayClose(date);
         StatementSnapshot prev = snapshotRepo.findByBusinessDate(date.minusDays(1)).orElse(null);
         BigDecimal openingCash = prev == null ? BigDecimal.ZERO : prev.getClosingCashBdt();
@@ -181,12 +185,14 @@ public class TradingService {
                 .build());
 
         dealRepo.findByDealTimeBetween(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(true); dealRepo.save(d); });
-        dailyCloseRepo.save(DailyClose.builder()
-                .businessDate(date)
-                .closedBy(getCurrentUser())
-                .closedAt(LocalDateTime.now())
-                .reopened(false)
-                .build());
+        DailyClose closeRecord = existingClose == null
+                ? DailyClose.builder().businessDate(date).build()
+                : existingClose;
+        closeRecord.setClosedBy(getCurrentUser());
+        closeRecord.setClosedAt(LocalDateTime.now());
+        closeRecord.setReopened(false);
+        closeRecord.setReopenReason(null);
+        dailyCloseRepo.save(closeRecord);
         String auditRef = auditService.log("DAY_CLOSE", "/day-close/" + date, null, null, null, "snapshot:" + snap.getId());
         return new TradingDtos.DayCloseResponse(date, true, auditRef, openingCash, closingCash, openingUsd, closingUsd, p.realizedProfitLossBdt());
     }
@@ -228,6 +234,120 @@ public class TradingService {
                         s.getBusinessDate(), s.getOpeningCashBdt(), s.getClosingCashBdt(),
                         s.getOpeningUsd(), s.getClosingUsd(), s.getRealizedProfitLossBdt()
                 )).toList();
+    }
+
+    public TradingDtos.BalanceSheetResponse balanceSheetReport(String mode, LocalDate date, Integer month, Integer year, LocalDate from, LocalDate to) {
+        LocalDate[] range = resolveReportRange(mode, date, month, year, from, to);
+        List<TradingDtos.StatementLine> lines = statementRange(range[0], range[1]);
+        BigDecimal openingCash = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingCash();
+        BigDecimal closingCash = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingCash();
+        BigDecimal openingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingUsd();
+        BigDecimal closingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingUsd();
+        BigDecimal totalPnl = lines.stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new TradingDtos.BalanceSheetResponse(
+                normalizeMode(mode),
+                range[0],
+                range[1],
+                openingCash,
+                closingCash,
+                openingUsd,
+                closingUsd,
+                totalPnl,
+                lines
+        );
+    }
+
+    public TradingDtos.TransactionDetailsResponse transactionDetails(
+            LocalDate from,
+            LocalDate to,
+            String type,
+            Long partyId,
+            String search,
+            String sortField,
+            String sortDirection
+    ) {
+        LocalDate safeFrom = from == null ? LocalDate.now() : from;
+        LocalDate safeTo = to == null ? safeFrom : to;
+        LocalDateTime[] range = dayRange(safeFrom, safeTo);
+        String normalizedType = normalizeFilter(type);
+        String normalizedSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        String normalizedSortField = normalizeSortField(sortField);
+        String normalizedSortDirection = "asc".equalsIgnoreCase(sortDirection) ? "asc" : "desc";
+
+        List<TradingDtos.TransactionDetailRow> rows = new ArrayList<>();
+
+        dealRepo.findByDealTimeBetween(range[0], range[1]).stream()
+                .filter(deal -> partyId == null || deal.getParty().getId().equals(partyId))
+                .filter(deal -> normalizedType.isEmpty() || normalizedType.equals("DEAL"))
+                .map(deal -> new TradingDtos.TransactionDetailRow(
+                        "DEAL",
+                        deal.getId(),
+                        deal.getDealTime(),
+                        deal.getParty().getId(),
+                        deal.getParty().getName(),
+                        deal.getBdtGross(),
+                        deal.getUsdAmount(),
+                        deal.getBdtRate(),
+                        deal.getDealType().name(),
+                        "Deal #" + deal.getId(),
+                        deal.getNotes(),
+                        null
+                ))
+                .forEach(rows::add);
+
+        settlementRepo.findBySettlementTimeBetween(range[0], range[1]).stream()
+                .filter(settlement -> partyId == null || settlement.getParty().getId().equals(partyId))
+                .filter(settlement -> normalizedType.isEmpty() || normalizedType.equals("SETTLEMENT"))
+                .map(settlement -> new TradingDtos.TransactionDetailRow(
+                        "SETTLEMENT",
+                        settlement.getId(),
+                        settlement.getSettlementTime(),
+                        settlement.getParty().getId(),
+                        settlement.getParty().getName(),
+                        settlement.getBdtAmount(),
+                        null,
+                        null,
+                        settlement.getDirection().name() + " / " + settlement.getBasis().name(),
+                        "Settlement #" + settlement.getId(),
+                        settlement.getNotes(),
+                        null
+                ))
+                .forEach(rows::add);
+
+        expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+                .filter(expense -> partyId == null || Objects.equals(expensePartyId(expense), partyId))
+                .filter(expense -> normalizedType.isEmpty() || normalizedType.equals("EXPENSE"))
+                .map(expense -> new TradingDtos.TransactionDetailRow(
+                        "EXPENSE",
+                        expense.getId(),
+                        expense.getExpenseTime(),
+                        expensePartyId(expense),
+                        expensePartyName(expense),
+                        expense.getAmountBdt(),
+                        null,
+                        null,
+                        expense.getExpenseType().name(),
+                        "Expense #" + expense.getId(),
+                        expense.getNotes(),
+                        expense.getCategory()
+                ))
+                .forEach(rows::add);
+
+        rows = rows.stream()
+                .filter(row -> matchesSearch(row, normalizedSearch))
+                .sorted(transactionComparator(normalizedSortField, normalizedSortDirection))
+                .toList();
+
+        return new TradingDtos.TransactionDetailsResponse(
+                safeFrom,
+                safeTo,
+                normalizedType,
+                partyId,
+                search,
+                normalizedSortField,
+                normalizedSortDirection,
+                rows
+        );
     }
 
     public TradingDtos.PartyLedgerResponse partyLedger(Long partyId) {
@@ -600,6 +720,100 @@ public class TradingService {
 
     private LocalDateTime[] dayRange(LocalDate date) {
         return new LocalDateTime[]{date.atStartOfDay(), date.plusDays(1).atStartOfDay().minusNanos(1)};
+    }
+
+    private LocalDateTime[] dayRange(LocalDate from, LocalDate to) {
+        return new LocalDateTime[]{from.atStartOfDay(), to.plusDays(1).atStartOfDay().minusNanos(1)};
+    }
+
+    private LocalDate[] resolveReportRange(String mode, LocalDate date, Integer month, Integer year, LocalDate from, LocalDate to) {
+        return switch (normalizeMode(mode)) {
+            case "MONTHLY" -> {
+                int safeYear = year == null ? LocalDate.now().getYear() : year;
+                int safeMonth = month == null ? LocalDate.now().getMonthValue() : month;
+                LocalDate start = LocalDate.of(safeYear, safeMonth, 1);
+                yield new LocalDate[]{start, start.withDayOfMonth(start.lengthOfMonth())};
+            }
+            case "YEARLY" -> {
+                int safeYear = year == null ? LocalDate.now().getYear() : year;
+                yield new LocalDate[]{LocalDate.of(safeYear, 1, 1), LocalDate.of(safeYear, 12, 31)};
+            }
+            case "CUSTOM" -> {
+                LocalDate safeFrom = from == null ? LocalDate.now() : from;
+                LocalDate safeTo = to == null ? safeFrom : to;
+                yield new LocalDate[]{safeFrom, safeTo};
+            }
+            default -> {
+                LocalDate safeDate = date == null ? LocalDate.now() : date;
+                yield new LocalDate[]{safeDate, safeDate};
+            }
+        };
+    }
+
+    private String normalizeMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return "DAILY";
+        }
+        return switch (mode.trim().toUpperCase(Locale.ROOT)) {
+            case "MONTHLY" -> "MONTHLY";
+            case "YEARLY" -> "YEARLY";
+            case "CUSTOM", "RANGE" -> "CUSTOM";
+            default -> "DAILY";
+        };
+    }
+
+    private String normalizeFilter(String type) {
+        if (type == null || type.isBlank() || "ALL".equalsIgnoreCase(type)) {
+            return "";
+        }
+        String value = type.trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "DEAL", "SETTLEMENT", "EXPENSE" -> value;
+            default -> "";
+        };
+    }
+
+    private String normalizeSortField(String sortField) {
+        if (sortField == null || sortField.isBlank()) {
+            return "occurredAt";
+        }
+        return switch (sortField) {
+            case "amountBdt", "entryType", "partyName" -> sortField;
+            default -> "occurredAt";
+        };
+    }
+
+    private Long expensePartyId(Expense expense) {
+        return expense.getTradeDeal() == null ? null : expense.getTradeDeal().getParty().getId();
+    }
+
+    private String expensePartyName(Expense expense) {
+        return expense.getTradeDeal() == null ? "Internal" : expense.getTradeDeal().getParty().getName();
+    }
+
+    private boolean matchesSearch(TradingDtos.TransactionDetailRow row, String search) {
+        if (search.isEmpty()) {
+            return true;
+        }
+        return containsIgnoreCase(row.partyName(), search)
+                || containsIgnoreCase(row.notes(), search)
+                || containsIgnoreCase(row.category(), search)
+                || containsIgnoreCase(row.referenceLabel(), search)
+                || containsIgnoreCase(row.directionLabel(), search);
+    }
+
+    private boolean containsIgnoreCase(String source, String search) {
+        return source != null && source.toLowerCase(Locale.ROOT).contains(search);
+    }
+
+    private Comparator<TradingDtos.TransactionDetailRow> transactionComparator(String field, String direction) {
+        Comparator<TradingDtos.TransactionDetailRow> comparator = switch (field) {
+            case "amountBdt" -> Comparator.comparing(TradingDtos.TransactionDetailRow::amountBdt, Comparator.nullsLast(BigDecimal::compareTo));
+            case "entryType" -> Comparator.comparing(TradingDtos.TransactionDetailRow::entryType, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "partyName" -> Comparator.comparing(TradingDtos.TransactionDetailRow::partyName, Comparator.nullsLast(String::compareToIgnoreCase));
+            default -> Comparator.comparing(TradingDtos.TransactionDetailRow::occurredAt, Comparator.nullsLast(LocalDateTime::compareTo));
+        };
+        return "asc".equalsIgnoreCase(direction) ? comparator : comparator.reversed();
     }
 
     private UserAccount getCurrentUser() {

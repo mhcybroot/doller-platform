@@ -108,12 +108,137 @@ class StatementLineModel {
   }
 }
 
+class BalanceSheetModel {
+  final String mode;
+  final DateTime from;
+  final DateTime to;
+  final double openingCash;
+  final double closingCash;
+  final double openingUsd;
+  final double closingUsd;
+  final double totalPnl;
+  final List<StatementLineModel> lines;
+
+  const BalanceSheetModel({
+    required this.mode,
+    required this.from,
+    required this.to,
+    required this.openingCash,
+    required this.closingCash,
+    required this.openingUsd,
+    required this.closingUsd,
+    required this.totalPnl,
+    required this.lines,
+  });
+
+  factory BalanceSheetModel.fromJson(Map<String, dynamic> json) {
+    return BalanceSheetModel(
+      mode: json["mode"] as String,
+      from: DateTime.parse(json["from"] as String),
+      to: DateTime.parse(json["to"] as String),
+      openingCash: (json["openingCash"] as num).toDouble(),
+      closingCash: (json["closingCash"] as num).toDouble(),
+      openingUsd: (json["openingUsd"] as num).toDouble(),
+      closingUsd: (json["closingUsd"] as num).toDouble(),
+      totalPnl: (json["totalPnl"] as num).toDouble(),
+      lines: (json["lines"] as List<dynamic>)
+          .map((item) => StatementLineModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class TransactionDetailsModel {
+  final DateTime from;
+  final DateTime to;
+  final String typeFilter;
+  final int? partyId;
+  final String? search;
+  final String sortField;
+  final String sortDirection;
+  final List<TransactionDetailRowModel> rows;
+
+  const TransactionDetailsModel({
+    required this.from,
+    required this.to,
+    required this.typeFilter,
+    required this.partyId,
+    required this.search,
+    required this.sortField,
+    required this.sortDirection,
+    required this.rows,
+  });
+
+  factory TransactionDetailsModel.fromJson(Map<String, dynamic> json) {
+    return TransactionDetailsModel(
+      from: DateTime.parse(json["from"] as String),
+      to: DateTime.parse(json["to"] as String),
+      typeFilter: (json["typeFilter"] as String?) ?? '',
+      partyId: (json["partyId"] as num?)?.toInt(),
+      search: json["search"] as String?,
+      sortField: json["sortField"] as String? ?? 'occurredAt',
+      sortDirection: json["sortDirection"] as String? ?? 'desc',
+      rows: (json["rows"] as List<dynamic>)
+          .map((item) => TransactionDetailRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class TransactionDetailRowModel {
+  final String entryType;
+  final int entryId;
+  final DateTime occurredAt;
+  final int? partyId;
+  final String? partyName;
+  final double amountBdt;
+  final double? usdAmount;
+  final double? bdtRate;
+  final String? directionLabel;
+  final String? referenceLabel;
+  final String? notes;
+  final String? category;
+
+  const TransactionDetailRowModel({
+    required this.entryType,
+    required this.entryId,
+    required this.occurredAt,
+    required this.partyId,
+    required this.partyName,
+    required this.amountBdt,
+    required this.usdAmount,
+    required this.bdtRate,
+    required this.directionLabel,
+    required this.referenceLabel,
+    required this.notes,
+    required this.category,
+  });
+
+  factory TransactionDetailRowModel.fromJson(Map<String, dynamic> json) {
+    return TransactionDetailRowModel(
+      entryType: json["entryType"] as String,
+      entryId: (json["entryId"] as num).toInt(),
+      occurredAt: DateTime.parse(json["occurredAt"] as String),
+      partyId: (json["partyId"] as num?)?.toInt(),
+      partyName: json["partyName"] as String?,
+      amountBdt: (json["amountBdt"] as num).toDouble(),
+      usdAmount: (json["usdAmount"] as num?)?.toDouble(),
+      bdtRate: (json["bdtRate"] as num?)?.toDouble(),
+      directionLabel: json["directionLabel"] as String?,
+      referenceLabel: json["referenceLabel"] as String?,
+      notes: json["notes"] as String?,
+      category: json["category"] as String?,
+    );
+  }
+}
+
 class DayClosePreviewModel {
   final DateTime date;
   final double totalBuyBdt;
   final double totalSellBdt;
   final double totalExpenseBdt;
   final double realizedProfitLossBdt;
+  final bool closed;
 
   const DayClosePreviewModel({
     required this.date,
@@ -121,6 +246,7 @@ class DayClosePreviewModel {
     required this.totalSellBdt,
     required this.totalExpenseBdt,
     required this.realizedProfitLossBdt,
+    required this.closed,
   });
 
   factory DayClosePreviewModel.fromJson(Map<String, dynamic> json) {
@@ -130,6 +256,7 @@ class DayClosePreviewModel {
       totalSellBdt: (json["totalSellBdt"] as num).toDouble(),
       totalExpenseBdt: (json["totalExpenseBdt"] as num).toDouble(),
       realizedProfitLossBdt: (json["realizedProfitLossBdt"] as num).toDouble(),
+      closed: json["closed"] as bool? ?? false,
     );
   }
 }

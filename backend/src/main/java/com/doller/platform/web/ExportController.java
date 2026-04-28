@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/exports")
@@ -41,17 +42,43 @@ public class ExportController {
     }
 
     @GetMapping("/pdf")
-    public ResponseEntity<byte[]> pdf(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) throws Exception {
-        List<TradingDtos.StatementLine> lines = service.statementRange(from, to);
-        byte[] out = renderPdf(lines, from, to);
+    public ResponseEntity<byte[]> pdf(
+            @RequestParam(value = "reportType", required = false) String reportType,
+            @RequestParam(value = "mode", required = false) String mode,
+            @RequestParam(value = "date", required = false) LocalDate date,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to,
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "partyId", required = false) Long partyId,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "sortField", required = false) String sortField,
+            @RequestParam(value = "sortDirection", required = false) String sortDirection
+    ) throws Exception {
+        String normalizedType = reportType == null ? "BALANCE_SHEET" : reportType.trim().toUpperCase(Locale.ROOT);
+        byte[] out;
+        String filename;
+        String rangeHeader;
+        if ("TRANSACTION_DETAILS".equals(normalizedType)) {
+            TradingDtos.TransactionDetailsResponse response = service.transactionDetails(from, to, type, partyId, search, sortField, sortDirection);
+            out = renderTransactionPdf(response);
+            filename = "transaction_details.pdf";
+            rangeHeader = response.from() + "_" + response.to();
+        } else {
+            TradingDtos.BalanceSheetResponse response = service.balanceSheetReport(mode, date, month, year, from, to);
+            out = renderBalanceSheetPdf(response);
+            filename = "balance_sheet.pdf";
+            rangeHeader = response.from() + "_" + response.to();
+        }
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=statement.pdf")
-                .header("X-Export-Range", from + "_" + to)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .header("X-Export-Range", rangeHeader)
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(out);
     }
 
-    private byte[] renderPdf(List<TradingDtos.StatementLine> lines, LocalDate from, LocalDate to) throws Exception {
+    private byte[] renderBalanceSheetPdf(TradingDtos.BalanceSheetResponse response) throws Exception {
         try (PDDocument doc = new PDDocument(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(PDRectangle.A4);
             doc.addPage(page);
@@ -59,17 +86,23 @@ public class ExportController {
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 14);
                 cs.beginText();
                 cs.newLineAtOffset(50, 790);
-                cs.showText("Doller Platform - Statement Report");
+                cs.showText("Doller Platform - Balance Sheet");
                 cs.endText();
 
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
                 cs.beginText();
                 cs.newLineAtOffset(50, 772);
-                cs.showText("Range: " + from + " to " + to);
+                cs.showText("Mode: " + response.mode() + " | Range: " + response.from() + " to " + response.to());
                 cs.endText();
 
-                float y = 748;
-                for (TradingDtos.StatementLine line : lines) {
+                cs.beginText();
+                cs.newLineAtOffset(50, 756);
+                cs.showText(String.format("Open Cash=%s | Close Cash=%s | Open USD=%s | Close USD=%s | Total P/L=%s",
+                        response.openingCash(), response.closingCash(), response.openingUsd(), response.closingUsd(), response.totalPnl()));
+                cs.endText();
+
+                float y = 732;
+                for (TradingDtos.StatementLine line : response.lines()) {
                     if (y < 60) break;
                     cs.beginText();
                     cs.newLineAtOffset(50, y);
@@ -77,6 +110,48 @@ public class ExportController {
                             line.date(), line.openingCash(), line.closingCash(), line.openingUsd(), line.closingUsd(), line.pnl()));
                     cs.endText();
                     y -= 16;
+                }
+            }
+            doc.save(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    private byte[] renderTransactionPdf(TradingDtos.TransactionDetailsResponse response) throws Exception {
+        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            doc.addPage(page);
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 14);
+                cs.beginText();
+                cs.newLineAtOffset(50, 790);
+                cs.showText("Doller Platform - Transaction Details");
+                cs.endText();
+
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
+                cs.beginText();
+                cs.newLineAtOffset(50, 772);
+                cs.showText("Range: " + response.from() + " to " + response.to());
+                cs.endText();
+
+                cs.beginText();
+                cs.newLineAtOffset(50, 756);
+                cs.showText(String.format("Type=%s | Search=%s | Sort=%s %s",
+                        response.typeFilter() == null || response.typeFilter().isBlank() ? "ALL" : response.typeFilter(),
+                        response.search() == null || response.search().isBlank() ? "-" : response.search(),
+                        response.sortField(),
+                        response.sortDirection()));
+                cs.endText();
+
+                float y = 732;
+                for (TradingDtos.TransactionDetailRow row : response.rows()) {
+                    if (y < 60) break;
+                    cs.beginText();
+                    cs.newLineAtOffset(50, y);
+                    cs.showText(String.format("%s | %s | %s | %s | amount=%s",
+                            row.occurredAt(), row.entryType(), row.partyName(), row.directionLabel(), row.amountBdt()));
+                    cs.endText();
+                    y -= 14;
                 }
             }
             doc.save(baos);

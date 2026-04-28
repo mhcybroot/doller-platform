@@ -172,6 +172,52 @@ class DollerRepository {
     );
   }
 
+  Future<BalanceSheetModel> balanceSheet({
+    required String mode,
+    DateTime? date,
+    int? month,
+    int? year,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    return _api.get<BalanceSheetModel>(
+      '/reports/balance-sheet',
+      query: {
+        'mode': mode,
+        if (date != null) 'date': _date(date),
+        if (month != null) 'month': month,
+        if (year != null) 'year': year,
+        if (from != null) 'from': _date(from),
+        if (to != null) 'to': _date(to),
+      },
+      parser: (json) => BalanceSheetModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<TransactionDetailsModel> transactionDetails({
+    required DateTime from,
+    required DateTime to,
+    String? type,
+    int? partyId,
+    String? search,
+    String? sortField,
+    String? sortDirection,
+  }) async {
+    return _api.get<TransactionDetailsModel>(
+      '/reports/transactions',
+      query: {
+        'from': _date(from),
+        'to': _date(to),
+        if (type != null && type.isNotEmpty) 'type': type,
+        if (partyId != null) 'partyId': partyId,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (sortField != null) 'sortField': sortField,
+        if (sortDirection != null) 'sortDirection': sortDirection,
+      },
+      parser: (json) => TransactionDetailsModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
   Future<DayClosePreviewModel> previewDayClose(DateTime date) async {
     return _api.get<DayClosePreviewModel>(
       '/day-close/${_date(date)}',
@@ -236,15 +282,66 @@ class DollerRepository {
     );
   }
 
-  Future<void> exportAndShare(String kind, DateTime from, DateTime to) async {
+  Future<void> exportAndShareBalanceSheet({
+    required String mode,
+    DateTime? date,
+    int? month,
+    int? year,
+    DateTime? from,
+    DateTime? to,
+  }) async {
     final bytes = await _api.download(
-      '/exports/$kind',
-      query: {'from': _date(from), 'to': _date(to)},
+      '/exports/pdf',
+      query: {
+        'reportType': 'BALANCE_SHEET',
+        'mode': mode,
+        if (date != null) 'date': _date(date),
+        if (month != null) 'month': month,
+        if (year != null) 'year': year,
+        if (from != null) 'from': _date(from),
+        if (to != null) 'to': _date(to),
+      },
     );
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/statement_${_date(from)}_${_date(to)}.$kind');
+    final file = File('${tempDir.path}/balance_sheet_${DateTime.now().millisecondsSinceEpoch}.pdf');
     await file.writeAsBytes(bytes);
     await Share.shareXFiles([XFile(file.path)]);
+  }
+
+  Future<void> exportAndShareTransactionDetails({
+    required DateTime from,
+    required DateTime to,
+    String? type,
+    int? partyId,
+    String? search,
+    String? sortField,
+    String? sortDirection,
+  }) async {
+    final bytes = await _api.download(
+      '/exports/pdf',
+      query: {
+        'reportType': 'TRANSACTION_DETAILS',
+        'from': _date(from),
+        'to': _date(to),
+        if (type != null && type.isNotEmpty) 'type': type,
+        if (partyId != null) 'partyId': partyId,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (sortField != null) 'sortField': sortField,
+        if (sortDirection != null) 'sortDirection': sortDirection,
+      },
+    );
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/transaction_details_${_date(from)}_${_date(to)}.pdf');
+    await file.writeAsBytes(bytes);
+    await Share.shareXFiles([XFile(file.path)]);
+  }
+
+  Future<void> exportAndShare(String kind, DateTime from, DateTime to) async {
+    await exportAndShareBalanceSheet(
+      mode: 'CUSTOM',
+      from: from,
+      to: to,
+    );
   }
 
   Future<Map<String, int>> queueStats() => _api.queueStats();

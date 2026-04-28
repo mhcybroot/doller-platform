@@ -45,9 +45,44 @@ public class TradingDtos {
     ) {}
     public record ExpenseCreateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
-    public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt) {}
+    public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal usdPosition, BigDecimal todayPnL, BigDecimal periodPnL) {}
     public record StatementLine(LocalDate date, BigDecimal openingCash, BigDecimal closingCash, BigDecimal openingUsd, BigDecimal closingUsd, BigDecimal pnl) {}
+    public record BalanceSheetResponse(
+            String mode,
+            LocalDate from,
+            LocalDate to,
+            BigDecimal openingCash,
+            BigDecimal closingCash,
+            BigDecimal openingUsd,
+            BigDecimal closingUsd,
+            BigDecimal totalPnl,
+            List<StatementLine> lines
+    ) {}
+    public record TransactionDetailRow(
+            String entryType,
+            Long entryId,
+            LocalDateTime occurredAt,
+            Long partyId,
+            String partyName,
+            BigDecimal amountBdt,
+            BigDecimal usdAmount,
+            BigDecimal bdtRate,
+            String directionLabel,
+            String referenceLabel,
+            String notes,
+            String category
+    ) {}
+    public record TransactionDetailsResponse(
+            LocalDate from,
+            LocalDate to,
+            String typeFilter,
+            Long partyId,
+            String search,
+            String sortField,
+            String sortDirection,
+            List<TransactionDetailRow> rows
+    ) {}
     public record PartyLedgerLine(String kind, LocalDateTime time, BigDecimal amount, String note) {}
     public record PartyLedgerResponse(Long partyId, String partyName, PartyBalanceSummary balances, List<PartyLedgerLine> lines) {}
     public record DayCloseResponse(LocalDate date, boolean locked, String auditRef, BigDecimal openingCash, BigDecimal closingCash, BigDecimal openingUsd, BigDecimal closingUsd, BigDecimal pnl) {}

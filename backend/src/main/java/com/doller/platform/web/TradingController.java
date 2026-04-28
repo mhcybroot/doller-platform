@@ -53,6 +53,31 @@ public class TradingController {
     @GetMapping("/statements/range")
     public List<TradingDtos.StatementLine> range(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) { return service.statementRange(from, to); }
 
+    @GetMapping("/reports/balance-sheet")
+    public TradingDtos.BalanceSheetResponse balanceSheet(
+            @RequestParam(value = "mode", required = false) String mode,
+            @RequestParam(value = "date", required = false) LocalDate date,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to
+    ) {
+        return service.balanceSheetReport(mode, date, month, year, from, to);
+    }
+
+    @GetMapping("/reports/transactions")
+    public TradingDtos.TransactionDetailsResponse transactionDetails(
+            @RequestParam("from") LocalDate from,
+            @RequestParam("to") LocalDate to,
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "partyId", required = false) Long partyId,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "sortField", required = false) String sortField,
+            @RequestParam(value = "sortDirection", required = false) String sortDirection
+    ) {
+        return service.transactionDetails(from, to, type, partyId, search, sortField, sortDirection);
+    }
+
     @GetMapping("/ledgers/party/{id}")
     public TradingDtos.PartyLedgerResponse ledger(@PathVariable("id") Long id) { return service.partyLedger(id); }
 

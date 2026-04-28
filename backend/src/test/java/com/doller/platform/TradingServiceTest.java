@@ -59,6 +59,26 @@ class TradingServiceTest {
     }
 
     @Test
+    void dayCloseTracksUsdQuantityNotBdtGross() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p = partyRepository.save(Party.builder().name("USD Party").build());
+        LocalDate businessDate = LocalDate.now().plusDays(31);
+        LocalDateTime stamp = businessDate.atTime(9, 0);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p.getId(), new BigDecimal("10"), new BigDecimal("120"),
+                stamp, "buy"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, p.getId(), new BigDecimal("5"), new BigDecimal("130"),
+                stamp.plusMinutes(30), "sell"
+        ));
+
+        var result = tradingService.confirmDayClose(businessDate);
+        assertEquals(0, result.closingUsd().compareTo(new BigDecimal("5.000000")));
+    }
+
+    @Test
     void incomingSettlementReducesReceivableAndCreatesAdvance() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party p = partyRepository.save(Party.builder().name("Customer A").build());
