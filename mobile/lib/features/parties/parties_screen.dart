@@ -169,12 +169,18 @@ class _PartiesScreenState extends State<PartiesScreen> {
                       children: [
                         BalancePill(
                           label: 'Receivable',
-                          value: formatBdt(ledger.balances.receivableBdt),
+                          value: _formatSignedAmount(
+                            ledger.balances.receivableBdt,
+                            positiveSign: '+',
+                          ),
                           tone: BalancePillTone.receivable,
                         ),
                         BalancePill(
                           label: 'Payable',
-                          value: formatBdt(ledger.balances.payableBdt),
+                          value: _formatSignedAmount(
+                            ledger.balances.payableBdt,
+                            positiveSign: '+',
+                          ),
                           tone: BalancePillTone.payable,
                         ),
                         BalancePill(
@@ -189,7 +195,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
                         ),
                         BalancePill(
                           label: 'Net Position',
-                          value: formatBdt(ledger.balances.netBalanceBdt.abs()),
+                          value: _formatSignedAmount(ledger.balances.netBalanceBdt),
                           tone: ledger.balances.netBalanceBdt >= 0
                               ? BalancePillTone.netPositive
                               : BalancePillTone.netNegative,
@@ -209,10 +215,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
                             subtitle: Text(
                                 '${formatDateTime(line.time)}  ${line.note ?? ''}'),
                             trailing: Text(
-                              formatBdt(line.amount),
+                              _formatSignedAmount(line.amount),
                               style: TextStyle(
                                 color: line.amount >= 0
-                                    ? Colors.black
+                                    ? Colors.green.shade700
                                     : Colors.red.shade700,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -295,5 +301,11 @@ class _PartiesScreenState extends State<PartiesScreen> {
           ),
       ],
     );
+  }
+
+  String _formatSignedAmount(double value, {String positiveSign = '+'}) {
+    if (value > 0) return '$positiveSign${formatBdt(value)}';
+    if (value < 0) return '-${formatBdt(value.abs())}';
+    return formatBdt(0);
   }
 }
