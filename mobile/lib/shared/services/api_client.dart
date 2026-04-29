@@ -21,7 +21,7 @@ class ApiClient {
   ApiClient(this._store)
       : _dio = Dio(
           BaseOptions(
-            baseUrl: 'http://10.0.2.2:8080',
+            baseUrl: 'http://76.13.221.43:8088',
             connectTimeout: const Duration(seconds: 20),
             receiveTimeout: const Duration(seconds: 20),
           ),

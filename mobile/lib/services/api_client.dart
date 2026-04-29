@@ -6,7 +6,7 @@ import 'auth_store.dart';
 import 'outbox_store.dart';
 
 class ApiClient {
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:8080'));
+  final Dio _dio = Dio(BaseOptions(baseUrl: 'http://76.13.221.43:8088'));
   final AuthStore _store;
   final OutboxStore _outbox = OutboxStore();
 

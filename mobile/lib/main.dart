@@ -18,7 +18,7 @@ class DollerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Doller Platform',
+      title: 'Exchange Platform',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
       home: const AppBootstrap(),

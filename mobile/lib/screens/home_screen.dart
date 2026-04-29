@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Doller Platform'),
+        title: const Text('Exchange Platform'),
         actions: [
           if (widget.session.isOwner)
             IconButton(
@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: 'Dashboard'),
           NavigationDestination(icon: Icon(Icons.candlestick_chart), label: 'Trading'),
-          NavigationDestination(icon: Icon(Icons.people_alt_outlined), label: 'Parties'),
+          NavigationDestination(icon: Icon(Icons.people_alt_outlined), label: 'Party'),
           NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'Reports'),
         ],
       ),
