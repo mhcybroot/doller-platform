@@ -42,7 +42,8 @@ class _StatementsScreenState extends State<StatementsScreen> {
           _BalanceSheetTab(
               repository: widget.repository, session: widget.session)
         else
-          _TransactionDetailsTab(repository: widget.repository),
+          _TransactionDetailsTab(
+              repository: widget.repository, session: widget.session),
       ],
     );
   }
@@ -546,9 +547,13 @@ Widget _reportPill(String label, String value, BalancePillTone tone) {
 }
 
 class _TransactionDetailsTab extends StatefulWidget {
-  const _TransactionDetailsTab({required this.repository});
+  const _TransactionDetailsTab({
+    required this.repository,
+    required this.session,
+  });
 
   final DollerRepository repository;
+  final AuthSession session;
 
   @override
   State<_TransactionDetailsTab> createState() => _TransactionDetailsTabState();
@@ -638,6 +643,425 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       if (!mounted) return;
       showAppMessage(context, error.message, isError: true);
     }
+  }
+
+  bool _canMutate(TransactionDetailRowModel row) {
+    return widget.session.isOwner &&
+        (row.entryType == 'DEAL' ||
+            row.entryType == 'SETTLEMENT' ||
+            row.entryType == 'EXPENSE');
+  }
+
+  Future<void> _deleteRow(TransactionDetailRowModel row) async {
+    if (row.entryType == 'OPENING_BALANCE') {
+      showAppMessage(context, 'Opening balance entries cannot be deleted.',
+          isError: true);
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Transaction'),
+        content: Text('Delete ${row.referenceLabel ?? row.entryType}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      if (row.entryType == 'DEAL') {
+        await widget.repository.deleteDeal(row.entryId);
+      } else if (row.entryType == 'SETTLEMENT') {
+        await widget.repository.deleteSettlement(row.entryId);
+      } else if (row.entryType == 'EXPENSE') {
+        await widget.repository.deleteExpense(row.entryId);
+      }
+      if (!mounted) return;
+      showAppMessage(context, 'Transaction deleted');
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      showAppMessage(context, error.message, isError: true);
+    }
+  }
+
+  Future<void> _editRow(TransactionDetailRowModel row) async {
+    if (row.entryType == 'OPENING_BALANCE') {
+      showAppMessage(context, 'Opening balance entries are not editable.',
+          isError: true);
+      return;
+    }
+    if (row.entryType == 'DEAL') {
+      await _editDeal(row);
+      return;
+    }
+    if (row.entryType == 'SETTLEMENT') {
+      await _editSettlement(row);
+      return;
+    }
+    if (row.entryType == 'EXPENSE') {
+      await _editExpense(row);
+    }
+  }
+
+  Future<void> _editDeal(TransactionDetailRowModel row) async {
+    if (row.partyId == null ||
+        row.instrumentCode == null ||
+        row.quantity == null ||
+        row.bdtRate == null ||
+        row.directionLabel == null) {
+      showAppMessage(context, 'This deal row is missing required data.',
+          isError: true);
+      return;
+    }
+    final qty = TextEditingController(text: row.quantity!.toString());
+    final rate = TextEditingController(text: row.bdtRate!.toString());
+    final notes = TextEditingController(text: row.notes ?? '');
+    int selectedPartyId = row.partyId!;
+    String selectedInstrument = row.instrumentCode!;
+    String dealType = row.directionLabel!.toUpperCase().contains('SELL')
+        ? 'SELL'
+        : 'BUY';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              24,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Edit Deal', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: dealType,
+                  items: const [
+                    DropdownMenuItem(value: 'BUY', child: Text('BUY')),
+                    DropdownMenuItem(value: 'SELL', child: Text('SELL')),
+                  ],
+                  onChanged: (value) =>
+                      setModalState(() => dealType = value ?? 'BUY'),
+                  decoration: const InputDecoration(labelText: 'Deal Type'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: selectedPartyId,
+                  isExpanded: true,
+                  items: _parties
+                      .map((party) => DropdownMenuItem<int>(
+                            value: party.id,
+                            child: Text(party.name),
+                          ))
+                      .toList(),
+                  onChanged: (value) => setModalState(
+                      () => selectedPartyId = value ?? selectedPartyId),
+                  decoration: const InputDecoration(labelText: 'Party'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedInstrument,
+                  items: supportedInstrumentCodes
+                      .map((code) => DropdownMenuItem<String>(
+                            value: code,
+                            child: Text(instrumentDisplayName(code)),
+                          ))
+                      .toList(),
+                  onChanged: (value) => setModalState(
+                      () => selectedInstrument = value ?? selectedInstrument),
+                  decoration: const InputDecoration(labelText: 'Instrument'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: qty,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Quantity')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: rate,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Rate')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: notes,
+                    decoration: const InputDecoration(labelText: 'Notes')),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await widget.repository.updateDeal(
+                        id: row.entryId,
+                        dealType: dealType,
+                        partyId: selectedPartyId,
+                        instrumentCode: selectedInstrument,
+                        quantity: double.parse(qty.text),
+                        bdtRate: double.parse(rate.text),
+                        dealTime: row.occurredAt,
+                        notes: notes.text.trim(),
+                      );
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    } on ApiException catch (error) {
+                      showAppMessage(context, error.message, isError: true);
+                    } on FormatException {
+                      showAppMessage(context, 'Enter valid numbers',
+                          isError: true);
+                    }
+                  },
+                  child: const Text('Update Deal'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    await _load();
+  }
+
+  Future<void> _editSettlement(TransactionDetailRowModel row) async {
+    if (row.partyId == null) {
+      showAppMessage(context, 'This settlement row is missing party data.',
+          isError: true);
+      return;
+    }
+    final amount = TextEditingController(text: row.amountBdt.toString());
+    final paymentRef = TextEditingController(text: row.paymentReference ?? '');
+    final notes = TextEditingController(text: row.notes ?? '');
+    bool allowAdvance = row.directionLabel?.contains(' / NONE') ?? false;
+    int selectedPartyId = row.partyId!;
+    int? selectedDealId = row.tradeDealId;
+    List<DealSummary> partyDeals = const [];
+    try {
+      partyDeals = await widget.repository.listDeals(partyId: selectedPartyId);
+    } on ApiException {}
+    String paymentMethod = (row.paymentMethod ?? 'CASH').toUpperCase();
+    if (paymentMethod != 'BANK' &&
+        paymentMethod != 'CHECK' &&
+        paymentMethod != 'CASH') {
+      paymentMethod = 'CASH';
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              24,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Edit Settlement',
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: amount,
+                    keyboardType: TextInputType.number,
+                    decoration:
+                        const InputDecoration(labelText: 'Amount (BDT)')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: selectedPartyId,
+                  isExpanded: true,
+                  items: _parties
+                      .map((party) => DropdownMenuItem<int>(
+                            value: party.id,
+                            child: Text(party.name),
+                          ))
+                      .toList(),
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    final deals =
+                        await widget.repository.listDeals(partyId: value);
+                    setModalState(() {
+                      selectedPartyId = value;
+                      partyDeals = deals;
+                      selectedDealId = null;
+                    });
+                  },
+                  decoration: const InputDecoration(labelText: 'Party'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int?>(
+                  value: selectedDealId,
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<int?>(
+                        value: null, child: Text('No Related Deal')),
+                    ...partyDeals.map(
+                      (deal) => DropdownMenuItem<int?>(
+                        value: deal.id,
+                        child: Text(
+                            'Deal #${deal.id} • ${deal.dealType}'),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setModalState(() => selectedDealId = value),
+                  decoration:
+                      const InputDecoration(labelText: 'Related Deal'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: paymentMethod,
+                  items: const [
+                    DropdownMenuItem(value: 'CASH', child: Text('CASH')),
+                    DropdownMenuItem(value: 'BANK', child: Text('BANK')),
+                    DropdownMenuItem(value: 'CHECK', child: Text('CHEQUE')),
+                  ],
+                  onChanged: (value) =>
+                      setModalState(() => paymentMethod = value ?? 'CASH'),
+                  decoration: const InputDecoration(labelText: 'Payment Method'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: paymentRef,
+                    decoration:
+                        const InputDecoration(labelText: 'Payment Reference')),
+                const SizedBox(height: 12),
+                TextField(
+                    controller: notes,
+                    decoration: const InputDecoration(labelText: 'Notes')),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: allowAdvance,
+                  onChanged: (value) =>
+                      setModalState(() => allowAdvance = value),
+                  title: const Text('Allow Advance'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await widget.repository.updateSettlement(
+                        id: row.entryId,
+                        partyId: selectedPartyId,
+                        tradeDealId: selectedDealId,
+                        amount: double.parse(amount.text),
+                        paymentMethod: paymentMethod,
+                        paymentReference: paymentRef.text.trim().isEmpty
+                            ? null
+                            : paymentRef.text.trim(),
+                        allowAdvance: allowAdvance,
+                        notes: notes.text.trim(),
+                        settlementTime: row.occurredAt,
+                      );
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    } on ApiException catch (error) {
+                      showAppMessage(context, error.message, isError: true);
+                    } on FormatException {
+                      showAppMessage(context, 'Enter valid numbers',
+                          isError: true);
+                    }
+                  },
+                  child: const Text('Update Settlement'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    await _load();
+  }
+
+  Future<void> _editExpense(TransactionDetailRowModel row) async {
+    final amount = TextEditingController(text: row.amountBdt.toString());
+    final category = TextEditingController(text: row.category ?? 'OTHER');
+    final notes = TextEditingController(text: row.notes ?? '');
+    String expenseType = row.expenseType ?? 'OTHER';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          24,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Edit Expense', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            TextField(
+                controller: amount,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Amount (BDT)')),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: expenseType,
+              items: const [
+                DropdownMenuItem(
+                    value: 'OFFICE_MANAGEMENT',
+                    child: Text('OFFICE MANAGEMENT')),
+                DropdownMenuItem(value: 'TRANSPORT', child: Text('TRANSPORT')),
+                DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+                DropdownMenuItem(value: 'RENT', child: Text('RENT')),
+                DropdownMenuItem(
+                    value: 'EMPLOYEE_SALARY', child: Text('EMPLOYEE SALARY')),
+                DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
+              ],
+              onChanged: (value) =>
+                  setModalState(() => expenseType = value ?? expenseType),
+              decoration: const InputDecoration(labelText: 'Expense Type'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+                controller: category,
+                decoration: const InputDecoration(labelText: 'Category')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: notes,
+                decoration: const InputDecoration(labelText: 'Notes')),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await widget.repository.updateExpense(
+                    id: row.entryId,
+                    expenseType: expenseType,
+                    amount: double.parse(amount.text),
+                    category: category.text.trim(),
+                    notes: notes.text.trim(),
+                    expenseTime: row.occurredAt,
+                  );
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                } on ApiException catch (error) {
+                  showAppMessage(context, error.message, isError: true);
+                } on FormatException {
+                  showAppMessage(context, 'Enter valid numbers', isError: true);
+                }
+              },
+              child: const Text('Update Expense'),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
+    await _load();
   }
 
   @override
@@ -822,6 +1246,39 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                             : AppTheme.ink,
                                       ),
                                 ),
+                                if (widget.session.isOwner)
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) async {
+                                      if (value == 'edit') {
+                                        await _editRow(row);
+                                        return;
+                                      }
+                                      if (value == 'delete') {
+                                        await _deleteRow(row);
+                                      }
+                                    },
+                                    itemBuilder: (context) {
+                                      if (_canMutate(row)) {
+                                        return const [
+                                          PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('Edit')),
+                                          PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text('Delete')),
+                                        ];
+                                      }
+                                      return const [
+                                        PopupMenuItem(
+                                            value: 'edit',
+                                            child: Text('Edit not available')),
+                                        PopupMenuItem(
+                                            value: 'delete',
+                                            child:
+                                                Text('Delete not available')),
+                                      ];
+                                    },
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 6),

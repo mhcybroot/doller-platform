@@ -569,6 +569,7 @@ class TransactionDetailRowModel {
   final DateTime occurredAt;
   final int? partyId;
   final String? partyName;
+  final int? tradeDealId;
   final String? instrumentCode;
   final double? quantity;
   final double amountBdt;
@@ -578,6 +579,7 @@ class TransactionDetailRowModel {
   final String? paymentMethod;
   final String? paymentReference;
   final String? notes;
+  final String? expenseType;
   final String? category;
 
   const TransactionDetailRowModel({
@@ -586,6 +588,7 @@ class TransactionDetailRowModel {
     required this.occurredAt,
     required this.partyId,
     required this.partyName,
+    required this.tradeDealId,
     required this.instrumentCode,
     required this.quantity,
     required this.amountBdt,
@@ -595,6 +598,7 @@ class TransactionDetailRowModel {
     required this.paymentMethod,
     required this.paymentReference,
     required this.notes,
+    required this.expenseType,
     required this.category,
   });
 
@@ -605,6 +609,7 @@ class TransactionDetailRowModel {
       occurredAt: DateTime.parse(json["occurredAt"] as String),
       partyId: (json["partyId"] as num?)?.toInt(),
       partyName: json["partyName"] as String?,
+      tradeDealId: (json["tradeDealId"] as num?)?.toInt(),
       instrumentCode: json["instrumentCode"] as String?,
       quantity: (json["quantity"] as num?)?.toDouble(),
       amountBdt: (json["amountBdt"] as num).toDouble(),
@@ -614,6 +619,7 @@ class TransactionDetailRowModel {
       paymentMethod: json["paymentMethod"] as String?,
       paymentReference: json["paymentReference"] as String?,
       notes: json["notes"] as String?,
+      expenseType: json["expenseType"] as String?,
       category: json["category"] as String?,
     );
   }

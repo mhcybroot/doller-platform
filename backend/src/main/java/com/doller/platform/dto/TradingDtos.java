@@ -172,6 +172,7 @@ public class TradingDtos {
             LocalDateTime occurredAt,
             Long partyId,
             String partyName,
+            Long tradeDealId,
             String instrumentCode,
             BigDecimal quantity,
             BigDecimal amountBdt,
@@ -181,6 +182,7 @@ public class TradingDtos {
             String paymentMethod,
             String paymentReference,
             String notes,
+            String expenseType,
             String category
     ) {}
     public record TransactionDetailsResponse(

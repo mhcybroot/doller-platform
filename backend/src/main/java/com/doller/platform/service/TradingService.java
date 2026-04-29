@@ -517,6 +517,7 @@ public class TradingService {
                         deal.getDealTime(),
                         deal.getParty().getId(),
                         deal.getParty().getName(),
+                        deal.getId(),
                         deal.getInstrumentCode().name(),
                         deal.getQuantity(),
                         deal.getBdtGross(),
@@ -526,6 +527,7 @@ public class TradingService {
                         null,
                         null,
                         deal.getNotes(),
+                        null,
                         null
                 ))
                 .forEach(rows::add);
@@ -539,6 +541,7 @@ public class TradingService {
                         settlement.getSettlementTime(),
                         settlement.getParty().getId(),
                         settlement.getParty().getName(),
+                        settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getId(),
                         settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getInstrumentCode().name(),
                         settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getQuantity(),
                         settlement.getBdtAmount(),
@@ -548,6 +551,7 @@ public class TradingService {
                         settlement.getPaymentMethod() == null ? null : settlement.getPaymentMethod().name(),
                         settlement.getPaymentReference(),
                         settlement.getNotes(),
+                        null,
                         null
                 ))
                 .forEach(rows::add);
@@ -561,6 +565,7 @@ public class TradingService {
                         expense.getExpenseTime(),
                         expensePartyId(expense),
                         expensePartyName(expense),
+                        expense.getTradeDeal() == null ? null : expense.getTradeDeal().getId(),
                         expense.getTradeDeal() == null ? null : expense.getTradeDeal().getInstrumentCode().name(),
                         expense.getTradeDeal() == null ? null : expense.getTradeDeal().getQuantity(),
                         expense.getAmountBdt(),
@@ -570,6 +575,7 @@ public class TradingService {
                         null,
                         null,
                         expense.getNotes(),
+                        expense.getExpenseType().name(),
                         expense.getCategory()
                 ))
                 .forEach(rows::add);
@@ -588,6 +594,7 @@ public class TradingService {
                             party == null ? null : party.getName(),
                             null,
                             null,
+                            null,
                             entry.getDebit().subtract(entry.getCredit()).abs(),
                             null,
                             entry.getAccountCode().startsWith("RECEIVABLE_") ? "OPENING RECEIVABLE" : "OPENING PAYABLE",
@@ -595,6 +602,7 @@ public class TradingService {
                             null,
                             null,
                             entry.getNarration(),
+                            null,
                             null
                     );
                 })
