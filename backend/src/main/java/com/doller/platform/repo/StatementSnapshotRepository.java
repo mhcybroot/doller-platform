@@ -9,5 +9,6 @@ import java.util.Optional;
 
 public interface StatementSnapshotRepository extends JpaRepository<StatementSnapshot, Long> {
     Optional<StatementSnapshot> findByBusinessDate(LocalDate date);
+    Optional<StatementSnapshot> findTopByBusinessDateLessThanEqualOrderByBusinessDateDesc(LocalDate date);
     List<StatementSnapshot> findByBusinessDateBetweenOrderByBusinessDateAsc(LocalDate from, LocalDate to);
 }

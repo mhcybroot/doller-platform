@@ -174,6 +174,12 @@ public class TradingDtos {
             BigDecimal closingCash,
             BigDecimal openingUsd,
             BigDecimal closingUsd,
+            BigDecimal settlementCashNetBdt,
+            BigDecimal settlementBankNetBdt,
+            BigDecimal settlementCheckNetBdt,
+            BigDecimal closingCashMethodBdt,
+            BigDecimal closingBankMethodBdt,
+            BigDecimal closingCheckMethodBdt,
             BigDecimal openingReceivableBdt,
             BigDecimal closingReceivableBdt,
             BigDecimal openingPayableBdt,
@@ -185,7 +191,13 @@ public class TradingDtos {
             BigDecimal openingAgingBdt,
             BigDecimal closingAgingBdt,
             BigDecimal totalPnl,
+            List<InstrumentBalanceRow> instrumentBalances,
             List<StatementLine> lines
+    ) {}
+    public record InstrumentBalanceRow(
+            String instrumentCode,
+            BigDecimal openingQty,
+            BigDecimal closingQty
     ) {}
     public record TransactionDetailRow(
             String entryType,

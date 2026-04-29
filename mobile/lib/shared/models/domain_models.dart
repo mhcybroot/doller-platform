@@ -534,6 +534,12 @@ class BalanceSheetModel {
   final double closingCash;
   final double openingUsd;
   final double closingUsd;
+  final double settlementCashNetBdt;
+  final double settlementBankNetBdt;
+  final double settlementCheckNetBdt;
+  final double closingCashMethodBdt;
+  final double closingBankMethodBdt;
+  final double closingCheckMethodBdt;
   final double openingReceivableBdt;
   final double closingReceivableBdt;
   final double openingPayableBdt;
@@ -545,6 +551,7 @@ class BalanceSheetModel {
   final double openingAgingBdt;
   final double closingAgingBdt;
   final double totalPnl;
+  final List<InstrumentBalanceRowModel> instrumentBalances;
   final List<StatementLineModel> lines;
 
   const BalanceSheetModel({
@@ -555,6 +562,12 @@ class BalanceSheetModel {
     required this.closingCash,
     required this.openingUsd,
     required this.closingUsd,
+    required this.settlementCashNetBdt,
+    required this.settlementBankNetBdt,
+    required this.settlementCheckNetBdt,
+    required this.closingCashMethodBdt,
+    required this.closingBankMethodBdt,
+    required this.closingCheckMethodBdt,
     required this.openingReceivableBdt,
     required this.closingReceivableBdt,
     required this.openingPayableBdt,
@@ -566,6 +579,7 @@ class BalanceSheetModel {
     required this.openingAgingBdt,
     required this.closingAgingBdt,
     required this.totalPnl,
+    required this.instrumentBalances,
     required this.lines,
   });
 
@@ -578,6 +592,18 @@ class BalanceSheetModel {
       closingCash: (json["closingCash"] as num).toDouble(),
       openingUsd: (json["openingUsd"] as num).toDouble(),
       closingUsd: (json["closingUsd"] as num).toDouble(),
+      settlementCashNetBdt:
+          (json["settlementCashNetBdt"] as num? ?? 0).toDouble(),
+      settlementBankNetBdt:
+          (json["settlementBankNetBdt"] as num? ?? 0).toDouble(),
+      settlementCheckNetBdt:
+          (json["settlementCheckNetBdt"] as num? ?? 0).toDouble(),
+      closingCashMethodBdt:
+          (json["closingCashMethodBdt"] as num? ?? 0).toDouble(),
+      closingBankMethodBdt:
+          (json["closingBankMethodBdt"] as num? ?? 0).toDouble(),
+      closingCheckMethodBdt:
+          (json["closingCheckMethodBdt"] as num? ?? 0).toDouble(),
       openingReceivableBdt:
           (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
       closingReceivableBdt:
@@ -595,10 +621,35 @@ class BalanceSheetModel {
       openingAgingBdt: (json["openingAgingBdt"] as num? ?? 0).toDouble(),
       closingAgingBdt: (json["closingAgingBdt"] as num? ?? 0).toDouble(),
       totalPnl: (json["totalPnl"] as num).toDouble(),
+      instrumentBalances: (json["instrumentBalances"] as List<dynamic>? ??
+              const [])
+          .map((item) =>
+              InstrumentBalanceRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
       lines: (json["lines"] as List<dynamic>)
           .map((item) =>
               StatementLineModel.fromJson(item as Map<String, dynamic>))
           .toList(),
+    );
+  }
+}
+
+class InstrumentBalanceRowModel {
+  final String instrumentCode;
+  final double openingQty;
+  final double closingQty;
+
+  const InstrumentBalanceRowModel({
+    required this.instrumentCode,
+    required this.openingQty,
+    required this.closingQty,
+  });
+
+  factory InstrumentBalanceRowModel.fromJson(Map<String, dynamic> json) {
+    return InstrumentBalanceRowModel(
+      instrumentCode: json["instrumentCode"] as String? ?? 'USD',
+      openingQty: (json["openingQty"] as num? ?? 0).toDouble(),
+      closingQty: (json["closingQty"] as num? ?? 0).toDouble(),
     );
   }
 }

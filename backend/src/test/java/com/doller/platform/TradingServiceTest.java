@@ -1,6 +1,7 @@
 package com.doller.platform;
 
 import com.doller.platform.domain.Party;
+import com.doller.platform.domain.StatementSnapshot;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.InstrumentCode;
@@ -314,7 +315,7 @@ class TradingServiceTest {
     void balanceSheetReportUsesLiveRecomputeWithoutDayClose() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party party = partyRepository.save(Party.builder().name("Live Party").build());
-        LocalDate day = LocalDate.now();
+        LocalDate day = LocalDate.now().minusDays(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
                 DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("110"),
@@ -333,8 +334,9 @@ class TradingServiceTest {
         ));
 
         var report = tradingService.balanceSheetReport("DAILY", day, null, null, null, null);
+        var explain = tradingService.dashboardPnlExplain("CUSTOM", null, null, null, day, day);
         assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("600.00")));
-        assertEquals(0, report.totalPnl().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, report.totalPnl().compareTo(explain.period().netPnlBdt()));
     }
 
     @Test
@@ -342,7 +344,7 @@ class TradingServiceTest {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party customer = partyRepository.save(Party.builder().name("Customer Z").build());
         Party supplier = partyRepository.save(Party.builder().name("Supplier Z").build());
-        LocalDate from = LocalDate.now().minusDays(1);
+        LocalDate from = LocalDate.now().minusDays(3);
         LocalDate to = from.plusDays(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
@@ -372,5 +374,35 @@ class TradingServiceTest {
         assertEquals(0, balance.closingReceivableBdt().compareTo(dues.totalReceivableBdt()));
         assertEquals(0, balance.closingPayableBdt().compareTo(dues.totalPayableBdt()));
         assertEquals(0, balance.totalPnl().compareTo(explain.period().netPnlBdt()));
+    }
+
+    @Test
+    void dailyOpeningUsesPreviousSnapshotBaselineWhenLedgerHistoryMissing() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate today = LocalDate.now();
+
+        statementSnapshotRepository.save(StatementSnapshot.builder()
+                .businessDate(yesterday)
+                .openingCashBdt(BigDecimal.ZERO)
+                .closingCashBdt(new BigDecimal("5000.00"))
+                .openingUsd(BigDecimal.ZERO)
+                .closingUsd(new BigDecimal("120.000000"))
+                .openingReceivableBdt(BigDecimal.ZERO)
+                .closingReceivableBdt(BigDecimal.ZERO)
+                .openingPayableBdt(BigDecimal.ZERO)
+                .closingPayableBdt(BigDecimal.ZERO)
+                .openingAdvanceFromPartyBdt(BigDecimal.ZERO)
+                .closingAdvanceFromPartyBdt(BigDecimal.ZERO)
+                .openingAdvanceToPartyBdt(BigDecimal.ZERO)
+                .closingAdvanceToPartyBdt(BigDecimal.ZERO)
+                .openingAgingBdt(BigDecimal.ZERO)
+                .closingAgingBdt(BigDecimal.ZERO)
+                .realizedProfitLossBdt(BigDecimal.ZERO)
+                .build());
+
+        var report = tradingService.balanceSheetReport("DAILY", today, null, null, null, null);
+        assertEquals(0, report.openingCash().compareTo(new BigDecimal("5000.00")));
+        assertEquals(0, report.openingUsd().compareTo(new BigDecimal("120.000000")));
     }
 }

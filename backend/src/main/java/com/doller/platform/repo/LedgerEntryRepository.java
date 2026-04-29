@@ -11,6 +11,10 @@ import java.util.List;
 
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> {
     List<LedgerEntry> findByEntryTimeBetween(LocalDateTime from, LocalDateTime to);
+    List<LedgerEntry> findByAccountCodeAndEntryTimeLessThanEqual(String accountCode, LocalDateTime to);
+    List<LedgerEntry> findByAccountCodeAndEntryTimeBetween(String accountCode, LocalDateTime from, LocalDateTime to);
+    List<LedgerEntry> findByAccountCodeStartingWithAndEntryTimeLessThanEqual(String prefix, LocalDateTime to);
+    List<LedgerEntry> findByAccountCodeStartingWithAndEntryTimeBetween(String prefix, LocalDateTime from, LocalDateTime to);
     List<LedgerEntry> findByReferenceTypeAndEntryTimeBetween(String referenceType, LocalDateTime from, LocalDateTime to);
     List<LedgerEntry> findByReferenceTypeAndReferenceId(String referenceType, Long referenceId);
 

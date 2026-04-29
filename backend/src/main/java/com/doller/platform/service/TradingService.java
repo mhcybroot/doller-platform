@@ -6,6 +6,7 @@ import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.ExpenseType;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
+import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.*;
 import jakarta.transaction.Transactional;
@@ -468,6 +469,9 @@ public class TradingService {
         BigDecimal openingAging = bdt(first.openingAgingBdt());
         BigDecimal closingAging = bdt(last.closingAgingBdt());
         BigDecimal totalPnl = bdt(pnlMetrics(range[0], range[1]).netPnlBdt());
+        Map<SettlementPaymentMethod, BigDecimal> paymentNet = settlementPaymentNet(range[0], range[1]);
+        Map<SettlementPaymentMethod, BigDecimal> paymentClosing = settlementPaymentClosing(range[1]);
+        List<TradingDtos.InstrumentBalanceRow> instrumentBalances = instrumentBalances(range[0], range[1]);
         return new TradingDtos.BalanceSheetResponse(
                 normalizeMode(mode),
                 range[0],
@@ -476,6 +480,12 @@ public class TradingService {
                 closingCash,
                 openingUsd,
                 closingUsd,
+                bdt(paymentNet.getOrDefault(SettlementPaymentMethod.CASH, BigDecimal.ZERO)),
+                bdt(paymentNet.getOrDefault(SettlementPaymentMethod.BANK, BigDecimal.ZERO)),
+                bdt(paymentNet.getOrDefault(SettlementPaymentMethod.CHECK, BigDecimal.ZERO)),
+                bdt(paymentClosing.getOrDefault(SettlementPaymentMethod.CASH, BigDecimal.ZERO)),
+                bdt(paymentClosing.getOrDefault(SettlementPaymentMethod.BANK, BigDecimal.ZERO)),
+                bdt(paymentClosing.getOrDefault(SettlementPaymentMethod.CHECK, BigDecimal.ZERO)),
                 openingReceivable,
                 closingReceivable,
                 openingPayable,
@@ -487,6 +497,7 @@ public class TradingService {
                 openingAging,
                 closingAging,
                 totalPnl,
+                instrumentBalances,
                 lines
         );
     }
@@ -704,10 +715,10 @@ public class TradingService {
         LocalDateTime cutoff = asOfDate == null
                 ? LocalDateTime.now()
                 : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        BigDecimal receivable = ledgerRepo.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff).max(BigDecimal.ZERO);
-        BigDecimal payable = ledgerRepo.netForAccountUntil("PAYABLE_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
-        BigDecimal advanceFromParty = ledgerRepo.netForAccountUntil("ADVANCE_FROM_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
-        BigDecimal advanceToParty = ledgerRepo.netForAccountUntil("ADVANCE_TO_" + party.getId(), cutoff).max(BigDecimal.ZERO);
+        BigDecimal receivable = netForAccountUntilActive("RECEIVABLE_" + party.getId(), cutoff).max(BigDecimal.ZERO);
+        BigDecimal payable = netForAccountUntilActive("PAYABLE_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
+        BigDecimal advanceFromParty = netForAccountUntilActive("ADVANCE_FROM_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
+        BigDecimal advanceToParty = netForAccountUntilActive("ADVANCE_TO_" + party.getId(), cutoff).max(BigDecimal.ZERO);
         BigDecimal aging = computeAgingDue(party, asOfDate == null ? LocalDate.now() : asOfDate);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging);
@@ -938,12 +949,34 @@ public class TradingService {
 
     private BigDecimal cashAt(LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        return ledgerRepo.netForAccountUntil("CASH", cutoff);
+        Optional<StatementSnapshot> baseline = snapshotRepo
+                .findTopByBusinessDateLessThanEqualOrderByBusinessDateDesc(asOfDate);
+        if (baseline.isEmpty()) {
+            return netForAccountUntilActive("CASH", cutoff);
+        }
+        StatementSnapshot snapshot = baseline.get();
+        LocalDateTime deltaFrom = snapshot.getBusinessDate().plusDays(1).atStartOfDay();
+        if (deltaFrom.isAfter(cutoff)) {
+            return snapshot.getClosingCashBdt();
+        }
+        BigDecimal delta = netForAccountBetweenActive("CASH", deltaFrom, cutoff);
+        return snapshot.getClosingCashBdt().add(delta);
     }
 
     private BigDecimal usdAt(LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        return ledgerRepo.netForAccountPrefixUntil("FX_INVENTORY_", cutoff);
+        Optional<StatementSnapshot> baseline = snapshotRepo
+                .findTopByBusinessDateLessThanEqualOrderByBusinessDateDesc(asOfDate);
+        if (baseline.isEmpty()) {
+            return netForPrefixUntilActive("FX_INVENTORY_", cutoff);
+        }
+        StatementSnapshot snapshot = baseline.get();
+        LocalDateTime deltaFrom = snapshot.getBusinessDate().plusDays(1).atStartOfDay();
+        if (deltaFrom.isAfter(cutoff)) {
+            return snapshot.getClosingUsd();
+        }
+        BigDecimal delta = netForPrefixBetweenActive("FX_INVENTORY_", deltaFrom, cutoff);
+        return snapshot.getClosingUsd().add(delta);
     }
 
     private BalancePosition closingPositionFromSnapshot(StatementSnapshot snapshot) {
@@ -1461,6 +1494,106 @@ public class TradingService {
 
     private BigDecimal bdt(BigDecimal value) {
         return value.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private Map<SettlementPaymentMethod, BigDecimal> settlementPaymentNet(LocalDate from, LocalDate to) {
+        LocalDateTime[] range = dayRange(from, to);
+        Map<SettlementPaymentMethod, BigDecimal> map = new EnumMap<>(SettlementPaymentMethod.class);
+        for (Settlement settlement : settlementRepo.findBySettlementTimeBetweenAndDeletedFalse(range[0], range[1])) {
+            BigDecimal signed = settlement.getDirection() == SettlementDirection.INCOMING
+                    ? settlement.getBdtAmount()
+                    : settlement.getBdtAmount().negate();
+            map.merge(settlement.getPaymentMethod(), signed, BigDecimal::add);
+        }
+        return map;
+    }
+
+    private Map<SettlementPaymentMethod, BigDecimal> settlementPaymentClosing(LocalDate asOfDate) {
+        Map<SettlementPaymentMethod, BigDecimal> map = new EnumMap<>(SettlementPaymentMethod.class);
+        LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
+        map.put(SettlementPaymentMethod.CASH, netForAccountUntilActive("CASH", cutoff));
+        map.put(SettlementPaymentMethod.BANK, netForAccountUntilActive("BANK", cutoff));
+        map.put(SettlementPaymentMethod.CHECK, netForAccountUntilActive("CHEQUE", cutoff));
+        return map;
+    }
+
+    private List<TradingDtos.InstrumentBalanceRow> instrumentBalances(LocalDate from, LocalDate to) {
+        Map<String, BigDecimal> opening = instrumentQtyAt(from.minusDays(1));
+        Map<String, BigDecimal> closing = instrumentQtyAt(to);
+        Set<String> codes = new TreeSet<>();
+        codes.addAll(opening.keySet());
+        codes.addAll(closing.keySet());
+        List<TradingDtos.InstrumentBalanceRow> rows = new ArrayList<>();
+        for (String code : codes) {
+            BigDecimal openingQty = opening.getOrDefault(code, BigDecimal.ZERO);
+            BigDecimal closingQty = closing.getOrDefault(code, BigDecimal.ZERO);
+            if (openingQty.compareTo(BigDecimal.ZERO) == 0 && closingQty.compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+            rows.add(new TradingDtos.InstrumentBalanceRow(code, openingQty, closingQty));
+        }
+        return rows;
+    }
+
+    private Map<String, BigDecimal> instrumentQtyAt(LocalDate asOfDate) {
+        Map<String, BigDecimal> qtyByCode = new HashMap<>();
+        for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
+            if (deal.getDealTime().toLocalDate().isAfter(asOfDate)) {
+                continue;
+            }
+            String code = deal.getInstrumentCode().name();
+            BigDecimal signedQty = deal.getDealType() == DealType.BUY
+                    ? deal.getQuantity()
+                    : deal.getQuantity().negate();
+            qtyByCode.merge(code, signedQty, BigDecimal::add);
+        }
+        return qtyByCode;
+    }
+
+    private BigDecimal netForAccountUntilActive(String accountCode, LocalDateTime cutoff) {
+        return ledgerRepo.findByAccountCodeAndEntryTimeLessThanEqual(accountCode, cutoff).stream()
+                .filter(this::isActiveLedgerReference)
+                .map(entry -> entry.getDebit().subtract(entry.getCredit()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal netForAccountBetweenActive(String accountCode, LocalDateTime from, LocalDateTime to) {
+        return ledgerRepo.findByAccountCodeAndEntryTimeBetween(accountCode, from, to).stream()
+                .filter(this::isActiveLedgerReference)
+                .map(entry -> entry.getDebit().subtract(entry.getCredit()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal netForPrefixUntilActive(String prefix, LocalDateTime cutoff) {
+        return ledgerRepo.findByAccountCodeStartingWithAndEntryTimeLessThanEqual(prefix, cutoff).stream()
+                .filter(this::isActiveLedgerReference)
+                .map(entry -> entry.getDebit().subtract(entry.getCredit()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal netForPrefixBetweenActive(String prefix, LocalDateTime from, LocalDateTime to) {
+        return ledgerRepo.findByAccountCodeStartingWithAndEntryTimeBetween(prefix, from, to).stream()
+                .filter(this::isActiveLedgerReference)
+                .map(entry -> entry.getDebit().subtract(entry.getCredit()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private boolean isActiveLedgerReference(LedgerEntry entry) {
+        String referenceType = entry.getReferenceType();
+        Long referenceId = entry.getReferenceId();
+        if ("DEAL".equals(referenceType) || "DEAL_REVERSAL".equals(referenceType)) {
+            return dealRepo.findByIdAndDeletedFalse(referenceId).isPresent();
+        }
+        if ("SETTLEMENT".equals(referenceType) || "SETTLEMENT_REVERSAL".equals(referenceType)) {
+            return settlementRepo.findByIdAndDeletedFalse(referenceId).isPresent();
+        }
+        if ("EXPENSE".equals(referenceType) || "EXPENSE_REVERSAL".equals(referenceType)) {
+            return expenseRepo.findByIdAndDeletedFalse(referenceId).isPresent();
+        }
+        if ("OPENING_BALANCE".equals(referenceType)) {
+            return partyRepo.findByIdAndDeletedFalse(referenceId).isPresent();
+        }
+        return true;
     }
 
     private record PnlMetrics(

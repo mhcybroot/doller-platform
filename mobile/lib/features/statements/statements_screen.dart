@@ -277,16 +277,53 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _summaryPill('Opening Cash', formatBdt(report.openingCash),
+                  _summaryPill('Opening Balance', formatBdt(report.openingCash),
                       BalancePillTone.neutral),
-                  _summaryPill('Closing Cash', formatBdt(report.closingCash),
-                      BalancePillTone.neutral),
-                  _summaryPill('Opening USD', formatUsd(report.openingUsd),
-                      BalancePillTone.neutral),
-                  _summaryPill('Closing USD', formatUsd(report.closingUsd),
+                  _summaryPill('Closing Balance', formatBdt(report.closingCash),
                       BalancePillTone.neutral),
                 ],
               ),
+              const SizedBox(height: 12),
+              Text('Closing Balance By Account',
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _summaryPill(
+                      'Cash Closing',
+                      formatBdt(report.closingCashMethodBdt),
+                      BalancePillTone.neutral),
+                  _summaryPill(
+                      'Bank Closing',
+                      formatBdt(report.closingBankMethodBdt),
+                      BalancePillTone.neutral),
+                  _summaryPill(
+                      'Cheque Closing',
+                      formatBdt(report.closingCheckMethodBdt),
+                      BalancePillTone.neutral),
+                ],
+              ),
+              if (report.instrumentBalances.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('Multi-Currency Positions',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: report.instrumentBalances
+                      .map(
+                        (row) => _summaryPill(
+                          row.instrumentCode,
+                          _formatFxFlow(row.openingQty, row.closingQty),
+                          BalancePillTone.neutral,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               const SizedBox(height: 12),
               Text('Exposure', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
@@ -470,7 +507,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                         title: Text(formatDate(line.date)),
                         subtitle: Text(
                           'Cash ${formatBdt(line.openingCash)} -> ${formatBdt(line.closingCash)} • '
-                          'USD ${formatUsd(line.openingUsd)} -> ${formatUsd(line.closingUsd)}',
+                          'FX ${line.openingUsd.toStringAsFixed(2)} -> ${line.closingUsd.toStringAsFixed(2)}',
                         ),
                         trailing: Text(
                           formatBdt(line.pnl),
@@ -539,6 +576,18 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
     );
   }
 
+  String _formatSignedBdt(double value) {
+    final sign = value >= 0 ? '+' : '-';
+    final abs = value.abs();
+    return '$sign${formatBdt(abs)}';
+  }
+
+  String _formatQty(double value) => value.toStringAsFixed(2);
+
+  String _formatFxFlow(double opening, double closing) {
+    return 'Open: ${_formatQty(opening)} qty\nClose: ${_formatQty(closing)} qty';
+  }
+
   Widget _summaryPill(String label, String value, BalancePillTone tone) {
     return GestureDetector(
       onTap: () => _showBalanceSummaryExplanation(label, value),
@@ -578,20 +627,30 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
   }
 
   (String, String, String, String) _balanceExplain(String title) {
-    if (title.contains('Cash')) {
+    if (title.contains('Balance')) {
       return (
-        'ক্যাশ অ্যাকাউন্টে মোট টাকা (BDT) কত আছে।',
-        'সব deal/settlement/expense সহ ক্যাশে যেসব লেনদেন হয়েছে, তার net effect দেখায়।',
-        'Opening = selected range শুরুর আগের দিনের ending cash, Closing = range শেষ দিনের পর্যন্ত cash ledger net।',
-        'নতুন cash-impact transaction যোগ/এডিট/ডিলিট হলে, বা date range বদলালে বদলাবে।'
+        'মোট টাকার ব্যালেন্স (BDT)।',
+        'সব active deal/settlement/expense এর net effect থেকে এই ব্যালেন্স আসে।',
+        'Opening = period শুরুর আগের closing balance, Closing = period শেষ পর্যন্ত updated balance।',
+        'নতুন transaction যোগ/এডিট/ডিলিট বা period বদলালে মান পরিবর্তন হবে।'
       );
     }
-    if (title.contains('USD')) {
+    if (title.contains('FX') || title.contains('USD')) {
       return (
-        'USD inventory quantity (unit), টাকায় না, পরিমাণে দেখায়।',
-        'BUY হলে inventory বাড়ে, SELL হলে কমে।',
-        'FX inventory ledger থেকে cumulative unit balance নিয়ে opening/closing হিসাব করা হয়।',
-        'USD BUY/SELL পরিবর্তন হলে বা date range বদলালে মান পরিবর্তন হবে।'
+        'Foreign currency quantity summary (unit) দেখায়।',
+        'BUY হলে quantity বাড়ে, SELL হলে কমে।',
+        'Currency inventory net quantity থেকে opening/closing হিসাব হয়।',
+        'FX deal পরিবর্তন বা period বদলালে মান পরিবর্তন হবে।'
+      );
+    }
+    if (title == 'Cash Closing' ||
+        title == 'Bank Closing' ||
+        title == 'Cheque Closing') {
+      return (
+        'নির্বাচিত period শেষ হওয়া পর্যন্ত ঐ account-এর closing balance।',
+        'All active ledger impact (deal + settlement + expense) থেকে account-wise এই balance আসে।',
+        'Formula: Account Closing = cumulative debit - cumulative credit (as of period end)।',
+        'যে কোনো transaction add/edit/delete বা period change হলে মান বদলাবে।'
       );
     }
     if (title.contains('Receivable')) {
