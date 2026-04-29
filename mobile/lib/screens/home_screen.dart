@@ -30,8 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final screens = [
       DashboardScreen(repository: widget.repository),
-      TradingScreen(repository: widget.repository),
-      PartiesScreen(repository: widget.repository),
+      TradingScreen(repository: widget.repository, session: widget.session),
+      PartiesScreen(repository: widget.repository, session: widget.session),
       MoreScreen(repository: widget.repository, session: widget.session),
     ];
 

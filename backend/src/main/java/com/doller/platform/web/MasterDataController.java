@@ -6,7 +6,7 @@ import com.doller.platform.domain.enums.Role;
 import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.service.MasterDataService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,7 +35,20 @@ public class MasterDataController {
     public List<Party> parties() { return service.parties(); }
 
     @PostMapping("/parties")
+    @PreAuthorize("hasAnyRole('OWNER','STAFF')")
     public Party createParty(@Valid @RequestBody MasterDataDtos.PartyCreateRequest req) {
         return service.createParty(req);
+    }
+
+    @PutMapping("/parties/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public Party updateParty(@PathVariable("id") Long id, @Valid @RequestBody MasterDataDtos.PartyUpdateRequest req) {
+        return service.updateParty(id, req);
+    }
+
+    @DeleteMapping("/parties/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public void deleteParty(@PathVariable("id") Long id) {
+        service.deleteParty(id);
     }
 }

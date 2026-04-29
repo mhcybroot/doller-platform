@@ -25,4 +25,8 @@ public class Expense {
     @Column(nullable = false)
     private String category;
     private String notes;
+    @Column(nullable = false)
+    private boolean deleted;
+    private LocalDateTime deletedAt;
+    private String deletedBy;
 }

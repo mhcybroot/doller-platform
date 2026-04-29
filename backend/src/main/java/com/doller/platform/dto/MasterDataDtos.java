@@ -14,4 +14,10 @@ public class MasterDataDtos {
             @DecimalMin("0.00") BigDecimal openingReceivableBdt,
             @DecimalMin("0.00") BigDecimal openingPayableBdt
     ) {}
+    public record PartyUpdateRequest(
+            @NotBlank String name,
+            String phone,
+            String address,
+            String notes
+    ) {}
 }

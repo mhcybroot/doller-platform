@@ -50,10 +50,9 @@ public class TradingService {
     @Transactional
     public TradeDeal createDeal(TradingDtos.DealCreateRequest req) {
         requireOpenDay(req.dealTime().toLocalDate());
-        Party party = partyRepo.findById(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
+        Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         UserAccount by = getCurrentUser();
         BigDecimal gross = req.quantity().multiply(req.bdtRate());
-        String inventoryAccount = fxInventoryAccount(req.instrumentCode().name());
         TradeDeal deal = dealRepo.save(TradeDeal.builder()
                 .dealType(req.dealType())
                 .party(party)
@@ -65,21 +64,16 @@ public class TradingService {
                 .dealTime(req.dealTime())
                 .notes(req.notes())
                 .lockedByDayClose(false)
+                .deleted(false)
                 .build());
 
-        if (req.dealType() == DealType.BUY) {
-            ledgerService.post(req.dealTime(), inventoryAccount, req.quantity(), BigDecimal.ZERO, "DEAL", deal.getId(), "Buy " + req.instrumentCode().name());
-            ledgerService.post(req.dealTime(), "PAYABLE_" + party.getId(), BigDecimal.ZERO, gross, "DEAL", deal.getId(), "Payable to party");
-        } else {
-            ledgerService.post(req.dealTime(), "RECEIVABLE_" + party.getId(), gross, BigDecimal.ZERO, "DEAL", deal.getId(), "Receivable from party");
-            ledgerService.post(req.dealTime(), inventoryAccount, BigDecimal.ZERO, req.quantity(), "DEAL", deal.getId(), "Sell " + req.instrumentCode().name());
-        }
+        postDealLedger(deal, req.dealTime());
         auditService.log("CREATE_DEAL", "/deals", "partyId=" + party.getId(), null, null, "deal:" + deal.getId());
         return deal;
     }
 
     public List<TradingDtos.DealSummary> listDeals(Long partyId) {
-        return dealRepo.findAll().stream()
+        return dealRepo.findByDeletedFalse().stream()
                 .filter(d -> partyId == null || d.getParty().getId().equals(partyId))
                 .sorted(Comparator.comparing(TradeDeal::getDealTime).reversed())
                 .map(d -> new TradingDtos.DealSummary(
@@ -98,7 +92,7 @@ public class TradingService {
     @Transactional
     public Settlement createSettlement(TradingDtos.SettlementCreateRequest req) {
         requireOpenDay(req.settlementTime().toLocalDate());
-        Party party = partyRepo.findById(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
+        Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         TradeDeal deal = resolveDeal(req.tradeDealId(), party.getId());
         SettlementPlan plan = inferSettlementPlan(party, deal, req.bdtAmount());
 
@@ -118,6 +112,7 @@ public class TradingService {
                 .paymentReference(req.paymentReference())
                 .settlementTime(req.settlementTime())
                 .notes(req.notes())
+                .deleted(false)
                 .build());
 
         postSettlementLedger(st, req.settlementTime());
@@ -126,7 +121,7 @@ public class TradingService {
     }
 
     public TradingDtos.SettlementInferenceResponse settlementInference(Long partyId, Long tradeDealId, BigDecimal amount) {
-        Party party = partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"));
+        Party party = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
         TradeDeal deal = resolveDeal(tradeDealId, partyId);
         return toInferenceResponse(party, deal, amount == null ? BigDecimal.ZERO : amount);
     }
@@ -144,22 +139,141 @@ public class TradingService {
                 .expenseTime(req.expenseTime())
                 .category(req.category())
                 .notes(req.notes())
+                .deleted(false)
                 .build());
-        ledgerService.post(req.expenseTime(), "EXPENSE", req.amountBdt(), BigDecimal.ZERO, "EXPENSE", ex.getId(), ex.getCategory());
-        ledgerService.post(req.expenseTime(), "CASH", BigDecimal.ZERO, req.amountBdt(), "EXPENSE", ex.getId(), ex.getCategory());
+        postExpenseLedger(ex, req.expenseTime());
         auditService.log("CREATE_EXPENSE", "/expenses", "category=" + req.category(), null, null, "expense:" + ex.getId());
         return ex;
     }
 
+    @Transactional
+    public TradeDeal updateDeal(Long id, TradingDtos.DealUpdateRequest req) {
+        TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
+        requireOpenDay(deal.getDealTime().toLocalDate());
+        requireOpenDay(req.dealTime().toLocalDate());
+        if (deal.isLockedByDayClose()) {
+            throw new ApiException("Deal is locked by day close");
+        }
+        Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
+        String before = serializeDeal(deal);
+        reverseDealLedger(deal, LocalDateTime.now());
+        BigDecimal gross = req.quantity().multiply(req.bdtRate());
+        deal.setDealType(req.dealType());
+        deal.setParty(party);
+        deal.setInstrumentCode(req.instrumentCode());
+        deal.setQuantity(req.quantity());
+        deal.setBdtRate(req.bdtRate());
+        deal.setBdtGross(gross);
+        deal.setDealTime(req.dealTime());
+        deal.setNotes(req.notes());
+        TradeDeal saved = dealRepo.save(deal);
+        postDealLedger(saved, req.dealTime());
+        auditService.log("UPDATE_DEAL", "/deals/" + id, "partyId=" + party.getId(), null, before, serializeDeal(saved));
+        return saved;
+    }
+
+    @Transactional
+    public void deleteDeal(Long id) {
+        TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
+        requireOpenDay(deal.getDealTime().toLocalDate());
+        if (deal.isLockedByDayClose()) {
+            throw new ApiException("Deal is locked by day close");
+        }
+        String before = serializeDeal(deal);
+        reverseDealLedger(deal, LocalDateTime.now());
+        deal.setDeleted(true);
+        deal.setDeletedAt(LocalDateTime.now());
+        deal.setDeletedBy(currentActor());
+        dealRepo.save(deal);
+        auditService.log("DELETE_DEAL", "/deals/" + id, null, null, before, null);
+    }
+
+    @Transactional
+    public Settlement updateSettlement(Long id, TradingDtos.SettlementUpdateRequest req) {
+        Settlement settlement = settlementRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Settlement not found"));
+        requireOpenDay(settlement.getSettlementTime().toLocalDate());
+        requireOpenDay(req.settlementTime().toLocalDate());
+        Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
+        TradeDeal deal = resolveDeal(req.tradeDealId(), party.getId());
+        SettlementPlan plan = inferSettlementPlan(party, deal, req.bdtAmount());
+        if (plan.advanceAmount().compareTo(BigDecimal.ZERO) > 0 && !req.allowAdvance()) {
+            throw new ApiException("Over settlement requires allowAdvance=true");
+        }
+        String before = serializeSettlement(settlement);
+        reverseSettlementLedger(settlement, LocalDateTime.now());
+        settlement.setParty(party);
+        settlement.setTradeDeal(deal);
+        settlement.setDirection(plan.direction());
+        settlement.setBasis(plan.basis());
+        settlement.setBdtAmount(req.bdtAmount());
+        settlement.setAppliedAmount(plan.appliedAmount());
+        settlement.setAdvanceAmount(plan.advanceAmount());
+        settlement.setPaymentMethod(req.paymentMethod());
+        settlement.setPaymentReference(req.paymentReference());
+        settlement.setSettlementTime(req.settlementTime());
+        settlement.setNotes(req.notes());
+        Settlement saved = settlementRepo.save(settlement);
+        postSettlementLedger(saved, req.settlementTime());
+        auditService.log("UPDATE_SETTLEMENT", "/settlements/" + id, "partyId=" + party.getId(), null, before, serializeSettlement(saved));
+        return saved;
+    }
+
+    @Transactional
+    public void deleteSettlement(Long id) {
+        Settlement settlement = settlementRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Settlement not found"));
+        requireOpenDay(settlement.getSettlementTime().toLocalDate());
+        String before = serializeSettlement(settlement);
+        reverseSettlementLedger(settlement, LocalDateTime.now());
+        settlement.setDeleted(true);
+        settlement.setDeletedAt(LocalDateTime.now());
+        settlement.setDeletedBy(currentActor());
+        settlementRepo.save(settlement);
+        auditService.log("DELETE_SETTLEMENT", "/settlements/" + id, null, null, before, null);
+    }
+
+    @Transactional
+    public Expense updateExpense(Long id, TradingDtos.ExpenseUpdateRequest req) {
+        Expense expense = expenseRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Expense not found"));
+        requireOpenDay(expense.getExpenseTime().toLocalDate());
+        requireOpenDay(req.expenseTime().toLocalDate());
+        if (req.expenseType() == ExpenseType.TRANSACTION || req.expenseType() == ExpenseType.DAILY_OVERHEAD) {
+            throw new ApiException("Unsupported expenseType for new entries");
+        }
+        String before = serializeExpense(expense);
+        reverseExpenseLedger(expense, LocalDateTime.now());
+        expense.setExpenseType(req.expenseType());
+        expense.setAmountBdt(req.amountBdt());
+        expense.setExpenseTime(req.expenseTime());
+        expense.setCategory(req.category());
+        expense.setNotes(req.notes());
+        Expense saved = expenseRepo.save(expense);
+        postExpenseLedger(saved, req.expenseTime());
+        auditService.log("UPDATE_EXPENSE", "/expenses/" + id, "category=" + req.category(), null, before, serializeExpense(saved));
+        return saved;
+    }
+
+    @Transactional
+    public void deleteExpense(Long id) {
+        Expense expense = expenseRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Expense not found"));
+        requireOpenDay(expense.getExpenseTime().toLocalDate());
+        String before = serializeExpense(expense);
+        reverseExpenseLedger(expense, LocalDateTime.now());
+        expense.setDeleted(true);
+        expense.setDeletedAt(LocalDateTime.now());
+        expense.setDeletedBy(currentActor());
+        expenseRepo.save(expense);
+        auditService.log("DELETE_EXPENSE", "/expenses/" + id, null, null, before, null);
+    }
+
     public TradingDtos.DayClosePreview previewDayClose(LocalDate date) {
         var range = dayRange(date);
-        BigDecimal buy = dealRepo.findByDealTimeBetween(range[0], range[1]).stream()
+        BigDecimal buy = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .filter(d -> d.getDealType() == DealType.BUY)
                 .map(TradeDeal::getBdtGross).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sell = dealRepo.findByDealTimeBetween(range[0], range[1]).stream()
+        BigDecimal sell = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .filter(d -> d.getDealType() == DealType.SELL)
                 .map(TradeDeal::getBdtGross).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal cost = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+        BigDecimal cost = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal pnl = sell.subtract(buy);
         boolean closed = dailyCloseRepo.findByBusinessDate(date).filter(c -> !c.isReopened()).isPresent();
@@ -204,7 +318,7 @@ public class TradingService {
                 .realizedProfitLossBdt(p.realizedProfitLossBdt())
                 .build());
 
-        dealRepo.findByDealTimeBetween(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(true); dealRepo.save(d); });
+        dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(true); dealRepo.save(d); });
         DailyClose closeRecord = existingClose == null
                 ? DailyClose.builder().businessDate(date).build()
                 : existingClose;
@@ -224,7 +338,7 @@ public class TradingService {
         close.setReopenReason(reason);
         snapshotRepo.findByBusinessDate(date).ifPresent(snapshotRepo::delete);
         var range = dayRange(date);
-        dealRepo.findByDealTimeBetween(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(false); dealRepo.save(d); });
+        dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(false); dealRepo.save(d); });
         dailyCloseRepo.save(close);
         String auditRef = auditService.log("DAY_REOPEN", "/day-close/" + date + "/reopen", null, reason, "closed", "reopened");
         return new TradingDtos.DayCloseResponse(date, false, auditRef, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -233,14 +347,14 @@ public class TradingService {
     public TradingDtos.DashboardResponse dashboard(LocalDate from, LocalDate to) {
         BigDecimal receivable = BigDecimal.ZERO;
         BigDecimal payable = BigDecimal.ZERO;
-        for (Party party : partyRepo.findAll()) {
+        for (Party party : partyRepo.findByDeletedFalse()) {
             TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
             receivable = receivable.add(balances.receivableBdt());
             payable = payable.add(balances.payableBdt());
         }
         var range = new LocalDateTime[]{from.atStartOfDay(), to.plusDays(1).atStartOfDay().minusNanos(1)};
         Map<String, BigDecimal> positionByInstrument = new HashMap<>();
-        for (TradeDeal deal : dealRepo.findAll()) {
+        for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
             String code = deal.getInstrumentCode().name();
             BigDecimal signedQty = deal.getDealType() == DealType.BUY ? deal.getQuantity() : deal.getQuantity().negate();
             positionByInstrument.merge(code, signedQty, BigDecimal::add);
@@ -307,7 +421,7 @@ public class TradingService {
         BigDecimal totalPayable = BigDecimal.ZERO;
         List<TradingDtos.PartyDueRow> rows = new ArrayList<>();
 
-        for (Party party : partyRepo.findAll()) {
+        for (Party party : partyRepo.findByDeletedFalse()) {
             TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
             totalReceivable = totalReceivable.add(balances.receivableBdt());
             totalPayable = totalPayable.add(balances.payableBdt());
@@ -394,7 +508,7 @@ public class TradingService {
 
         List<TradingDtos.TransactionDetailRow> rows = new ArrayList<>();
 
-        dealRepo.findByDealTimeBetween(range[0], range[1]).stream()
+        dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .filter(deal -> partyId == null || deal.getParty().getId().equals(partyId))
                 .filter(deal -> normalizedType.isEmpty() || normalizedType.equals("DEAL"))
                 .map(deal -> new TradingDtos.TransactionDetailRow(
@@ -416,7 +530,7 @@ public class TradingService {
                 ))
                 .forEach(rows::add);
 
-        settlementRepo.findBySettlementTimeBetween(range[0], range[1]).stream()
+        settlementRepo.findBySettlementTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .filter(settlement -> partyId == null || settlement.getParty().getId().equals(partyId))
                 .filter(settlement -> normalizedType.isEmpty() || normalizedType.equals("SETTLEMENT"))
                 .map(settlement -> new TradingDtos.TransactionDetailRow(
@@ -438,7 +552,7 @@ public class TradingService {
                 ))
                 .forEach(rows::add);
 
-        expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+        expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .filter(expense -> partyId == null || Objects.equals(expensePartyId(expense), partyId))
                 .filter(expense -> normalizedType.isEmpty() || normalizedType.equals("EXPENSE"))
                 .map(expense -> new TradingDtos.TransactionDetailRow(
@@ -465,7 +579,7 @@ public class TradingService {
                 .filter(entry -> partyId == null || Objects.equals(entry.getReferenceId(), partyId))
                 .filter(entry -> normalizedType.isEmpty() || normalizedType.equals("OPENING_BALANCE"))
                 .map(entry -> {
-                    Party party = partyRepo.findById(entry.getReferenceId()).orElse(null);
+                    Party party = partyRepo.findByIdAndDeletedFalse(entry.getReferenceId()).orElse(null);
                     return new TradingDtos.TransactionDetailRow(
                             "OPENING_BALANCE",
                             entry.getId(),
@@ -504,15 +618,15 @@ public class TradingService {
     }
 
     public TradingDtos.PartyLedgerResponse partyLedger(Long partyId) {
-        Party p = partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"));
+        Party p = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
         List<TradingDtos.PartyLedgerLine> lines = new ArrayList<>();
 
-        var deals = dealRepo.findAll().stream().filter(d -> d.getParty().getId().equals(partyId)).toList();
+        var deals = dealRepo.findByDeletedFalse().stream().filter(d -> d.getParty().getId().equals(partyId)).toList();
         for (TradeDeal d : deals) {
             BigDecimal signed = d.getDealType() == DealType.SELL ? d.getBdtGross() : d.getBdtGross().negate();
             lines.add(new TradingDtos.PartyLedgerLine("DEAL-" + d.getDealType() + "-" + d.getInstrumentCode(), d.getDealTime(), signed, d.getNotes()));
         }
-        for (Settlement s : settlementRepo.findByPartyOrderBySettlementTimeAsc(p)) {
+        for (Settlement s : settlementRepo.findByPartyAndDeletedFalseOrderBySettlementTimeAsc(p)) {
             lines.add(new TradingDtos.PartyLedgerLine(
                     "SETTLEMENT-" + s.getDirection() + "-" + s.getBasis(),
                     s.getSettlementTime(),
@@ -534,26 +648,26 @@ public class TradingService {
 
     public BigDecimal partyOutstanding(Long partyId) {
         TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(
-                partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"))
+                partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"))
         );
         return balances.netBalanceBdt();
     }
 
     public BigDecimal computeAgingDue(Long partyId, int olderThanDays) {
-        Party party = partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"));
+        Party party = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
         return computeAgingDue(party, LocalDate.now());
     }
 
     private BigDecimal computeAgingDue(Party party, LocalDate asOfDate) {
         BigDecimal aging = BigDecimal.ZERO;
 
-        List<TradeDeal> sellDeals = dealRepo.findAll().stream()
+        List<TradeDeal> sellDeals = dealRepo.findByDeletedFalse().stream()
                 .filter(d -> d.getParty().getId().equals(party.getId())
                         && d.getDealType() == DealType.SELL
                         && !d.getDealTime().toLocalDate().isAfter(asOfDate))
                 .sorted(Comparator.comparing(TradeDeal::getDealTime))
                 .toList();
-        BigDecimal remainingSettlements = settlementRepo.findByPartyOrderBySettlementTimeAsc(party).stream()
+        BigDecimal remainingSettlements = settlementRepo.findByPartyAndDeletedFalseOrderBySettlementTimeAsc(party).stream()
                 .filter(s -> !s.getSettlementTime().toLocalDate().isAfter(asOfDate))
                 .filter(s -> s.getDirection() == SettlementDirection.INCOMING && s.getBasis() == SettlementBasis.RECEIVABLE)
                 .map(Settlement::getAppliedAmount)
@@ -755,7 +869,7 @@ public class TradingService {
         BigDecimal advanceToParty = BigDecimal.ZERO;
         BigDecimal agingDue = BigDecimal.ZERO;
 
-        for (Party party : partyRepo.findAll()) {
+        for (Party party : partyRepo.findByDeletedFalse()) {
             TradingDtos.PartyBalanceSummary summary = partyBalanceSummary(party, asOfDate);
             receivable = receivable.add(summary.receivableBdt());
             payable = payable.add(summary.payableBdt());
@@ -820,6 +934,69 @@ public class TradingService {
         }
     }
 
+    private void reverseSettlementLedger(Settlement st, LocalDateTime at) {
+        String referenceType = "SETTLEMENT_REVERSAL";
+        Long referenceId = st.getId();
+        Long partyId = st.getParty().getId();
+        if (st.getDirection() == SettlementDirection.INCOMING) {
+            ledgerService.post(at, "CASH", BigDecimal.ZERO, st.getBdtAmount(), referenceType, referenceId, "Reversal cash received");
+            if (st.getBasis() == SettlementBasis.RECEIVABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "RECEIVABLE_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal receivable settlement");
+            } else if (st.getBasis() == SettlementBasis.ADVANCE_TO_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_TO_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal advance returned");
+            }
+            if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_FROM_" + partyId, st.getAdvanceAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal advance received");
+            }
+        } else {
+            ledgerService.post(at, "CASH", st.getBdtAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal cash paid");
+            if (st.getBasis() == SettlementBasis.PAYABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Reversal payable settlement");
+            } else if (st.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_FROM_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Reversal advance refund");
+            }
+            if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_TO_" + partyId, BigDecimal.ZERO, st.getAdvanceAmount(), referenceType, referenceId, "Reversal advance paid");
+            }
+        }
+    }
+
+    private void postDealLedger(TradeDeal deal, LocalDateTime at) {
+        String referenceType = "DEAL";
+        Long referenceId = deal.getId();
+        String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
+        if (deal.getDealType() == DealType.BUY) {
+            ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Buy " + deal.getInstrumentCode().name());
+            ledgerService.post(at, "PAYABLE_" + deal.getParty().getId(), BigDecimal.ZERO, deal.getBdtGross(), referenceType, referenceId, "Payable to party");
+        } else {
+            ledgerService.post(at, "RECEIVABLE_" + deal.getParty().getId(), deal.getBdtGross(), BigDecimal.ZERO, referenceType, referenceId, "Receivable from party");
+            ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Sell " + deal.getInstrumentCode().name());
+        }
+    }
+
+    private void reverseDealLedger(TradeDeal deal, LocalDateTime at) {
+        String referenceType = "DEAL_REVERSAL";
+        Long referenceId = deal.getId();
+        String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
+        if (deal.getDealType() == DealType.BUY) {
+            ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Reversal buy " + deal.getInstrumentCode().name());
+            ledgerService.post(at, "PAYABLE_" + deal.getParty().getId(), deal.getBdtGross(), BigDecimal.ZERO, referenceType, referenceId, "Reversal payable");
+        } else {
+            ledgerService.post(at, "RECEIVABLE_" + deal.getParty().getId(), BigDecimal.ZERO, deal.getBdtGross(), referenceType, referenceId, "Reversal receivable");
+            ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Reversal sell " + deal.getInstrumentCode().name());
+        }
+    }
+
+    private void postExpenseLedger(Expense expense, LocalDateTime at) {
+        ledgerService.post(at, "EXPENSE", expense.getAmountBdt(), BigDecimal.ZERO, "EXPENSE", expense.getId(), expense.getCategory());
+        ledgerService.post(at, "CASH", BigDecimal.ZERO, expense.getAmountBdt(), "EXPENSE", expense.getId(), expense.getCategory());
+    }
+
+    private void reverseExpenseLedger(Expense expense, LocalDateTime at) {
+        ledgerService.post(at, "EXPENSE", BigDecimal.ZERO, expense.getAmountBdt(), "EXPENSE_REVERSAL", expense.getId(), "Reversal " + expense.getCategory());
+        ledgerService.post(at, "CASH", expense.getAmountBdt(), BigDecimal.ZERO, "EXPENSE_REVERSAL", expense.getId(), "Reversal " + expense.getCategory());
+    }
+
     private BigDecimal settlementNetEffect(Settlement settlement) {
         if (settlement.getDirection() == SettlementDirection.INCOMING) {
             if (settlement.getBasis() == SettlementBasis.RECEIVABLE) {
@@ -843,7 +1020,7 @@ public class TradingService {
         if (tradeDealId == null) {
             return null;
         }
-        TradeDeal deal = dealRepo.findById(tradeDealId).orElseThrow(() -> new ApiException("Deal not found"));
+        TradeDeal deal = dealRepo.findByIdAndDeletedFalse(tradeDealId).orElseThrow(() -> new ApiException("Deal not found"));
         if (!deal.getParty().getId().equals(partyId)) {
             throw new ApiException("Selected deal does not belong to this party");
         }
@@ -851,18 +1028,18 @@ public class TradingService {
     }
 
     private TradeDeal latestDealForParty(Long partyId) {
-        return dealRepo.findAll().stream()
+        return dealRepo.findByDeletedFalse().stream()
                 .filter(d -> d.getParty().getId().equals(partyId))
                 .max(Comparator.comparing(TradeDeal::getDealTime))
                 .orElse(null);
     }
 
     private LocalDateTime latestActivityAtForParty(Long partyId) {
-        Optional<LocalDateTime> latestDealTime = dealRepo.findAll().stream()
+        Optional<LocalDateTime> latestDealTime = dealRepo.findByDeletedFalse().stream()
                 .filter(d -> d.getParty().getId().equals(partyId))
                 .map(TradeDeal::getDealTime)
                 .max(LocalDateTime::compareTo);
-        Optional<LocalDateTime> latestSettlementTime = settlementRepo.findAll().stream()
+        Optional<LocalDateTime> latestSettlementTime = settlementRepo.findByDeletedFalse().stream()
                 .filter(s -> s.getParty().getId().equals(partyId))
                 .map(Settlement::getSettlementTime)
                 .max(LocalDateTime::compareTo);
@@ -974,7 +1151,7 @@ public class TradingService {
     }
 
     private BigDecimal latestRateForInstrument(String instrumentCode) {
-        return dealRepo.findAll().stream()
+        return dealRepo.findByDeletedFalse().stream()
                 .filter(deal -> deal.getInstrumentCode().name().equals(instrumentCode))
                 .max(Comparator.comparing(TradeDeal::getDealTime))
                 .map(TradeDeal::getBdtRate)
@@ -995,8 +1172,8 @@ public class TradingService {
     private TradingDtos.PnlExplainSection buildExplainSection(String label, LocalDate from, LocalDate to) {
         PnlMetrics metrics = pnlMetrics(from, to);
         LocalDateTime[] range = dayRange(from, to);
-        List<TradeDeal> deals = dealRepo.findByDealTimeBetween(range[0], range[1]);
-        Map<String, List<Expense>> grouped = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+        List<TradeDeal> deals = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]);
+        Map<String, List<Expense>> grouped = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .collect(java.util.stream.Collectors.groupingBy(expense -> expense.getExpenseType().name()));
 
         List<TradingDtos.PnlExpenseGroup> groups = grouped.entrySet().stream()
@@ -1059,7 +1236,7 @@ public class TradingService {
 
     private PnlMetrics pnlMetrics(LocalDate from, LocalDate to) {
         LocalDateTime[] range = dayRange(from, to);
-        List<TradeDeal> deals = dealRepo.findByDealTimeBetween(range[0], range[1]);
+        List<TradeDeal> deals = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]);
         BigDecimal buy = deals.stream()
                 .filter(d -> d.getDealType() == DealType.BUY)
                 .map(TradeDeal::getBdtGross)
@@ -1068,7 +1245,7 @@ public class TradingService {
                 .filter(d -> d.getDealType() == DealType.SELL)
                 .map(TradeDeal::getBdtGross)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal expense = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+        BigDecimal expense = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal gross = sell.subtract(buy);
@@ -1101,6 +1278,47 @@ public class TradingService {
     private UserAccount getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepo.findByUsernameAndActiveTrue(username).orElseThrow(() -> new ApiException("User not found"));
+    }
+
+    private String currentActor() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth == null ? "system" : auth.getName();
+    }
+
+    private String serializeDeal(TradeDeal deal) {
+        return "id=" + deal.getId()
+                + ",partyId=" + deal.getParty().getId()
+                + ",dealType=" + deal.getDealType()
+                + ",instrument=" + deal.getInstrumentCode()
+                + ",qty=" + deal.getQuantity()
+                + ",rate=" + deal.getBdtRate()
+                + ",gross=" + deal.getBdtGross()
+                + ",time=" + deal.getDealTime()
+                + ",notes=" + deal.getNotes();
+    }
+
+    private String serializeSettlement(Settlement settlement) {
+        return "id=" + settlement.getId()
+                + ",partyId=" + settlement.getParty().getId()
+                + ",dealId=" + (settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getId())
+                + ",direction=" + settlement.getDirection()
+                + ",basis=" + settlement.getBasis()
+                + ",amount=" + settlement.getBdtAmount()
+                + ",applied=" + settlement.getAppliedAmount()
+                + ",advance=" + settlement.getAdvanceAmount()
+                + ",time=" + settlement.getSettlementTime()
+                + ",paymentMethod=" + settlement.getPaymentMethod()
+                + ",paymentReference=" + settlement.getPaymentReference()
+                + ",notes=" + settlement.getNotes();
+    }
+
+    private String serializeExpense(Expense expense) {
+        return "id=" + expense.getId()
+                + ",expenseType=" + expense.getExpenseType()
+                + ",amount=" + expense.getAmountBdt()
+                + ",time=" + expense.getExpenseTime()
+                + ",category=" + expense.getCategory()
+                + ",notes=" + expense.getNotes();
     }
 
     private void requireOpenDay(LocalDate date) {

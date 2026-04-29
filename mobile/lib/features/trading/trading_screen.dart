@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../shared/instruments/instrument_labels.dart';
+import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
 class TradingScreen extends StatefulWidget {
-  const TradingScreen({super.key, required this.repository});
+  const TradingScreen({super.key, required this.repository, required this.session});
 
   final DollerRepository repository;
+  final AuthSession session;
 
   @override
   State<TradingScreen> createState() => _TradingScreenState();

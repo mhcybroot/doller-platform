@@ -18,9 +18,14 @@ import java.util.List;
 public class TradingDtos {
     public record DealCreateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull InstrumentCode instrumentCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
                                     @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
+    public record DealUpdateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull InstrumentCode instrumentCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
+                                    @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
     public record DealSummary(Long id, String partyName, DealType dealType, InstrumentCode instrumentCode, BigDecimal quantity, BigDecimal bdtGross,
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
     public record SettlementCreateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
+                                          @NotNull LocalDateTime settlementTime, @NotNull SettlementPaymentMethod paymentMethod,
+                                          String paymentReference, String notes, boolean allowAdvance) {}
+    public record SettlementUpdateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
                                           @NotNull LocalDateTime settlementTime, @NotNull SettlementPaymentMethod paymentMethod,
                                           String paymentReference, String notes, boolean allowAdvance) {}
     public record PartyBalanceSummary(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal advanceFromPartyBdt,
@@ -38,6 +43,8 @@ public class TradingDtos {
             String summary
     ) {}
     public record ExpenseCreateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
+                                       @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
+    public record ExpenseUpdateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}

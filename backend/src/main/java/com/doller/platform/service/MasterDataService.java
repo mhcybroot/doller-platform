@@ -56,6 +56,7 @@ public class MasterDataService {
                 .phone(req.phone())
                 .address(req.address())
                 .notes(req.notes())
+                .deleted(false)
                 .build());
 
         LocalDateTime now = LocalDateTime.now();
@@ -76,7 +77,30 @@ public class MasterDataService {
         auditService.log("CREATE_PARTY", "/parties", metadata, null, null, "party:" + out.getId());
         return out;
     }
-    public List<Party> parties() { return partyRepo.findAll(); }
+    public List<Party> parties() { return partyRepo.findByDeletedFalse(); }
+
+    public Party updateParty(Long id, MasterDataDtos.PartyUpdateRequest req) {
+        Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
+        String before = "party:" + party.getId() + ":" + party.getName() + "|" + party.getPhone() + "|" + party.getAddress() + "|" + party.getNotes();
+        party.setName(req.name().trim());
+        party.setPhone(req.phone());
+        party.setAddress(req.address());
+        party.setNotes(req.notes());
+        Party saved = partyRepo.save(party);
+        String after = "party:" + saved.getId() + ":" + saved.getName() + "|" + saved.getPhone() + "|" + saved.getAddress() + "|" + saved.getNotes();
+        auditService.log("UPDATE_PARTY", "/parties/" + id, null, null, before, after);
+        return saved;
+    }
+
+    public void deleteParty(Long id) {
+        Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
+        String before = "party:" + party.getId() + ":" + party.getName() + "|" + party.getPhone() + "|" + party.getAddress() + "|" + party.getNotes();
+        party.setDeleted(true);
+        party.setDeletedAt(LocalDateTime.now());
+        party.setDeletedBy(currentActor());
+        partyRepo.save(party);
+        auditService.log("DELETE_PARTY", "/parties/" + id, null, null, before, null);
+    }
 
     public void deactivateUser(Long userId) {
         UserAccount u = userRepo.findById(userId).orElseThrow(() -> new ApiException("User not found"));
@@ -84,5 +108,10 @@ public class MasterDataService {
         userRepo.save(u);
         refreshTokenRepository.deleteByUser(u);
         auditService.log("DEACTIVATE_USER", "/users/" + userId + "/deactivate", null, null, null, "deactivated");
+    }
+
+    private String currentActor() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth == null ? "system" : auth.getName();
     }
 }

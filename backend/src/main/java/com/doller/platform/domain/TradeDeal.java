@@ -35,4 +35,8 @@ public class TradeDeal {
     private String notes;
     @Column(nullable = false)
     private boolean lockedByDayClose;
+    @Column(nullable = false)
+    private boolean deleted;
+    private LocalDateTime deletedAt;
+    private String deletedBy;
 }

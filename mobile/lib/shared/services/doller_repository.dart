@@ -78,6 +78,32 @@ class DollerRepository {
     );
   }
 
+  Future<PartyModel> updateParty(
+    int id,
+    String name,
+    String phone,
+    String address,
+    String notes,
+  ) async {
+    return _api.put<PartyModel>(
+      '/parties/$id',
+      data: {
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'notes': notes,
+      },
+      parser: (json) => PartyModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> deleteParty(int id) async {
+    await _api.delete<void>(
+      '/parties/$id',
+      parser: (_) {},
+    );
+  }
+
   Future<List<DealSummary>> listDeals({int? partyId}) async {
     return _api.get<List<DealSummary>>(
       '/deals',
@@ -111,6 +137,38 @@ class DollerRepository {
     );
   }
 
+  Future<void> updateDeal({
+    required int id,
+    required String dealType,
+    required int partyId,
+    required String instrumentCode,
+    required double quantity,
+    required double bdtRate,
+    required DateTime dealTime,
+    required String notes,
+  }) async {
+    await _api.put<void>(
+      '/deals/$id',
+      data: {
+        'dealType': dealType,
+        'partyId': partyId,
+        'instrumentCode': instrumentCode,
+        'quantity': quantity,
+        'bdtRate': bdtRate,
+        'dealTime': dealTime.toIso8601String(),
+        'notes': notes,
+      },
+      parser: (_) {},
+    );
+  }
+
+  Future<void> deleteDeal(int id) async {
+    await _api.delete<void>(
+      '/deals/$id',
+      parser: (_) {},
+    );
+  }
+
   Future<void> createSettlement({
     required int partyId,
     int? tradeDealId,
@@ -132,6 +190,40 @@ class DollerRepository {
         'notes': notes,
         'allowAdvance': allowAdvance,
       },
+      parser: (_) {},
+    );
+  }
+
+  Future<void> updateSettlement({
+    required int id,
+    required int partyId,
+    int? tradeDealId,
+    required double amount,
+    required String paymentMethod,
+    String? paymentReference,
+    required bool allowAdvance,
+    required String notes,
+    required DateTime settlementTime,
+  }) async {
+    await _api.put<void>(
+      '/settlements/$id',
+      data: {
+        'partyId': partyId,
+        'tradeDealId': tradeDealId,
+        'bdtAmount': amount,
+        'settlementTime': settlementTime.toIso8601String(),
+        'paymentMethod': paymentMethod,
+        'paymentReference': paymentReference,
+        'notes': notes,
+        'allowAdvance': allowAdvance,
+      },
+      parser: (_) {},
+    );
+  }
+
+  Future<void> deleteSettlement(int id) async {
+    await _api.delete<void>(
+      '/settlements/$id',
       parser: (_) {},
     );
   }
@@ -168,6 +260,34 @@ class DollerRepository {
         'category': category,
         'notes': notes,
       },
+      parser: (_) {},
+    );
+  }
+
+  Future<void> updateExpense({
+    required int id,
+    required String expenseType,
+    required double amount,
+    required String category,
+    required String notes,
+    required DateTime expenseTime,
+  }) async {
+    await _api.put<void>(
+      '/expenses/$id',
+      data: {
+        'expenseType': expenseType,
+        'amountBdt': amount,
+        'expenseTime': expenseTime.toIso8601String(),
+        'category': category,
+        'notes': notes,
+      },
+      parser: (_) {},
+    );
+  }
+
+  Future<void> deleteExpense(int id) async {
+    await _api.delete<void>(
+      '/expenses/$id',
       parser: (_) {},
     );
   }

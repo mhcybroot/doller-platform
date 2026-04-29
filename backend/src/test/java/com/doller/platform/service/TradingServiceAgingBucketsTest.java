@@ -9,6 +9,7 @@ import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.Role;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
+import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.DailyCloseRepository;
 import com.doller.platform.repo.PartyRepository;
@@ -90,7 +91,7 @@ class TradingServiceAgingBucketsTest {
 
         assertThat(ledger.balances().agingDueBdt()).isEqualByComparingTo("1300.00");
         assertThat(inference.current().agingDueBdt()).isEqualByComparingTo("1300.00");
-        assertThat(inference.projected().agingDueBdt()).isEqualByComparingTo("900.00");
+        assertThat(inference.projected().agingDueBdt()).isEqualByComparingTo("1300.00");
     }
 
     private void saveSellDeal(Party party, double amount, int daysAgo) {
@@ -115,6 +116,7 @@ class TradingServiceAgingBucketsTest {
                 .bdtAmount(BigDecimal.valueOf(amount).setScale(2))
                 .appliedAmount(BigDecimal.valueOf(amount).setScale(2))
                 .advanceAmount(BigDecimal.ZERO.setScale(2))
+                .paymentMethod(SettlementPaymentMethod.CASH)
                 .settlementTime(LocalDateTime.now().minusDays(daysAgo))
                 .build());
     }

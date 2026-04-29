@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
 class PartiesScreen extends StatefulWidget {
-  const PartiesScreen({super.key, required this.repository});
+  const PartiesScreen({super.key, required this.repository, required this.session});
 
   final DollerRepository repository;
+  final AuthSession session;
 
   @override
   State<PartiesScreen> createState() => _PartiesScreenState();
@@ -139,6 +141,93 @@ class _PartiesScreenState extends State<PartiesScreen> {
       },
     );
     await _load();
+  }
+
+  Future<void> _editParty(PartyModel party) async {
+    final name = TextEditingController(text: party.name);
+    final phone = TextEditingController(text: party.phone ?? '');
+    final address = TextEditingController(text: party.address ?? '');
+    final notes = TextEditingController(text: party.notes ?? '');
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            24,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Party', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+              const SizedBox(height: 12),
+              TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+              const SizedBox(height: 12),
+              TextField(controller: address, decoration: const InputDecoration(labelText: 'Address')),
+              const SizedBox(height: 12),
+              TextField(controller: notes, decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 18),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await widget.repository.updateParty(
+                      party.id,
+                      name.text.trim(),
+                      phone.text.trim(),
+                      address.text.trim(),
+                      notes.text.trim(),
+                    );
+                    if (!context.mounted) {
+                      return;
+                    }
+                    Navigator.pop(context);
+                  } on ApiException catch (error) {
+                    showAppMessage(context, error.message, isError: true);
+                  }
+                },
+                child: const Text('Update Party'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    await _load();
+  }
+
+  Future<void> _deleteParty(PartyModel party) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Party'),
+        content: Text('Delete ${party.name}? This is an owner-only action.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (shouldDelete != true) {
+      return;
+    }
+    try {
+      await widget.repository.deleteParty(party.id);
+      if (!mounted) {
+        return;
+      }
+      showAppMessage(context, 'Party deleted');
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      showAppMessage(context, error.message, isError: true);
+    }
   }
 
   Future<void> _openLedger(PartyModel party) async {
@@ -295,7 +384,24 @@ class _PartiesScreenState extends State<PartiesScreen> {
                 title: Text(party.name),
                 subtitle: Text(
                     '${party.phone ?? 'No phone'} • ${party.address ?? 'No address'} • ${party.notes ?? ''}'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: widget.session.isOwner
+                    ? PopupMenuButton<String>(
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            await _editParty(party);
+                            return;
+                          }
+                          if (value == 'delete') {
+                            await _deleteParty(party);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        ],
+                        child: const Icon(Icons.more_vert),
+                      )
+                    : const Icon(Icons.chevron_right),
               ),
             ),
           ),

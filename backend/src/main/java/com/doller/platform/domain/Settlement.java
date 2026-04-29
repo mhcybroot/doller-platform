@@ -39,4 +39,8 @@ public class Settlement {
     @Column(nullable = false)
     private LocalDateTime settlementTime;
     private String notes;
+    @Column(nullable = false)
+    private boolean deleted;
+    private LocalDateTime deletedAt;
+    private String deletedBy;
 }

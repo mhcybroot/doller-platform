@@ -6,8 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface TradeDealRepository extends JpaRepository<TradeDeal, Long> {
-    List<TradeDeal> findByDealTimeBetween(LocalDateTime from, LocalDateTime to);
-    List<TradeDeal> findByPartyAndDealTimeBetween(Party party, LocalDateTime from, LocalDateTime to);
+    List<TradeDeal> findByDeletedFalse();
+    Optional<TradeDeal> findByIdAndDeletedFalse(Long id);
+    List<TradeDeal> findByDealTimeBetweenAndDeletedFalse(LocalDateTime from, LocalDateTime to);
+    List<TradeDeal> findByPartyAndDealTimeBetweenAndDeletedFalse(Party party, LocalDateTime from, LocalDateTime to);
 }

@@ -26,7 +26,14 @@ public class TradingController {
         return service.listDeals(partyId);
     }
 
+    @PreAuthorize("hasAnyRole('OWNER','STAFF')")
     @PostMapping("/deals") public TradeDeal createDeal(@Valid @RequestBody TradingDtos.DealCreateRequest req) { return service.createDeal(req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/deals/{id}")
+    public TradeDeal updateDeal(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.DealUpdateRequest req) { return service.updateDeal(id, req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/deals/{id}")
+    public void deleteDeal(@PathVariable("id") Long id) { service.deleteDeal(id); }
     @GetMapping("/settlements/inference")
     public TradingDtos.SettlementInferenceResponse settlementInference(
             @RequestParam("partyId") Long partyId,
@@ -35,10 +42,25 @@ public class TradingController {
     ) {
         return service.settlementInference(partyId, tradeDealId, amount);
     }
+    @PreAuthorize("hasAnyRole('OWNER','STAFF')")
     @PostMapping("/settlements") public Settlement createSettlement(@Valid @RequestBody TradingDtos.SettlementCreateRequest req) { return service.createSettlement(req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/settlements/{id}")
+    public Settlement updateSettlement(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.SettlementUpdateRequest req) { return service.updateSettlement(id, req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/settlements/{id}")
+    public void deleteSettlement(@PathVariable("id") Long id) { service.deleteSettlement(id); }
+    @PreAuthorize("hasAnyRole('OWNER','STAFF')")
     @PostMapping("/expenses") public Expense createExpense(@Valid @RequestBody TradingDtos.ExpenseCreateRequest req) { return service.createExpense(req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/expenses/{id}")
+    public Expense updateExpense(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.ExpenseUpdateRequest req) { return service.updateExpense(id, req); }
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/expenses/{id}")
+    public void deleteExpense(@PathVariable("id") Long id) { service.deleteExpense(id); }
 
     @GetMapping("/day-close/{date}") public TradingDtos.DayClosePreview preview(@PathVariable("date") LocalDate date) { return service.previewDayClose(date); }
+    @PreAuthorize("hasRole('OWNER')")
     @PostMapping("/day-close/{date}") public TradingDtos.DayCloseResponse confirm(@PathVariable("date") LocalDate date) { return service.confirmDayClose(date); }
 
     @PreAuthorize("hasRole('OWNER')")

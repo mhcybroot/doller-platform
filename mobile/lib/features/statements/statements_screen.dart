@@ -380,7 +380,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 if (!isDailyClosed || widget.session.isOwner)
                   Row(
                     children: [
-                      if (!isDailyClosed)
+                      if (!isDailyClosed && widget.session.isOwner)
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () async {

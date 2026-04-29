@@ -79,6 +79,32 @@ class ApiClient {
     }
   }
 
+  Future<T> put<T>(
+    String path, {
+    Map<String, dynamic>? data,
+    required T Function(dynamic json) parser,
+  }) async {
+    try {
+      final response = await _request(() => _dio.put(path, data: data));
+      return parser(response.data);
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
+  Future<T> delete<T>(
+    String path, {
+    Map<String, dynamic>? data,
+    required T Function(dynamic json) parser,
+  }) async {
+    try {
+      final response = await _request(() => _dio.delete(path, data: data));
+      return parser(response.data);
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
   Future<Uint8List> download(
     String path, {
     required Map<String, dynamic> query,
