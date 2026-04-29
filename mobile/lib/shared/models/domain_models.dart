@@ -164,6 +164,12 @@ class PnlExplainSectionModel {
   final String costMethod;
   final double longFifoRealizedPnlBdt;
   final double shortCoverRealizedPnlBdt;
+  final double longMatchedQty;
+  final double longSellProceedsBdt;
+  final double longBuyCostBdt;
+  final double shortCoverQty;
+  final double shortSellProceedsBdt;
+  final double shortCoverBuyCostBdt;
   final double openLongQty;
   final double openLongValueBdt;
   final double openShortQty;
@@ -183,6 +189,12 @@ class PnlExplainSectionModel {
     required this.costMethod,
     required this.longFifoRealizedPnlBdt,
     required this.shortCoverRealizedPnlBdt,
+    required this.longMatchedQty,
+    required this.longSellProceedsBdt,
+    required this.longBuyCostBdt,
+    required this.shortCoverQty,
+    required this.shortSellProceedsBdt,
+    required this.shortCoverBuyCostBdt,
     required this.openLongQty,
     required this.openLongValueBdt,
     required this.openShortQty,
@@ -206,6 +218,15 @@ class PnlExplainSectionModel {
           (json["longFifoRealizedPnlBdt"] as num?)?.toDouble() ?? 0,
       shortCoverRealizedPnlBdt:
           (json["shortCoverRealizedPnlBdt"] as num?)?.toDouble() ?? 0,
+      longMatchedQty: (json["longMatchedQty"] as num?)?.toDouble() ?? 0,
+      longSellProceedsBdt:
+          (json["longSellProceedsBdt"] as num?)?.toDouble() ?? 0,
+      longBuyCostBdt: (json["longBuyCostBdt"] as num?)?.toDouble() ?? 0,
+      shortCoverQty: (json["shortCoverQty"] as num?)?.toDouble() ?? 0,
+      shortSellProceedsBdt:
+          (json["shortSellProceedsBdt"] as num?)?.toDouble() ?? 0,
+      shortCoverBuyCostBdt:
+          (json["shortCoverBuyCostBdt"] as num?)?.toDouble() ?? 0,
       openLongQty: (json["openLongQty"] as num?)?.toDouble() ?? 0,
       openLongValueBdt: (json["openLongValueBdt"] as num?)?.toDouble() ?? 0,
       openShortQty: (json["openShortQty"] as num?)?.toDouble() ?? 0,

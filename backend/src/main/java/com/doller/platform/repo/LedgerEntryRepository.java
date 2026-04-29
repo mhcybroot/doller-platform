@@ -20,6 +20,9 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> 
     @Query("select coalesce(sum(l.debit - l.credit),0) from LedgerEntry l where l.accountCode like concat(:prefix, '%') and l.entryTime between :from and :to")
     BigDecimal netForAccountPrefix(@Param("prefix") String prefix, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    @Query("select coalesce(sum(l.debit - l.credit),0) from LedgerEntry l where l.accountCode like concat(:prefix, '%') and l.entryTime <= :to")
+    BigDecimal netForAccountPrefixUntil(@Param("prefix") String prefix, @Param("to") LocalDateTime to);
+
     @Query("select coalesce(sum(l.debit - l.credit),0) from LedgerEntry l where l.accountCode = :account and l.entryTime <= :to")
     BigDecimal netForAccountUntil(@Param("account") String account, @Param("to") LocalDateTime to);
 }

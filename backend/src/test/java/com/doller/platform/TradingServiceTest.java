@@ -309,4 +309,68 @@ class TradingServiceTest {
         assertTrue(tx.rows().stream().anyMatch(r -> "OPENING RECEIVABLE".equals(r.directionLabel())));
         assertTrue(tx.rows().stream().anyMatch(r -> "OPENING PAYABLE".equals(r.directionLabel())));
     }
+
+    @Test
+    void balanceSheetReportUsesLiveRecomputeWithoutDayClose() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Live Party").build());
+        LocalDate day = LocalDate.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("110"),
+                day.atTime(10, 0), "sell"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("500"), day.atTime(12, 0), SettlementPaymentMethod.CASH, null, "incoming", false
+        ));
+        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(
+                com.doller.platform.domain.enums.ExpenseType.OFFICE_MANAGEMENT,
+                null,
+                new BigDecimal("100"),
+                day.atTime(13, 0),
+                "cost",
+                ""
+        ));
+
+        var report = tradingService.balanceSheetReport("DAILY", day, null, null, null, null);
+        assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("600.00")));
+        assertEquals(0, report.totalPnl().compareTo(new BigDecimal("1000.00")));
+    }
+
+    @Test
+    void balanceSheetClosingMatchesDuesAndTotalPnlMatchesDashboardPeriod() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party customer = partyRepository.save(Party.builder().name("Customer Z").build());
+        Party supplier = partyRepository.save(Party.builder().name("Supplier Z").build());
+        LocalDate from = LocalDate.now().minusDays(1);
+        LocalDate to = from.plusDays(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, supplier.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("120"),
+                from.atTime(9, 0), "buy"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, customer.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("130"),
+                to.atTime(11, 0), "sell"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                customer.getId(), null, new BigDecimal("200"), to.atTime(14, 0), SettlementPaymentMethod.BANK, "ref", "incoming", false
+        ));
+        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(
+                com.doller.platform.domain.enums.ExpenseType.OFFICE_MANAGEMENT,
+                null,
+                new BigDecimal("50"),
+                to.atTime(15, 0),
+                "owner",
+                ""
+        ));
+
+        var balance = tradingService.balanceSheetReport("CUSTOM", null, null, null, from, to);
+        var dues = tradingService.duesSnapshot();
+        var explain = tradingService.dashboardPnlExplain("CUSTOM", null, null, null, from, to);
+
+        assertEquals(0, balance.closingReceivableBdt().compareTo(dues.totalReceivableBdt()));
+        assertEquals(0, balance.closingPayableBdt().compareTo(dues.totalPayableBdt()));
+        assertEquals(0, balance.totalPnl().compareTo(explain.period().netPnlBdt()));
+    }
 }

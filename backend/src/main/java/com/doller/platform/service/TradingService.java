@@ -418,14 +418,11 @@ public class TradingService {
     }
 
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {
-        BigDecimal totalReceivable = BigDecimal.ZERO;
-        BigDecimal totalPayable = BigDecimal.ZERO;
+        BalancePosition totals = businessPositionAt(null);
         List<TradingDtos.PartyDueRow> rows = new ArrayList<>();
 
         for (Party party : partyRepo.findByDeletedFalse()) {
             TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
-            totalReceivable = totalReceivable.add(balances.receivableBdt());
-            totalPayable = totalPayable.add(balances.payableBdt());
             rows.add(new TradingDtos.PartyDueRow(
                     party.getId(),
                     party.getName(),
@@ -438,8 +435,10 @@ public class TradingService {
             ));
         }
 
-        BigDecimal gross = totalReceivable.add(totalPayable);
-        BigDecimal net = totalReceivable.subtract(totalPayable);
+        BigDecimal totalReceivable = bdt(totals.receivableBdt());
+        BigDecimal totalPayable = bdt(totals.payableBdt());
+        BigDecimal gross = bdt(totalReceivable.add(totalPayable));
+        BigDecimal net = bdt(totalReceivable.subtract(totalPayable));
         return new TradingDtos.DuesSnapshotResponse(totalReceivable, totalPayable, gross, net, rows);
     }
 
@@ -451,22 +450,24 @@ public class TradingService {
 
     public TradingDtos.BalanceSheetResponse balanceSheetReport(String mode, LocalDate date, Integer month, Integer year, LocalDate from, LocalDate to) {
         LocalDate[] range = resolveReportRange(mode, date, month, year, from, to);
-        List<TradingDtos.StatementLine> lines = statementRange(range[0], range[1]);
-        BigDecimal openingCash = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingCash();
-        BigDecimal closingCash = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingCash();
-        BigDecimal openingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingUsd();
-        BigDecimal closingUsd = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingUsd();
-        BigDecimal openingReceivable = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingReceivableBdt();
-        BigDecimal closingReceivable = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingReceivableBdt();
-        BigDecimal openingPayable = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingPayableBdt();
-        BigDecimal closingPayable = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingPayableBdt();
-        BigDecimal openingAdvanceFromParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAdvanceFromPartyBdt();
-        BigDecimal closingAdvanceFromParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAdvanceFromPartyBdt();
-        BigDecimal openingAdvanceToParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAdvanceToPartyBdt();
-        BigDecimal closingAdvanceToParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAdvanceToPartyBdt();
-        BigDecimal openingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAgingBdt();
-        BigDecimal closingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAgingBdt();
-        BigDecimal totalPnl = lines.stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<TradingDtos.StatementLine> lines = liveStatementRange(range[0], range[1]);
+        TradingDtos.StatementLine first = lines.getFirst();
+        TradingDtos.StatementLine last = lines.getLast();
+        BigDecimal openingCash = bdt(first.openingCash());
+        BigDecimal closingCash = bdt(last.closingCash());
+        BigDecimal openingUsd = first.openingUsd();
+        BigDecimal closingUsd = last.closingUsd();
+        BigDecimal openingReceivable = bdt(first.openingReceivableBdt());
+        BigDecimal closingReceivable = bdt(last.closingReceivableBdt());
+        BigDecimal openingPayable = bdt(first.openingPayableBdt());
+        BigDecimal closingPayable = bdt(last.closingPayableBdt());
+        BigDecimal openingAdvanceFromParty = bdt(first.openingAdvanceFromPartyBdt());
+        BigDecimal closingAdvanceFromParty = bdt(last.closingAdvanceFromPartyBdt());
+        BigDecimal openingAdvanceToParty = bdt(first.openingAdvanceToPartyBdt());
+        BigDecimal closingAdvanceToParty = bdt(last.closingAdvanceToPartyBdt());
+        BigDecimal openingAging = bdt(first.openingAgingBdt());
+        BigDecimal closingAging = bdt(last.closingAgingBdt());
+        BigDecimal totalPnl = bdt(pnlMetrics(range[0], range[1]).netPnlBdt());
         return new TradingDtos.BalanceSheetResponse(
                 normalizeMode(mode),
                 range[0],
@@ -872,6 +873,10 @@ public class TradingService {
     }
 
     private BalancePosition aggregateBusinessPositionAt(LocalDate asOfDate) {
+        return businessPositionAt(asOfDate);
+    }
+
+    private BalancePosition businessPositionAt(LocalDate asOfDate) {
         BigDecimal receivable = BigDecimal.ZERO;
         BigDecimal payable = BigDecimal.ZERO;
         BigDecimal advanceFromParty = BigDecimal.ZERO;
@@ -889,6 +894,56 @@ public class TradingService {
 
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
+    }
+
+    private List<TradingDtos.StatementLine> liveStatementRange(LocalDate from, LocalDate to) {
+        List<TradingDtos.StatementLine> lines = new ArrayList<>();
+        LocalDate cursor = from;
+        while (!cursor.isAfter(to)) {
+            lines.add(liveStatementLine(cursor));
+            cursor = cursor.plusDays(1);
+        }
+        return lines;
+    }
+
+    private TradingDtos.StatementLine liveStatementLine(LocalDate businessDate) {
+        LocalDate priorDate = businessDate.minusDays(1);
+        BalancePosition openingPosition = businessPositionAt(priorDate);
+        BalancePosition closingPosition = businessPositionAt(businessDate);
+        BigDecimal openingCash = cashAt(priorDate);
+        BigDecimal closingCash = cashAt(businessDate);
+        BigDecimal openingUsd = usdAt(priorDate);
+        BigDecimal closingUsd = usdAt(businessDate);
+        BigDecimal dayPnl = bdt(pnlMetrics(businessDate, businessDate).netPnlBdt());
+
+        return new TradingDtos.StatementLine(
+                businessDate,
+                bdt(openingCash),
+                bdt(closingCash),
+                openingUsd,
+                closingUsd,
+                bdt(openingPosition.receivableBdt()),
+                bdt(closingPosition.receivableBdt()),
+                bdt(openingPosition.payableBdt()),
+                bdt(closingPosition.payableBdt()),
+                bdt(openingPosition.advanceFromPartyBdt()),
+                bdt(closingPosition.advanceFromPartyBdt()),
+                bdt(openingPosition.advanceToPartyBdt()),
+                bdt(closingPosition.advanceToPartyBdt()),
+                bdt(openingPosition.agingDueBdt()),
+                bdt(closingPosition.agingDueBdt()),
+                dayPnl
+        );
+    }
+
+    private BigDecimal cashAt(LocalDate asOfDate) {
+        LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
+        return ledgerRepo.netForAccountUntil("CASH", cutoff);
+    }
+
+    private BigDecimal usdAt(LocalDate asOfDate) {
+        LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
+        return ledgerRepo.netForAccountPrefixUntil("FX_INVENTORY_", cutoff);
     }
 
     private BalancePosition closingPositionFromSnapshot(StatementSnapshot snapshot) {
@@ -1215,6 +1270,12 @@ public class TradingService {
                 "FIFO",
                 metrics.longFifoRealizedPnlBdt(),
                 metrics.shortCoverRealizedPnlBdt(),
+                metrics.longMatchedQty(),
+                metrics.longSellProceedsBdt(),
+                metrics.longBuyCostBdt(),
+                metrics.shortCoverQty(),
+                metrics.shortSellProceedsBdt(),
+                metrics.shortCoverBuyCostBdt(),
                 metrics.openLongQty(),
                 metrics.openLongValueBdt(),
                 metrics.openShortQty(),
@@ -1266,6 +1327,12 @@ public class TradingService {
         BigDecimal sell = BigDecimal.ZERO;
         BigDecimal longRealized = BigDecimal.ZERO;
         BigDecimal shortCoverRealized = BigDecimal.ZERO;
+        BigDecimal longMatchedQty = BigDecimal.ZERO;
+        BigDecimal longSellProceeds = BigDecimal.ZERO;
+        BigDecimal longBuyCost = BigDecimal.ZERO;
+        BigDecimal shortCoverQty = BigDecimal.ZERO;
+        BigDecimal shortSellProceeds = BigDecimal.ZERO;
+        BigDecimal shortCoverBuyCost = BigDecimal.ZERO;
 
         Map<String, InstrumentState> stateByInstrument = new HashMap<>();
         for (TradeDeal deal : allDealsUntilTo) {
@@ -1291,6 +1358,9 @@ public class TradingService {
                     BigDecimal realized = shortLot.unitRate().subtract(rate).multiply(covered);
                     if (inPeriod) {
                         shortCoverRealized = shortCoverRealized.add(realized);
+                        shortCoverQty = shortCoverQty.add(covered);
+                        shortSellProceeds = shortSellProceeds.add(shortLot.unitRate().multiply(covered));
+                        shortCoverBuyCost = shortCoverBuyCost.add(rate.multiply(covered));
                     }
                     remaining = remaining.subtract(covered);
                     BigDecimal shortLeft = shortLot.quantity().subtract(covered);
@@ -1310,6 +1380,9 @@ public class TradingService {
                     BigDecimal realized = rate.subtract(longLot.unitRate()).multiply(matched);
                     if (inPeriod) {
                         longRealized = longRealized.add(realized);
+                        longMatchedQty = longMatchedQty.add(matched);
+                        longSellProceeds = longSellProceeds.add(rate.multiply(matched));
+                        longBuyCost = longBuyCost.add(longLot.unitRate().multiply(matched));
                     }
                     remaining = remaining.subtract(matched);
                     BigDecimal longLeft = longLot.quantity().subtract(matched);
@@ -1370,6 +1443,12 @@ public class TradingService {
                 gross,
                 longRealized,
                 shortCoverRealized,
+                longMatchedQty,
+                longSellProceeds,
+                longBuyCost,
+                shortCoverQty,
+                shortSellProceeds,
+                shortCoverBuyCost,
                 openLongQty,
                 openLongValue,
                 openShortQty,
@@ -1380,12 +1459,22 @@ public class TradingService {
         );
     }
 
+    private BigDecimal bdt(BigDecimal value) {
+        return value.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
     private record PnlMetrics(
             BigDecimal buyBdt,
             BigDecimal sellBdt,
             BigDecimal grossPnlBdt,
             BigDecimal longFifoRealizedPnlBdt,
             BigDecimal shortCoverRealizedPnlBdt,
+            BigDecimal longMatchedQty,
+            BigDecimal longSellProceedsBdt,
+            BigDecimal longBuyCostBdt,
+            BigDecimal shortCoverQty,
+            BigDecimal shortSellProceedsBdt,
+            BigDecimal shortCoverBuyCostBdt,
             BigDecimal openLongQty,
             BigDecimal openLongValueBdt,
             BigDecimal openShortQty,

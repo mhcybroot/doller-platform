@@ -277,13 +277,13 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill('Opening Cash', formatBdt(report.openingCash),
+                  _summaryPill('Opening Cash', formatBdt(report.openingCash),
                       BalancePillTone.neutral),
-                  _reportPill('Closing Cash', formatBdt(report.closingCash),
+                  _summaryPill('Closing Cash', formatBdt(report.closingCash),
                       BalancePillTone.neutral),
-                  _reportPill('Opening USD', formatUsd(report.openingUsd),
+                  _summaryPill('Opening USD', formatUsd(report.openingUsd),
                       BalancePillTone.neutral),
-                  _reportPill('Closing USD', formatUsd(report.closingUsd),
+                  _summaryPill('Closing USD', formatUsd(report.closingUsd),
                       BalancePillTone.neutral),
                 ],
               ),
@@ -294,35 +294,35 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill(
+                  _summaryPill(
                       'Opening Receivable',
                       formatBdt(report.openingReceivableBdt),
                       BalancePillTone.receivable),
-                  _reportPill(
+                  _summaryPill(
                       'Closing Receivable',
                       formatBdt(report.closingReceivableBdt),
                       BalancePillTone.receivable),
-                  _reportPill(
+                  _summaryPill(
                       'Opening Payable',
                       formatBdt(report.openingPayableBdt),
                       BalancePillTone.payable),
-                  _reportPill(
+                  _summaryPill(
                       'Closing Payable',
                       formatBdt(report.closingPayableBdt),
                       BalancePillTone.payable),
-                  _reportPill(
+                  _summaryPill(
                       'Opening Advance In',
                       formatBdt(report.openingAdvanceFromPartyBdt),
                       BalancePillTone.advanceIn),
-                  _reportPill(
+                  _summaryPill(
                       'Closing Advance In',
                       formatBdt(report.closingAdvanceFromPartyBdt),
                       BalancePillTone.advanceIn),
-                  _reportPill(
+                  _summaryPill(
                       'Opening Advance Out',
                       formatBdt(report.openingAdvanceToPartyBdt),
                       BalancePillTone.advanceOut),
-                  _reportPill(
+                  _summaryPill(
                       'Closing Advance Out',
                       formatBdt(report.closingAdvanceToPartyBdt),
                       BalancePillTone.advanceOut),
@@ -335,9 +335,9 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill('Opening Aging',
+                  _summaryPill('Opening Aging',
                       formatBdt(report.openingAgingBdt), BalancePillTone.aging),
-                  _reportPill('Closing Aging',
+                  _summaryPill('Closing Aging',
                       formatBdt(report.closingAgingBdt), BalancePillTone.aging),
                 ],
               ),
@@ -345,12 +345,16 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
               Text('Performance',
                   style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
-              MetricCard(
-                label: 'Total P/L',
-                value: formatBdt(report.totalPnl),
-                caption:
-                    '${formatDate(report.from)} to ${formatDate(report.to)}',
-                positive: report.totalPnl >= 0,
+              GestureDetector(
+                onTap: () => _showBalanceSummaryExplanation(
+                    'Total P/L', formatBdt(report.totalPnl)),
+                child: MetricCard(
+                  label: 'Total P/L',
+                  value: formatBdt(report.totalPnl),
+                  caption:
+                      '${formatDate(report.from)} to ${formatDate(report.to)}',
+                  positive: report.totalPnl >= 0,
+                ),
               ),
             ],
           ),
@@ -364,7 +368,8 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
               children: [
                 Text('Buy ${formatBdt(_preview!.totalBuyBdt)}'),
                 Text('Sell ${formatBdt(_preview!.totalSellBdt)}'),
-                Text('Owner/Company Expense ${formatBdt(_preview!.totalExpenseBdt)}'),
+                Text(
+                    'Owner/Company Expense ${formatBdt(_preview!.totalExpenseBdt)}'),
                 const SizedBox(height: 8),
                 Text(
                   'Projected P/L ${formatBdt(_preview!.realizedProfitLossBdt)}',
@@ -533,15 +538,115 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
       ],
     );
   }
+
+  Widget _summaryPill(String label, String value, BalancePillTone tone) {
+    return GestureDetector(
+      onTap: () => _showBalanceSummaryExplanation(label, value),
+      child: _reportPill(label, value, tone),
+    );
+  }
+
+  void _showBalanceSummaryExplanation(String title, String value) {
+    final (what, why, howNow, changeWhen) = _balanceExplain(title);
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('এখনের মান: $value'),
+            const SizedBox(height: 10),
+            Text('এটা কী:\n$what'),
+            const SizedBox(height: 10),
+            Text('এই অংক কেন দেখাচ্ছে:\n$why'),
+            const SizedBox(height: 10),
+            Text('এখনের মান কীভাবে হিসাব হচ্ছে:\n$howNow'),
+            const SizedBox(height: 10),
+            Text('কখন পরিবর্তন হবে:\n$changeWhen'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('ঠিক আছে'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  (String, String, String, String) _balanceExplain(String title) {
+    if (title.contains('Cash')) {
+      return (
+        'ক্যাশ অ্যাকাউন্টে মোট টাকা (BDT) কত আছে।',
+        'সব deal/settlement/expense সহ ক্যাশে যেসব লেনদেন হয়েছে, তার net effect দেখায়।',
+        'Opening = selected range শুরুর আগের দিনের ending cash, Closing = range শেষ দিনের পর্যন্ত cash ledger net।',
+        'নতুন cash-impact transaction যোগ/এডিট/ডিলিট হলে, বা date range বদলালে বদলাবে।'
+      );
+    }
+    if (title.contains('USD')) {
+      return (
+        'USD inventory quantity (unit), টাকায় না, পরিমাণে দেখায়।',
+        'BUY হলে inventory বাড়ে, SELL হলে কমে।',
+        'FX inventory ledger থেকে cumulative unit balance নিয়ে opening/closing হিসাব করা হয়।',
+        'USD BUY/SELL পরিবর্তন হলে বা date range বদলালে মান পরিবর্তন হবে।'
+      );
+    }
+    if (title.contains('Receivable')) {
+      return (
+        'কাস্টমারের কাছে পাওনা বাকি টাকা।',
+        'SELL/settlement/opening balance মিলিয়ে যেটা এখনো পাওয়া বাকি, সেটাই receivable।',
+        'Party-wise receivable যোগ করে report total দেখানো হয়।',
+        'SELL বাড়লে বা incoming settlement কম/বেশি হলে মান বদলাবে।'
+      );
+    }
+    if (title.contains('Payable')) {
+      return (
+        'সাপ্লায়ারকে দেওয়ার বাকি টাকা।',
+        'BUY/settlement/opening balance থেকে outstanding payable হিসাব হয়।',
+        'সব party payable যোগ করে opening/closing payable দেখায়।',
+        'BUY, outgoing settlement, opening adjustments বা range change হলে বদলাবে।'
+      );
+    }
+    if (title.contains('Advance')) {
+      return (
+        'Due ছাড়াও অগ্রিম দেওয়া/নেওয়া টাকার balance।',
+        'Settlement due-এর বেশি/কম apply হলে advance-in বা advance-out তৈরি হয়।',
+        'Opening/closing advance party-wise ledger net থেকে aggregate করা হয়।',
+        'Advance-related settlement যোগ/এডিট/ডিলিট করলে এটি পরিবর্তন হবে।'
+      );
+    }
+    if (title.contains('Aging')) {
+      return (
+        'পুরনো বকেয়া receivable যেটা এখনো ক্লিয়ার হয়নি।',
+        'SELL due থেকে incoming settlement cover বাদ দিয়ে aging outstanding হিসাব হয়।',
+        'Party-level aging যোগফল opening/closing aging metric এ দেখানো হয়।',
+        'পুরনো due settle হলে কমে, নতুন unpaid receivable যোগ হলে বাড়ে।'
+      );
+    }
+    return (
+      'নির্বাচিত সময়ের মোট লাভ/ক্ষতি (Net P/L)।',
+      'Trading gross P/L থেকে expense বাদ দিয়ে final net amount দেখায়।',
+      'Formula: Net P/L = Period Gross P/L - Period Expense (live recompute)।',
+      'Deal/expense update, settlement impact, বা period change হলে এই মান বদলাবে।'
+    );
+  }
 }
 
-Widget _reportPill(String label, String value, BalancePillTone tone) {
+Widget _reportPill(String label, String value, BalancePillTone tone,
+    {VoidCallback? onTap}) {
   return SizedBox(
     width: 150,
-    child: BalancePill(
-      label: label,
-      value: value,
-      tone: tone,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: BalancePill(
+        label: label,
+        value: value,
+        tone: tone,
+      ),
     ),
   );
 }
@@ -725,9 +830,8 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     final notes = TextEditingController(text: row.notes ?? '');
     int selectedPartyId = row.partyId!;
     String selectedInstrument = row.instrumentCode!;
-    String dealType = row.directionLabel!.toUpperCase().contains('SELL')
-        ? 'SELL'
-        : 'BUY';
+    String dealType =
+        row.directionLabel!.toUpperCase().contains('SELL') ? 'SELL' : 'BUY';
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -743,7 +847,8 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Edit Deal', style: Theme.of(context).textTheme.titleLarge),
+                Text('Edit Deal',
+                    style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: dealType,
@@ -907,15 +1012,13 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                     ...partyDeals.map(
                       (deal) => DropdownMenuItem<int?>(
                         value: deal.id,
-                        child: Text(
-                            'Deal #${deal.id} • ${deal.dealType}'),
+                        child: Text('Deal #${deal.id} • ${deal.dealType}'),
                       ),
                     ),
                   ],
                   onChanged: (value) =>
                       setModalState(() => selectedDealId = value),
-                  decoration:
-                      const InputDecoration(labelText: 'Related Deal'),
+                  decoration: const InputDecoration(labelText: 'Related Deal'),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -927,7 +1030,8 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                   ],
                   onChanged: (value) =>
                       setModalState(() => paymentMethod = value ?? 'CASH'),
-                  decoration: const InputDecoration(labelText: 'Payment Method'),
+                  decoration:
+                      const InputDecoration(labelText: 'Payment Method'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -993,72 +1097,75 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          24,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 24,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            24,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Expense',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount (BDT)')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: expenseType,
+                items: const [
+                  DropdownMenuItem(
+                      value: 'OFFICE_MANAGEMENT',
+                      child: Text('OFFICE MANAGEMENT')),
+                  DropdownMenuItem(
+                      value: 'TRANSPORT', child: Text('TRANSPORT')),
+                  DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+                  DropdownMenuItem(value: 'RENT', child: Text('RENT')),
+                  DropdownMenuItem(
+                      value: 'EMPLOYEE_SALARY', child: Text('EMPLOYEE SALARY')),
+                  DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
+                ],
+                onChanged: (value) =>
+                    setModalState(() => expenseType = value ?? expenseType),
+                decoration: const InputDecoration(labelText: 'Expense Type'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: category,
+                  decoration: const InputDecoration(labelText: 'Category')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await widget.repository.updateExpense(
+                      id: row.entryId,
+                      expenseType: expenseType,
+                      amount: double.parse(amount.text),
+                      category: category.text.trim(),
+                      notes: notes.text.trim(),
+                      expenseTime: row.occurredAt,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                  } on ApiException catch (error) {
+                    showAppMessage(context, error.message, isError: true);
+                  } on FormatException {
+                    showAppMessage(context, 'Enter valid numbers',
+                        isError: true);
+                  }
+                },
+                child: const Text('Update Expense'),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Edit Expense', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            TextField(
-                controller: amount,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount (BDT)')),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: expenseType,
-              items: const [
-                DropdownMenuItem(
-                    value: 'OFFICE_MANAGEMENT',
-                    child: Text('OFFICE MANAGEMENT')),
-                DropdownMenuItem(value: 'TRANSPORT', child: Text('TRANSPORT')),
-                DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
-                DropdownMenuItem(value: 'RENT', child: Text('RENT')),
-                DropdownMenuItem(
-                    value: 'EMPLOYEE_SALARY', child: Text('EMPLOYEE SALARY')),
-                DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
-              ],
-              onChanged: (value) =>
-                  setModalState(() => expenseType = value ?? expenseType),
-              decoration: const InputDecoration(labelText: 'Expense Type'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-                controller: category,
-                decoration: const InputDecoration(labelText: 'Category')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: notes,
-                decoration: const InputDecoration(labelText: 'Notes')),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await widget.repository.updateExpense(
-                    id: row.entryId,
-                    expenseType: expenseType,
-                    amount: double.parse(amount.text),
-                    category: category.text.trim(),
-                    notes: notes.text.trim(),
-                    expenseTime: row.occurredAt,
-                  );
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                } on ApiException catch (error) {
-                  showAppMessage(context, error.message, isError: true);
-                } on FormatException {
-                  showAppMessage(context, 'Enter valid numbers', isError: true);
-                }
-              },
-              child: const Text('Update Expense'),
-            ),
-          ],
-        ),
-      ),
       ),
     );
     await _load();
@@ -1129,8 +1236,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                       value: 'SETTLEMENT', child: Text('Settlements')),
                   DropdownMenuItem(value: 'EXPENSE', child: Text('Expenses')),
                   DropdownMenuItem(
-                      value: 'OPENING_BALANCE',
-                      child: Text('Opening Balance')),
+                      value: 'OPENING_BALANCE', child: Text('Opening Balance')),
                 ],
                 onChanged: (value) async {
                   setState(() =>
@@ -1327,9 +1433,10 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
     final isOutgoingSettlement =
         row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
-    final sign = row.entryType == 'EXPENSE' || isOutgoingSettlement || isOpeningPayable
-        ? '-'
-        : '+';
+    final sign =
+        row.entryType == 'EXPENSE' || isOutgoingSettlement || isOpeningPayable
+            ? '-'
+            : '+';
     return '$sign${formatBdt(amount.abs())}';
   }
 
@@ -1337,8 +1444,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     final direction = (row.directionLabel ?? '').toUpperCase();
     final isOpeningPayable =
         row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
-    final isNegative =
-        row.entryType == 'EXPENSE' ||
+    final isNegative = row.entryType == 'EXPENSE' ||
         (row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING')) ||
         isOpeningPayable;
     return isNegative ? Colors.red.shade700 : Colors.green.shade700;
