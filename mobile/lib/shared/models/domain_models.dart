@@ -25,7 +25,8 @@ class DealSummary {
   final int id;
   final String partyName;
   final String dealType;
-  final double usdAmount;
+  final String instrumentCode;
+  final double quantity;
   final double bdtGross;
   final DateTime dealTime;
   final bool lockedByDayClose;
@@ -34,7 +35,8 @@ class DealSummary {
     required this.id,
     required this.partyName,
     required this.dealType,
-    required this.usdAmount,
+    required this.instrumentCode,
+    required this.quantity,
     required this.bdtGross,
     required this.dealTime,
     required this.lockedByDayClose,
@@ -45,7 +47,9 @@ class DealSummary {
       id: (json["id"] as num).toInt(),
       partyName: json["partyName"] as String,
       dealType: json["dealType"] as String,
-      usdAmount: (json["usdAmount"] as num).toDouble(),
+      instrumentCode: json["instrumentCode"] as String? ?? 'USD',
+      quantity: (json["quantity"] as num?)?.toDouble() ??
+          (json["usdAmount"] as num).toDouble(),
       bdtGross: (json["bdtGross"] as num).toDouble(),
       dealTime: DateTime.parse(json["dealTime"] as String),
       lockedByDayClose: json["lockedByDayClose"] as bool? ?? false,
@@ -56,25 +60,53 @@ class DealSummary {
 class DashboardMetrics {
   final double receivableBdt;
   final double payableBdt;
-  final double usdPosition;
+  final double totalPositionValuationBdt;
   final double todayPnL;
   final double periodPnL;
+  final List<InstrumentPositionModel> positions;
 
   const DashboardMetrics({
     required this.receivableBdt,
     required this.payableBdt,
-    required this.usdPosition,
+    required this.totalPositionValuationBdt,
     required this.todayPnL,
     required this.periodPnL,
+    required this.positions,
   });
 
   factory DashboardMetrics.fromJson(Map<String, dynamic> json) {
     return DashboardMetrics(
       receivableBdt: (json["receivableBdt"] as num).toDouble(),
       payableBdt: (json["payableBdt"] as num).toDouble(),
-      usdPosition: (json["usdPosition"] as num).toDouble(),
+      totalPositionValuationBdt:
+          (json["totalPositionValuationBdt"] as num?)?.toDouble() ??
+              (json["usdPosition"] as num? ?? 0).toDouble(),
       todayPnL: (json["todayPnL"] as num).toDouble(),
       periodPnL: (json["periodPnL"] as num).toDouble(),
+      positions: (json["positions"] as List<dynamic>? ?? const [])
+          .map((item) =>
+              InstrumentPositionModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class InstrumentPositionModel {
+  final String instrumentCode;
+  final double quantity;
+  final double valuationBdt;
+
+  const InstrumentPositionModel({
+    required this.instrumentCode,
+    required this.quantity,
+    required this.valuationBdt,
+  });
+
+  factory InstrumentPositionModel.fromJson(Map<String, dynamic> json) {
+    return InstrumentPositionModel(
+      instrumentCode: json["instrumentCode"] as String,
+      quantity: (json["quantity"] as num).toDouble(),
+      valuationBdt: (json["valuationBdt"] as num).toDouble(),
     );
   }
 }
@@ -331,8 +363,9 @@ class TransactionDetailRowModel {
   final DateTime occurredAt;
   final int? partyId;
   final String? partyName;
+  final String? instrumentCode;
+  final double? quantity;
   final double amountBdt;
-  final double? usdAmount;
   final double? bdtRate;
   final String? directionLabel;
   final String? referenceLabel;
@@ -345,8 +378,9 @@ class TransactionDetailRowModel {
     required this.occurredAt,
     required this.partyId,
     required this.partyName,
+    required this.instrumentCode,
+    required this.quantity,
     required this.amountBdt,
-    required this.usdAmount,
     required this.bdtRate,
     required this.directionLabel,
     required this.referenceLabel,
@@ -361,8 +395,9 @@ class TransactionDetailRowModel {
       occurredAt: DateTime.parse(json["occurredAt"] as String),
       partyId: (json["partyId"] as num?)?.toInt(),
       partyName: json["partyName"] as String?,
+      instrumentCode: json["instrumentCode"] as String?,
+      quantity: (json["quantity"] as num?)?.toDouble(),
       amountBdt: (json["amountBdt"] as num).toDouble(),
-      usdAmount: (json["usdAmount"] as num?)?.toDouble(),
       bdtRate: (json["bdtRate"] as num?)?.toDouble(),
       directionLabel: json["directionLabel"] as String?,
       referenceLabel: json["referenceLabel"] as String?,

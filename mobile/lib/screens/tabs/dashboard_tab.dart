@@ -22,8 +22,10 @@ class _DashboardTabState extends State<DashboardTab> {
   Future<void> load() async {
     final now = DateTime.now();
     final from = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
-    final to = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final res = await widget.api.get('/dashboard', query: {'from': from, 'to': to});
+    final to =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final res =
+        await widget.api.get('/dashboard', query: {'from': from, 'to': to});
     final s = await widget.api.queueStats();
     setState(() {
       data = Map<String, dynamic>.from(res.data);
@@ -41,7 +43,8 @@ class _DashboardTabState extends State<DashboardTab> {
         Text('Period P/L: ${data!['periodPnL']} BDT'),
         Text('Receivable: ${data!['receivableBdt']} BDT'),
         Text('Payable: ${data!['payableBdt']} BDT'),
-        Text('USD Position: ${data!['usdPosition']} USD'),
+        Text(
+            'Position Value: ${data!['totalPositionValuationBdt'] ?? data!['usdPosition']} BDT'),
         const Divider(height: 24),
         Text('Sync Pending: ${stats['pending']}'),
         Text('Sync Failed: ${stats['failed']}'),

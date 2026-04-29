@@ -78,7 +78,8 @@ class DollerRepository {
   Future<void> createDeal({
     required String dealType,
     required int partyId,
-    required double usdAmount,
+    required String instrumentCode,
+    required double quantity,
     required double bdtRate,
     required String notes,
   }) async {
@@ -87,7 +88,8 @@ class DollerRepository {
       data: {
         'dealType': dealType,
         'partyId': partyId,
-        'usdAmount': usdAmount,
+        'instrumentCode': instrumentCode,
+        'quantity': quantity,
         'bdtRate': bdtRate,
         'dealTime': DateTime.now().toIso8601String(),
         'notes': notes,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
@@ -15,12 +16,13 @@ class TradingScreen extends StatefulWidget {
 }
 
 class _TradingScreenState extends State<TradingScreen> {
-  final _usdController = TextEditingController();
+  final _quantityController = TextEditingController();
   final _rateController = TextEditingController();
   final _amountController = TextEditingController();
   final _categoryController = TextEditingController(text: 'staff');
   final _noteController = TextEditingController();
   String _dealType = 'BUY';
+  String _instrumentCode = 'USD';
   String _expenseType = 'DAILY_OVERHEAD';
   bool _allowAdvance = false;
   int _mode = 0;
@@ -126,7 +128,8 @@ class _TradingScreenState extends State<TradingScreen> {
         await widget.repository.createDeal(
           dealType: _dealType,
           partyId: _selectedParty!.id,
-          usdAmount: double.parse(_usdController.text),
+          instrumentCode: _instrumentCode,
+          quantity: double.parse(_quantityController.text),
           bdtRate: double.parse(_rateController.text),
           notes: _noteController.text.trim(),
         );
@@ -157,7 +160,7 @@ class _TradingScreenState extends State<TradingScreen> {
         showAppMessage(context, 'Expense saved');
       }
       _noteController.clear();
-      _usdController.clear();
+      _quantityController.clear();
       _rateController.clear();
       _amountController.clear();
       _allowAdvance = false;
@@ -253,10 +256,23 @@ class _TradingScreenState extends State<TradingScreen> {
                   decoration: const InputDecoration(labelText: 'Deal Type'),
                 ),
                 const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _instrumentCode,
+                  items: supportedInstrumentCodes
+                      .map((instrument) => DropdownMenuItem(
+                            value: instrument,
+                            child: Text(instrumentDisplayName(instrument)),
+                          ))
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _instrumentCode = value ?? 'USD'),
+                  decoration: const InputDecoration(labelText: 'Instrument'),
+                ),
+                const SizedBox(height: 12),
                 TextField(
-                  controller: _usdController,
+                  controller: _quantityController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'USD Amount'),
+                  decoration: const InputDecoration(labelText: 'Quantity'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -275,7 +291,7 @@ class _TradingScreenState extends State<TradingScreen> {
                       (deal) => DropdownMenuItem(
                         value: deal.id,
                         child: Text(
-                            '#${deal.id} ${deal.dealType} ${formatUsd(deal.usdAmount)}'),
+                            '#${deal.id} ${deal.dealType} ${instrumentDisplayName(deal.instrumentCode)} ${deal.quantity}'),
                       ),
                     ),
                   ],

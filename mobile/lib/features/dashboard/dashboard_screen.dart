@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
@@ -65,7 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Executive Overview', style: Theme.of(context).textTheme.headlineMedium),
+          Text('Executive Overview',
+              style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text(
             'A clean view of liquidity, receivables, payables, and sync health.',
@@ -111,9 +113,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Expanded(
                   child: MetricCard(
-                    label: 'USD Position',
-                    value: formatUsd(_metrics!.usdPosition),
-                    caption: 'Net open dollar balance',
+                    label: 'Position Value',
+                    value: formatBdt(_metrics!.totalPositionValuationBdt),
+                    caption: 'Total open position valued in BDT',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -123,13 +125,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     value: '${_stats['pending']} pending',
                     caption:
                         '${_stats['failed']} failed / ${_stats['poison']} poison',
-                    positive: (_stats['failed'] ?? 0) == 0 && (_stats['poison'] ?? 0) == 0,
+                    positive: (_stats['failed'] ?? 0) == 0 &&
+                        (_stats['poison'] ?? 0) == 0,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
+          if (_metrics!.positions.isNotEmpty)
+            FinanceSection(
+              title: 'Per Instrument Positions',
+              child: Column(
+                children: _metrics!.positions
+                    .map(
+                      (position) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                            instrumentDisplayName(position.instrumentCode)),
+                        subtitle: Text('Qty ${position.quantity}'),
+                        trailing: Text(
+                          formatBdt(position.valuationBdt),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          if (_metrics!.positions.isNotEmpty) const SizedBox(height: 16),
           FinanceSection(
             title: 'Sync Controls',
             child: Row(

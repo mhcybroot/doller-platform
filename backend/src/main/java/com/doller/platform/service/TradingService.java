@@ -50,12 +50,14 @@ public class TradingService {
         requireOpenDay(req.dealTime().toLocalDate());
         Party party = partyRepo.findById(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         UserAccount by = getCurrentUser();
-        BigDecimal gross = req.usdAmount().multiply(req.bdtRate());
+        BigDecimal gross = req.quantity().multiply(req.bdtRate());
+        String inventoryAccount = fxInventoryAccount(req.instrumentCode().name());
         TradeDeal deal = dealRepo.save(TradeDeal.builder()
                 .dealType(req.dealType())
                 .party(party)
                 .createdBy(by)
-                .usdAmount(req.usdAmount())
+                .instrumentCode(req.instrumentCode())
+                .quantity(req.quantity())
                 .bdtRate(req.bdtRate())
                 .bdtGross(gross)
                 .dealTime(req.dealTime())
@@ -64,11 +66,11 @@ public class TradingService {
                 .build());
 
         if (req.dealType() == DealType.BUY) {
-            ledgerService.post(req.dealTime(), "USD_INVENTORY", req.usdAmount(), BigDecimal.ZERO, "DEAL", deal.getId(), "Buy USD");
+            ledgerService.post(req.dealTime(), inventoryAccount, req.quantity(), BigDecimal.ZERO, "DEAL", deal.getId(), "Buy " + req.instrumentCode().name());
             ledgerService.post(req.dealTime(), "PAYABLE_" + party.getId(), BigDecimal.ZERO, gross, "DEAL", deal.getId(), "Payable to party");
         } else {
             ledgerService.post(req.dealTime(), "RECEIVABLE_" + party.getId(), gross, BigDecimal.ZERO, "DEAL", deal.getId(), "Receivable from party");
-            ledgerService.post(req.dealTime(), "USD_INVENTORY", BigDecimal.ZERO, req.usdAmount(), "DEAL", deal.getId(), "Sell USD");
+            ledgerService.post(req.dealTime(), inventoryAccount, BigDecimal.ZERO, req.quantity(), "DEAL", deal.getId(), "Sell " + req.instrumentCode().name());
         }
         auditService.log("CREATE_DEAL", "/deals", "partyId=" + party.getId(), null, null, "deal:" + deal.getId());
         return deal;
@@ -82,7 +84,8 @@ public class TradingService {
                         d.getId(),
                         d.getParty().getName(),
                         d.getDealType(),
-                        d.getUsdAmount(),
+                        d.getInstrumentCode(),
+                        d.getQuantity(),
                         d.getBdtGross(),
                         d.getDealTime(),
                         d.isLockedByDayClose()
@@ -171,7 +174,7 @@ public class TradingService {
 
         var range = dayRange(date);
         BigDecimal cashNet = ledgerRepo.netForAccount("CASH", range[0], range[1]);
-        BigDecimal usdNet = ledgerRepo.netForAccount("USD_INVENTORY", range[0], range[1]);
+        BigDecimal usdNet = ledgerRepo.netForAccountPrefix("FX_INVENTORY_", range[0], range[1]);
         BigDecimal closingCash = openingCash.add(cashNet);
         BigDecimal closingUsd = openingUsd.add(usdNet);
         BalancePosition closingPosition = aggregateBusinessPositionAt(date);
@@ -230,13 +233,27 @@ public class TradingService {
             payable = payable.add(balances.payableBdt());
         }
         var range = new LocalDateTime[]{from.atStartOfDay(), to.plusDays(1).atStartOfDay().minusNanos(1)};
-        BigDecimal usd = dealRepo.findByDealTimeBetween(range[0], range[1]).stream()
-                .map(d -> d.getDealType() == DealType.BUY ? d.getUsdAmount() : d.getUsdAmount().negate())
+        Map<String, BigDecimal> positionByInstrument = new HashMap<>();
+        for (TradeDeal deal : dealRepo.findAll()) {
+            String code = deal.getInstrumentCode().name();
+            BigDecimal signedQty = deal.getDealType() == DealType.BUY ? deal.getQuantity() : deal.getQuantity().negate();
+            positionByInstrument.merge(code, signedQty, BigDecimal::add);
+        }
+        List<TradingDtos.InstrumentPosition> positions = positionByInstrument.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    BigDecimal latestRate = latestRateForInstrument(entry.getKey());
+                    BigDecimal valuation = entry.getValue().multiply(latestRate);
+                    return new TradingDtos.InstrumentPosition(entry.getKey(), entry.getValue(), valuation);
+                })
+                .toList();
+        BigDecimal totalPositionValuation = positions.stream()
+                .map(TradingDtos.InstrumentPosition::valuationBdt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal periodPnl = statementRange(from, to).stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal todayPnl = snapshotRepo.findByBusinessDate(LocalDate.now()).map(StatementSnapshot::getRealizedProfitLossBdt).orElse(BigDecimal.ZERO);
-        return new TradingDtos.DashboardResponse(receivable, payable, usd, todayPnl, periodPnl);
+        return new TradingDtos.DashboardResponse(receivable, payable, totalPositionValuation, todayPnl, periodPnl, positions);
     }
 
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {
@@ -340,8 +357,9 @@ public class TradingService {
                         deal.getDealTime(),
                         deal.getParty().getId(),
                         deal.getParty().getName(),
+                        deal.getInstrumentCode().name(),
+                        deal.getQuantity(),
                         deal.getBdtGross(),
-                        deal.getUsdAmount(),
                         deal.getBdtRate(),
                         deal.getDealType().name(),
                         "Deal #" + deal.getId(),
@@ -359,8 +377,9 @@ public class TradingService {
                         settlement.getSettlementTime(),
                         settlement.getParty().getId(),
                         settlement.getParty().getName(),
+                        settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getInstrumentCode().name(),
+                        settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getQuantity(),
                         settlement.getBdtAmount(),
-                        null,
                         null,
                         settlement.getDirection().name() + " / " + settlement.getBasis().name(),
                         "Settlement #" + settlement.getId(),
@@ -378,8 +397,9 @@ public class TradingService {
                         expense.getExpenseTime(),
                         expensePartyId(expense),
                         expensePartyName(expense),
+                        expense.getTradeDeal() == null ? null : expense.getTradeDeal().getInstrumentCode().name(),
+                        expense.getTradeDeal() == null ? null : expense.getTradeDeal().getQuantity(),
                         expense.getAmountBdt(),
-                        null,
                         null,
                         expense.getExpenseType().name(),
                         "Expense #" + expense.getId(),
@@ -412,7 +432,7 @@ public class TradingService {
         var deals = dealRepo.findAll().stream().filter(d -> d.getParty().getId().equals(partyId)).toList();
         for (TradeDeal d : deals) {
             BigDecimal signed = d.getDealType() == DealType.SELL ? d.getBdtGross() : d.getBdtGross().negate();
-            lines.add(new TradingDtos.PartyLedgerLine("DEAL-" + d.getDealType(), d.getDealTime(), signed, d.getNotes()));
+            lines.add(new TradingDtos.PartyLedgerLine("DEAL-" + d.getDealType() + "-" + d.getInstrumentCode(), d.getDealTime(), signed, d.getNotes()));
         }
         for (Settlement s : settlementRepo.findByPartyOrderBySettlementTimeAsc(p)) {
             lines.add(new TradingDtos.PartyLedgerLine(
@@ -893,6 +913,18 @@ public class TradingService {
 
     private String expensePartyName(Expense expense) {
         return expense.getTradeDeal() == null ? "Internal" : expense.getTradeDeal().getParty().getName();
+    }
+
+    private String fxInventoryAccount(String instrumentCode) {
+        return "FX_INVENTORY_" + instrumentCode;
+    }
+
+    private BigDecimal latestRateForInstrument(String instrumentCode) {
+        return dealRepo.findAll().stream()
+                .filter(deal -> deal.getInstrumentCode().name().equals(instrumentCode))
+                .max(Comparator.comparing(TradeDeal::getDealTime))
+                .map(TradeDeal::getBdtRate)
+                .orElse(BigDecimal.ZERO);
     }
 
     private boolean matchesSearch(TradingDtos.TransactionDetailRow row, String search) {

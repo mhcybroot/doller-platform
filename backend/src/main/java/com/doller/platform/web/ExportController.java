@@ -103,7 +103,7 @@ public class ExportController {
 
                 cs.beginText();
                 cs.newLineAtOffset(50, 756);
-                cs.showText(String.format("Open Cash=%s | Close Cash=%s | Open USD=%s | Close USD=%s | Total P/L=%s",
+                cs.showText(String.format("Open Cash=%s | Close Cash=%s | Open FX Qty=%s | Close FX Qty=%s | Total P/L=%s",
                         response.openingCash(), response.closingCash(), response.openingUsd(), response.closingUsd(), response.totalPnl()));
                 cs.endText();
 
@@ -132,7 +132,7 @@ public class ExportController {
                     if (y < 60) break;
                     cs.beginText();
                     cs.newLineAtOffset(50, y);
-                    cs.showText(String.format("%s | cash %s->%s | usd %s->%s | rec %s->%s | pay %s->%s | pnl=%s",
+                    cs.showText(String.format("%s | cash %s->%s | fx %s->%s | rec %s->%s | pay %s->%s | pnl=%s",
                             line.date(), line.openingCash(), line.closingCash(), line.openingUsd(), line.closingUsd(),
                             line.openingReceivableBdt(), line.closingReceivableBdt(),
                             line.openingPayableBdt(), line.closingPayableBdt(), line.pnl()));
@@ -176,8 +176,8 @@ public class ExportController {
                     if (y < 60) break;
                     cs.beginText();
                     cs.newLineAtOffset(50, y);
-                    cs.showText(String.format("%s | %s | %s | %s | amount=%s",
-                            row.occurredAt(), row.entryType(), row.partyName(), row.directionLabel(), row.amountBdt()));
+                    cs.showText(String.format("%s | %s | %s | %s | instrument=%s qty=%s amount=%s",
+                            row.occurredAt(), row.entryType(), row.partyName(), row.directionLabel(), row.instrumentCode(), row.quantity(), row.amountBdt()));
                     cs.endText();
                     y -= 14;
                 }

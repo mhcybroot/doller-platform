@@ -3,6 +3,7 @@ package com.doller.platform;
 import com.doller.platform.domain.Party;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
+import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.Role;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.AuditLogRepository;
@@ -76,8 +77,8 @@ class TradingServiceTest {
         LocalDate businessDate = LocalDate.now().plusDays(30);
         LocalDateTime stamp = businessDate.atTime(10, 0);
 
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
         tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.DAILY_OVERHEAD, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
 
         var preview = tradingService.previewDayClose(businessDate);
@@ -92,11 +93,11 @@ class TradingServiceTest {
         LocalDateTime stamp = businessDate.atTime(9, 0);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), new BigDecimal("10"), new BigDecimal("120"),
+                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("120"),
                 stamp, "buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), new BigDecimal("5"), new BigDecimal("130"),
+                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("5"), new BigDecimal("130"),
                 stamp.plusMinutes(30), "sell"
         ));
 
@@ -115,7 +116,7 @@ class TradingServiceTest {
         Party p = partyRepository.save(Party.builder().name("Customer A").build());
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), new BigDecimal("100"), new BigDecimal("120"),
+                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"),
                 LocalDateTime.now(), "sell"
         ));
 
@@ -140,7 +141,7 @@ class TradingServiceTest {
         Party p = partyRepository.save(Party.builder().name("Supplier B").build());
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), new BigDecimal("50"), new BigDecimal("130"),
+                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("130"),
                 LocalDateTime.now(), "buy"
         ));
 
@@ -168,11 +169,11 @@ class TradingServiceTest {
         LocalDateTime t3 = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, customer.getId(), new BigDecimal("100"), new BigDecimal("120"),
+                DealType.SELL, customer.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"),
                 t1, "sell receivable"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, supplier.getId(), new BigDecimal("50"), new BigDecimal("130"),
+                DealType.BUY, supplier.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("130"),
                 t2, "buy payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(

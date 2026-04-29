@@ -2,6 +2,7 @@ package com.doller.platform.dto;
 
 import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.ExpenseType;
+import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
 import jakarta.validation.constraints.DecimalMin;
@@ -14,9 +15,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class TradingDtos {
-    public record DealCreateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull @DecimalMin("0.000001") BigDecimal usdAmount,
+    public record DealCreateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull InstrumentCode instrumentCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
                                     @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
-    public record DealSummary(Long id, String partyName, DealType dealType, BigDecimal usdAmount, BigDecimal bdtGross,
+    public record DealSummary(Long id, String partyName, DealType dealType, InstrumentCode instrumentCode, BigDecimal quantity, BigDecimal bdtGross,
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
     public record SettlementCreateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
                                           @NotNull LocalDateTime settlementTime, String notes, boolean allowAdvance) {}
@@ -37,7 +38,8 @@ public class TradingDtos {
     public record ExpenseCreateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
-    public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal usdPosition, BigDecimal todayPnL, BigDecimal periodPnL) {}
+    public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}
+    public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal totalPositionValuationBdt, BigDecimal todayPnL, BigDecimal periodPnL, List<InstrumentPosition> positions) {}
     public record PartyDueRow(
             Long partyId,
             String partyName,
@@ -100,8 +102,9 @@ public class TradingDtos {
             LocalDateTime occurredAt,
             Long partyId,
             String partyName,
+            String instrumentCode,
+            BigDecimal quantity,
             BigDecimal amountBdt,
-            BigDecimal usdAmount,
             BigDecimal bdtRate,
             String directionLabel,
             String referenceLabel,

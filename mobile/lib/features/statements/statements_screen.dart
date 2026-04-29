@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_theme.dart';
 import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
+import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
@@ -836,8 +837,11 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                               Text('Party: ${row.partyName}'),
                             if ((row.directionLabel ?? '').isNotEmpty)
                               Text('Direction: ${row.directionLabel}'),
-                            if (row.usdAmount != null)
-                              Text('USD: ${formatUsd(row.usdAmount!)}'),
+                            if ((row.instrumentCode ?? '').isNotEmpty)
+                              Text(
+                                  'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),
+                            if (row.quantity != null)
+                              Text('Quantity: ${row.quantity}'),
                             if (row.bdtRate != null)
                               Text('Rate: ${row.bdtRate}'),
                             if ((row.category ?? '').isNotEmpty)
