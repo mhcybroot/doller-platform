@@ -3,7 +3,9 @@ package com.doller.platform.web;
 import com.doller.platform.domain.Party;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.Role;
+import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.service.MasterDataService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,5 +35,7 @@ public class MasterDataController {
     public List<Party> parties() { return service.parties(); }
 
     @PostMapping("/parties")
-    public Party createParty(@RequestBody Party party) { return service.createParty(party); }
+    public Party createParty(@Valid @RequestBody MasterDataDtos.PartyCreateRequest req) {
+        return service.createParty(req);
+    }
 }

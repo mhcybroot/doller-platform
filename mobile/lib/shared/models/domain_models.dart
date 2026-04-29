@@ -2,12 +2,14 @@ class PartyModel {
   final int id;
   final String name;
   final String? phone;
+  final String? address;
   final String? notes;
 
   const PartyModel({
     required this.id,
     required this.name,
     this.phone,
+    this.address,
     this.notes,
   });
 
@@ -16,6 +18,7 @@ class PartyModel {
       id: (json["id"] as num).toInt(),
       name: json["name"] as String,
       phone: json["phone"] as String?,
+      address: json["address"] as String?,
       notes: json["notes"] as String?,
     );
   }

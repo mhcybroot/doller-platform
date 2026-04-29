@@ -4,12 +4,15 @@ import com.doller.platform.common.ApiException;
 import com.doller.platform.domain.Party;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.Role;
+import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.RefreshTokenRepository;
 import com.doller.platform.repo.UserAccountRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -19,13 +22,15 @@ public class MasterDataService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final LedgerService ledgerService;
 
-    public MasterDataService(UserAccountRepository userRepo, PartyRepository partyRepo, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, AuditService auditService) {
+    public MasterDataService(UserAccountRepository userRepo, PartyRepository partyRepo, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, AuditService auditService, LedgerService ledgerService) {
         this.userRepo = userRepo;
         this.partyRepo = partyRepo;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.ledgerService = ledgerService;
     }
 
     public UserAccount createUser(String username, String password, Role role) {
@@ -42,9 +47,33 @@ public class MasterDataService {
     }
 
     public List<UserAccount> users() { return userRepo.findAll(); }
-    public Party createParty(Party p) {
-        Party out = partyRepo.save(p);
-        auditService.log("CREATE_PARTY", "/parties", null, null, null, "party:" + out.getId());
+    public Party createParty(MasterDataDtos.PartyCreateRequest req) {
+        BigDecimal openingReceivable = req.openingReceivableBdt() == null ? BigDecimal.ZERO : req.openingReceivableBdt();
+        BigDecimal openingPayable = req.openingPayableBdt() == null ? BigDecimal.ZERO : req.openingPayableBdt();
+
+        Party out = partyRepo.save(Party.builder()
+                .name(req.name().trim())
+                .phone(req.phone())
+                .address(req.address())
+                .notes(req.notes())
+                .build());
+
+        LocalDateTime now = LocalDateTime.now();
+        if (openingReceivable.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.post(now, "RECEIVABLE_" + out.getId(), openingReceivable, BigDecimal.ZERO,
+                    "OPENING_BALANCE", out.getId(), "Opening receivable");
+            ledgerService.post(now, "CASH", BigDecimal.ZERO, openingReceivable,
+                    "OPENING_BALANCE", out.getId(), "Opening receivable offset");
+        }
+        if (openingPayable.compareTo(BigDecimal.ZERO) > 0) {
+            ledgerService.post(now, "PAYABLE_" + out.getId(), BigDecimal.ZERO, openingPayable,
+                    "OPENING_BALANCE", out.getId(), "Opening payable");
+            ledgerService.post(now, "CASH", openingPayable, BigDecimal.ZERO,
+                    "OPENING_BALANCE", out.getId(), "Opening payable offset");
+        }
+
+        String metadata = "openingReceivableBdt=" + openingReceivable + ", openingPayableBdt=" + openingPayable;
+        auditService.log("CREATE_PARTY", "/parties", metadata, null, null, "party:" + out.getId());
         return out;
     }
     public List<Party> parties() { return partyRepo.findAll(); }

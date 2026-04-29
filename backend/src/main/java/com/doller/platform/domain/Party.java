@@ -12,5 +12,6 @@ public class Party {
     @Column(nullable = false)
     private String name;
     private String phone;
+    private String address;
     private String notes;
 }

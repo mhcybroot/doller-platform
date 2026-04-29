@@ -715,6 +715,9 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                   DropdownMenuItem(
                       value: 'SETTLEMENT', child: Text('Settlements')),
                   DropdownMenuItem(value: 'EXPENSE', child: Text('Expenses')),
+                  DropdownMenuItem(
+                      value: 'OPENING_BALANCE',
+                      child: Text('Opening Balance')),
                 ],
                 onChanged: (value) async {
                   setState(() =>
@@ -832,7 +835,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                                '${row.entryType} • ${formatDateTime(row.occurredAt)}'),
+                                '${_entryTypeLabel(row.entryType)} • ${formatDateTime(row.occurredAt)}'),
                             if ((row.partyName ?? '').isNotEmpty)
                               Text('Party: ${row.partyName}'),
                             if ((row.directionLabel ?? '').isNotEmpty)
@@ -865,5 +868,20 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
           ),
       ],
     );
+  }
+
+  String _entryTypeLabel(String entryType) {
+    switch (entryType) {
+      case 'OPENING_BALANCE':
+        return 'Opening Balance';
+      case 'SETTLEMENT':
+        return 'Settlement';
+      case 'EXPENSE':
+        return 'Expense';
+      case 'DEAL':
+        return 'Deal';
+      default:
+        return entryType;
+    }
   }
 }

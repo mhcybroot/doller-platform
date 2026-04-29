@@ -18,6 +18,7 @@ import com.doller.platform.repo.StatementSnapshotRepository;
 import com.doller.platform.repo.TradeDealRepository;
 import com.doller.platform.repo.UserAccountRepository;
 import com.doller.platform.service.TradingService;
+import com.doller.platform.service.MasterDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 class TradingServiceTest {
     @Autowired TradingService tradingService;
+    @Autowired MasterDataService masterDataService;
     @Autowired PartyRepository partyRepository;
     @Autowired UserAccountRepository userAccountRepository;
     @Autowired PasswordEncoder passwordEncoder;
@@ -173,7 +175,7 @@ class TradingServiceTest {
 
         var ledger = tradingService.partyLedger(p.getId());
         assertEquals(new BigDecimal("4500.00"), ledger.balances().payableBdt());
-        assertEquals(new BigDecimal("0.00"), ledger.balances().advanceToPartyBdt());
+        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(BigDecimal.ZERO));
     }
 
     @Test
@@ -215,5 +217,45 @@ class TradingServiceTest {
         assertEquals(0, customerRow.receivableBdt().compareTo(new BigDecimal("10000.00")));
         assertEquals(0, customerRow.payableBdt().compareTo(BigDecimal.ZERO.setScale(2)));
         assertTrue(customerRow.lastActivityAt() != null && !customerRow.lastActivityAt().isBefore(t3.withNano(0)));
+    }
+
+    @Test
+    void openingBalanceReflectsInPartyLedgerAndTransactionDetailsWithoutDeals() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        var created = masterDataService.createParty(new com.doller.platform.dto.MasterDataDtos.PartyCreateRequest(
+                "Opening Only",
+                "019",
+                "Gulshan",
+                "opening",
+                new BigDecimal("1200"),
+                new BigDecimal("300")
+        ));
+
+        var ledger = tradingService.partyLedger(created.getId());
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("1200.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("300.00")));
+        assertTrue(ledger.lines().stream().anyMatch(line -> line.kind().startsWith("OPENING_BALANCE-RECEIVABLE")));
+        assertTrue(ledger.lines().stream().anyMatch(line -> line.kind().startsWith("OPENING_BALANCE-PAYABLE")));
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow row = dues.rows().stream()
+                .filter(r -> r.partyId().equals(created.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, row.receivableBdt().compareTo(new BigDecimal("1200.00")));
+        assertEquals(0, row.payableBdt().compareTo(new BigDecimal("300.00")));
+
+        var tx = tradingService.transactionDetails(
+                LocalDate.now().minusDays(1),
+                LocalDate.now().plusDays(1),
+                "OPENING_BALANCE",
+                created.getId(),
+                null,
+                "occurredAt",
+                "asc"
+        );
+        assertTrue(tx.rows().stream().allMatch(r -> "OPENING_BALANCE".equals(r.entryType())));
+        assertTrue(tx.rows().stream().anyMatch(r -> "OPENING RECEIVABLE".equals(r.directionLabel())));
+        assertTrue(tx.rows().stream().anyMatch(r -> "OPENING PAYABLE".equals(r.directionLabel())));
     }
 }

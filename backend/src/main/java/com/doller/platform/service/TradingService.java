@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Stream;
 
 @Service
 public class TradingService {
@@ -459,6 +460,32 @@ public class TradingService {
                 ))
                 .forEach(rows::add);
 
+        ledgerRepo.findByReferenceTypeAndEntryTimeBetween("OPENING_BALANCE", range[0], range[1]).stream()
+                .filter(entry -> entry.getAccountCode().startsWith("RECEIVABLE_") || entry.getAccountCode().startsWith("PAYABLE_"))
+                .filter(entry -> partyId == null || Objects.equals(entry.getReferenceId(), partyId))
+                .filter(entry -> normalizedType.isEmpty() || normalizedType.equals("OPENING_BALANCE"))
+                .map(entry -> {
+                    Party party = partyRepo.findById(entry.getReferenceId()).orElse(null);
+                    return new TradingDtos.TransactionDetailRow(
+                            "OPENING_BALANCE",
+                            entry.getId(),
+                            entry.getEntryTime(),
+                            party == null ? null : party.getId(),
+                            party == null ? null : party.getName(),
+                            null,
+                            null,
+                            entry.getDebit().subtract(entry.getCredit()).abs(),
+                            null,
+                            entry.getAccountCode().startsWith("RECEIVABLE_") ? "OPENING RECEIVABLE" : "OPENING PAYABLE",
+                            "Opening Balance • " + entry.getAccountCode(),
+                            null,
+                            null,
+                            entry.getNarration(),
+                            null
+                    );
+                })
+                .forEach(rows::add);
+
         rows = rows.stream()
                 .filter(row -> matchesSearch(row, normalizedSearch))
                 .sorted(transactionComparator(normalizedSortField, normalizedSortDirection))
@@ -493,6 +520,14 @@ public class TradingService {
                     s.getNotes()
             ));
         }
+        ledgerRepo.findByReferenceTypeAndReferenceId("OPENING_BALANCE", partyId).stream()
+                .filter(entry -> entry.getAccountCode().startsWith("RECEIVABLE_") || entry.getAccountCode().startsWith("PAYABLE_"))
+                .forEach(entry -> lines.add(new TradingDtos.PartyLedgerLine(
+                        "OPENING_BALANCE-" + (entry.getAccountCode().startsWith("RECEIVABLE_") ? "RECEIVABLE" : "PAYABLE"),
+                        entry.getEntryTime(),
+                        entry.getDebit().subtract(entry.getCredit()),
+                        entry.getNarration()
+                )));
         lines.sort(Comparator.comparing(TradingDtos.PartyLedgerLine::time));
         return new TradingDtos.PartyLedgerResponse(p.getId(), p.getName(), partyBalanceSummary(p), lines);
     }
@@ -542,47 +577,13 @@ public class TradingService {
     }
 
     private TradingDtos.PartyBalanceSummary partyBalanceSummary(Party party, LocalDate asOfDate) {
-        List<TradeDeal> deals = dealRepo.findAll().stream()
-                .filter(d -> d.getParty().getId().equals(party.getId()))
-                .filter(d -> asOfDate == null || !d.getDealTime().toLocalDate().isAfter(asOfDate))
-                .toList();
-        List<Settlement> settlements = settlementRepo.findByPartyOrderBySettlementTimeAsc(party).stream()
-                .filter(s -> asOfDate == null || !s.getSettlementTime().toLocalDate().isAfter(asOfDate))
-                .toList();
-
-        BigDecimal receivable = deals.stream()
-                .filter(d -> d.getDealType() == DealType.SELL)
-                .map(TradeDeal::getBdtGross)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal payable = deals.stream()
-                .filter(d -> d.getDealType() == DealType.BUY)
-                .map(TradeDeal::getBdtGross)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal advanceFromParty = BigDecimal.ZERO;
-        BigDecimal advanceToParty = BigDecimal.ZERO;
-
-        for (Settlement settlement : settlements) {
-            if (settlement.getDirection() == SettlementDirection.INCOMING) {
-                if (settlement.getBasis() == SettlementBasis.RECEIVABLE) {
-                    receivable = receivable.subtract(settlement.getAppliedAmount());
-                } else if (settlement.getBasis() == SettlementBasis.ADVANCE_TO_PARTY) {
-                    advanceToParty = advanceToParty.subtract(settlement.getAppliedAmount());
-                }
-                advanceFromParty = advanceFromParty.add(settlement.getAdvanceAmount());
-            } else {
-                if (settlement.getBasis() == SettlementBasis.PAYABLE) {
-                    payable = payable.subtract(settlement.getAppliedAmount());
-                } else if (settlement.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY) {
-                    advanceFromParty = advanceFromParty.subtract(settlement.getAppliedAmount());
-                }
-                advanceToParty = advanceToParty.add(settlement.getAdvanceAmount());
-            }
-        }
-
-        receivable = receivable.max(BigDecimal.ZERO);
-        payable = payable.max(BigDecimal.ZERO);
-        advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
-        advanceToParty = advanceToParty.max(BigDecimal.ZERO);
+        LocalDateTime cutoff = asOfDate == null
+                ? LocalDateTime.now()
+                : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
+        BigDecimal receivable = ledgerRepo.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff).max(BigDecimal.ZERO);
+        BigDecimal payable = ledgerRepo.netForAccountUntil("PAYABLE_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
+        BigDecimal advanceFromParty = ledgerRepo.netForAccountUntil("ADVANCE_FROM_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
+        BigDecimal advanceToParty = ledgerRepo.netForAccountUntil("ADVANCE_TO_" + party.getId(), cutoff).max(BigDecimal.ZERO);
         BigDecimal aging = computeAgingDue(party, asOfDate == null ? LocalDate.now() : asOfDate);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging);
@@ -865,14 +866,16 @@ public class TradingService {
                 .filter(s -> s.getParty().getId().equals(partyId))
                 .map(Settlement::getSettlementTime)
                 .max(LocalDateTime::compareTo);
+        Optional<LocalDateTime> latestOpeningTime = ledgerRepo.findByReferenceTypeAndReferenceId("OPENING_BALANCE", partyId).stream()
+                .filter(entry -> entry.getAccountCode().startsWith("RECEIVABLE_") || entry.getAccountCode().startsWith("PAYABLE_"))
+                .map(LedgerEntry::getEntryTime)
+                .max(LocalDateTime::compareTo);
 
-        if (latestDealTime.isEmpty()) {
-            return latestSettlementTime.orElse(null);
-        }
-        if (latestSettlementTime.isEmpty()) {
-            return latestDealTime.get();
-        }
-        return latestDealTime.get().isAfter(latestSettlementTime.get()) ? latestDealTime.get() : latestSettlementTime.get();
+        return Stream.of(latestDealTime, latestSettlementTime, latestOpeningTime)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
     }
 
     private record BalancePosition(
@@ -943,7 +946,7 @@ public class TradingService {
         }
         String value = type.trim().toUpperCase(Locale.ROOT);
         return switch (value) {
-            case "DEAL", "SETTLEMENT", "EXPENSE" -> value;
+            case "DEAL", "SETTLEMENT", "EXPENSE", "OPENING_BALANCE" -> value;
             default -> "";
         };
     }

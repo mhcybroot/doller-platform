@@ -48,7 +48,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
   Future<void> _createParty() async {
     final name = TextEditingController();
     final phone = TextEditingController();
+    final address = TextEditingController();
     final notes = TextEditingController();
+    final openingReceivable = TextEditingController();
+    final openingPayable = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -75,14 +78,51 @@ class _PartiesScreenState extends State<PartiesScreen> {
                   decoration: const InputDecoration(labelText: 'Phone')),
               const SizedBox(height: 12),
               TextField(
+                  controller: address,
+                  decoration: const InputDecoration(labelText: 'Address')),
+              const SizedBox(height: 12),
+              TextField(
                   controller: notes,
                   decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: openingReceivable,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Opening Receivable (BDT)')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: openingPayable,
+                  keyboardType: TextInputType.number,
+                  decoration:
+                      const InputDecoration(labelText: 'Opening Payable (BDT)')),
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: () async {
                   try {
+                    final openingReceivableValue =
+                        double.tryParse(openingReceivable.text.trim().isEmpty
+                            ? '0'
+                            : openingReceivable.text.trim());
+                    final openingPayableValue =
+                        double.tryParse(openingPayable.text.trim().isEmpty
+                            ? '0'
+                            : openingPayable.text.trim());
+                    if (openingReceivableValue == null ||
+                        openingPayableValue == null ||
+                        openingReceivableValue < 0 ||
+                        openingPayableValue < 0) {
+                      throw const ApiException(
+                          'Opening balances must be valid positive numbers');
+                    }
                     await widget.repository.createParty(
-                        name.text.trim(), phone.text.trim(), notes.text.trim());
+                      name.text.trim(),
+                      phone.text.trim(),
+                      address.text.trim(),
+                      notes.text.trim(),
+                      openingReceivableBdt: openingReceivableValue,
+                      openingPayableBdt: openingPayableValue,
+                    );
                     if (!context.mounted) {
                       return;
                     }
@@ -202,7 +242,8 @@ class _PartiesScreenState extends State<PartiesScreen> {
       final q = _search.text.trim().toLowerCase();
       return q.isEmpty ||
           party.name.toLowerCase().contains(q) ||
-          (party.phone ?? '').contains(q);
+          (party.phone ?? '').contains(q) ||
+          (party.address ?? '').toLowerCase().contains(q);
     }).toList();
 
     if (_loading) {
@@ -227,7 +268,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
           controller: _search,
           onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
-            labelText: 'Search party by name or phone',
+            labelText: 'Search party by name, phone, or address',
             prefixIcon: Icon(Icons.search),
           ),
         ),
@@ -246,8 +287,8 @@ class _PartiesScreenState extends State<PartiesScreen> {
               child: ListTile(
                 onTap: () => _openLedger(party),
                 title: Text(party.name),
-                subtitle:
-                    Text('${party.phone ?? 'No phone'}  ${party.notes ?? ''}'),
+                subtitle: Text(
+                    '${party.phone ?? 'No phone'} • ${party.address ?? 'No address'} • ${party.notes ?? ''}'),
                 trailing: const Icon(Icons.chevron_right),
               ),
             ),

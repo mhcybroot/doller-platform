@@ -57,10 +57,23 @@ class DollerRepository {
   }
 
   Future<PartyModel> createParty(
-      String name, String phone, String notes) async {
+      String name,
+      String phone,
+      String address,
+      String notes, {
+      double openingReceivableBdt = 0,
+      double openingPayableBdt = 0,
+      }) async {
     return _api.post<PartyModel>(
       '/parties',
-      data: {'name': name, 'phone': phone, 'notes': notes},
+      data: {
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'notes': notes,
+        'openingReceivableBdt': openingReceivableBdt,
+        'openingPayableBdt': openingPayableBdt,
+      },
       parser: (json) => PartyModel.fromJson(json as Map<String, dynamic>),
     );
   }
