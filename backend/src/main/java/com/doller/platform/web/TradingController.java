@@ -83,6 +83,21 @@ public class TradingController {
 
     @GetMapping("/dashboard")
     public TradingDtos.DashboardResponse dashboard(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) { return service.dashboard(from, to); }
+    @GetMapping("/dashboard/pnl-explain")
+    public TradingDtos.DashboardPnlExplainResponse dashboardPnlExplain(
+            @RequestParam(value = "mode", required = false) String mode,
+            @RequestParam(value = "date", required = false) LocalDate date,
+            @RequestParam(value = "month", required = false) Integer month,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to
+    ) {
+        String normalizedMode = mode;
+        if ((normalizedMode == null || normalizedMode.isBlank()) && from != null) {
+            normalizedMode = "CUSTOM";
+        }
+        return service.dashboardPnlExplain(normalizedMode, date, month, year, from, to);
+    }
 
     @GetMapping("/dues/snapshot")
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/dues/dues_screen.dart';
+import '../features/pnl/pnl_explain_screen.dart';
 import '../features/statements/statements_screen.dart';
 import '../shared/models/auth_models.dart';
 import '../shared/services/doller_repository.dart';
@@ -36,6 +37,27 @@ class MoreScreen extends StatelessWidget {
                     appBar: AppBar(title: const Text('Dues')),
                     body: SafeArea(
                       child: DuesScreen(repository: repository),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.query_stats_outlined),
+            title: const Text('Profit/Loss Explanation'),
+            subtitle: const Text('Owner-friendly gross/net breakdown by period'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    appBar: AppBar(title: const Text('Profit/Loss Explanation')),
+                    body: SafeArea(
+                      child: PnlExplainScreen(repository: repository),
                     ),
                   ),
                 ),

@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -80,10 +81,26 @@ class TradingServiceTest {
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
-        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.DAILY_OVERHEAD, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
+        tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.OFFICE_MANAGEMENT, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
 
         var preview = tradingService.previewDayClose(businessDate);
-        assertEquals(new BigDecimal("-6000.00"), preview.realizedProfitLossBdt());
+        assertEquals(new BigDecimal("-5900.00"), preview.realizedProfitLossBdt());
+    }
+
+    @Test
+    void rejectsLegacyExpenseTypesForNewEntries() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        LocalDateTime stamp = LocalDate.now().plusDays(32).atTime(10, 0);
+        assertThrows(RuntimeException.class, () -> tradingService.createExpense(
+                new TradingDtos.ExpenseCreateRequest(
+                        com.doller.platform.domain.enums.ExpenseType.DAILY_OVERHEAD,
+                        null,
+                        new BigDecimal("100"),
+                        stamp,
+                        "legacy",
+                        ""
+                )
+        ));
     }
 
     @Test

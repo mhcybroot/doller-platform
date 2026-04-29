@@ -10,10 +10,9 @@ class ExpenseTab extends StatefulWidget {
 }
 
 class _ExpenseTabState extends State<ExpenseTab> {
-  final dealId = TextEditingController();
   final amount = TextEditingController();
-  final category = TextEditingController(text: 'staff');
-  String type = 'DAILY_OVERHEAD';
+  final custom = TextEditingController();
+  String type = 'OFFICE_MANAGEMENT';
 
   @override
   Widget build(BuildContext context) {
@@ -23,23 +22,25 @@ class _ExpenseTabState extends State<ExpenseTab> {
         DropdownButton<String>(
           value: type,
           items: const [
-            DropdownMenuItem(value: 'DAILY_OVERHEAD', child: Text('DAILY_OVERHEAD')),
-            DropdownMenuItem(value: 'TRANSACTION', child: Text('TRANSACTION')),
+            DropdownMenuItem(value: 'OFFICE_MANAGEMENT', child: Text('OFFICE_MANAGEMENT')),
+            DropdownMenuItem(value: 'TRANSPORT', child: Text('TRANSPORT')),
+            DropdownMenuItem(value: 'EMPLOYEE_SALARY', child: Text('EMPLOYEE_SALARY')),
+            DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+            DropdownMenuItem(value: 'RENT', child: Text('RENT')),
+            DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
           ],
           onChanged: (v) => setState(() => type = v!),
         ),
-        TextField(controller: dealId, decoration: const InputDecoration(labelText: 'Deal ID (optional)')),
         TextField(controller: amount, decoration: const InputDecoration(labelText: 'Cost Amount BDT')),
-        TextField(controller: category, decoration: const InputDecoration(labelText: 'Category')),
+        TextField(controller: custom, decoration: const InputDecoration(labelText: 'Category Detail (optional)')),
         const SizedBox(height: 16),
         ElevatedButton(
           onPressed: () async {
             await widget.api.post('/expenses', {
               'expenseType': type,
-              'tradeDealId': dealId.text.isEmpty ? null : int.parse(dealId.text),
               'amountBdt': amount.text,
               'expenseTime': DateTime.now().toIso8601String(),
-              'category': category.text,
+              'category': custom.text.trim().isEmpty ? type : custom.text.trim(),
               'notes': ''
             });
             if (!context.mounted) return;

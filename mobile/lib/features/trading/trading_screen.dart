@@ -19,12 +19,12 @@ class _TradingScreenState extends State<TradingScreen> {
   final _quantityController = TextEditingController();
   final _rateController = TextEditingController();
   final _amountController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'staff');
+  final _categoryController = TextEditingController();
   final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _dealType = 'BUY';
   String _instrumentCode = 'USD';
-  String _expenseType = 'DAILY_OVERHEAD';
+  String _expenseType = 'OFFICE_MANAGEMENT';
   String _paymentMethod = 'CASH';
   bool _allowAdvance = false;
   int _mode = 0;
@@ -158,9 +158,10 @@ class _TradingScreenState extends State<TradingScreen> {
       } else {
         await widget.repository.createExpense(
           expenseType: _expenseType,
-          tradeDealId: _selectedDealId,
           amount: double.parse(_amountController.text),
-          category: _categoryController.text.trim(),
+          category: _categoryController.text.trim().isEmpty
+              ? _expenseType
+              : _categoryController.text.trim(),
           notes: _noteController.text.trim(),
         );
         showAppMessage(context, 'Expense saved');
@@ -182,10 +183,11 @@ class _TradingScreenState extends State<TradingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final needsPartySelection = _mode != 2;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_parties.isEmpty) {
+    if (needsPartySelection && _parties.isEmpty) {
       return const EmptyStateCard(
         title: 'Trading needs parties first',
         message:
@@ -236,21 +238,22 @@ class _TradingScreenState extends State<TradingScreen> {
               : (_mode == 1 ? 'Settlement Capture' : 'Expense Capture'),
           child: Column(
             children: [
-              DropdownButtonFormField<int>(
-                initialValue: selectedParty?.id,
-                items: _parties
-                    .map((party) => DropdownMenuItem(
-                        value: party.id, child: Text(party.name)))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPartyId = value;
-                    _selectedDealId = null;
-                  });
-                  _refreshInference();
-                },
-                decoration: const InputDecoration(labelText: 'Party'),
-              ),
+              if (needsPartySelection)
+                DropdownButtonFormField<int>(
+                  initialValue: selectedParty?.id,
+                  items: _parties
+                      .map((party) => DropdownMenuItem(
+                          value: party.id, child: Text(party.name)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPartyId = value;
+                      _selectedDealId = null;
+                    });
+                    _refreshInference();
+                  },
+                  decoration: const InputDecoration(labelText: 'Party'),
+                ),
               if (_mode == 0) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -288,31 +291,37 @@ class _TradingScreenState extends State<TradingScreen> {
                   decoration: const InputDecoration(labelText: 'BDT Rate'),
                 ),
               ] else ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int?>(
-                  initialValue: selectedDeal?.id,
-                  items: [
-                    const DropdownMenuItem<int?>(
-                        value: null, child: Text('No specific deal')),
-                    ...selectableDeals.map(
-                      (deal) => DropdownMenuItem(
-                        value: deal.id,
-                        child: Text(
-                            '#${deal.id} ${deal.dealType} ${instrumentDisplayName(deal.instrumentCode)} ${deal.quantity}'),
+                if (_mode == 1) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int?>(
+                    initialValue: selectedDeal?.id,
+                    items: [
+                      const DropdownMenuItem<int?>(
+                          value: null, child: Text('No specific deal')),
+                      ...selectableDeals.map(
+                        (deal) => DropdownMenuItem(
+                          value: deal.id,
+                          child: Text(
+                              '#${deal.id} ${deal.dealType} ${instrumentDisplayName(deal.instrumentCode)} ${deal.quantity}'),
+                        ),
                       ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _selectedDealId = value);
-                    _refreshInference();
-                  },
-                  decoration: const InputDecoration(labelText: 'Related Deal'),
-                ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedDealId = value);
+                      _refreshInference();
+                    },
+                    decoration: const InputDecoration(labelText: 'Related Deal'),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
-                  onChanged: (_) => _refreshInference(),
+                  onChanged: (_) {
+                    if (_mode == 1) {
+                      _refreshInference();
+                    }
+                  },
                   decoration: InputDecoration(
                     labelText: amountLabel,
                   ),
@@ -367,10 +376,16 @@ class _TradingScreenState extends State<TradingScreen> {
                     initialValue: _expenseType,
                     items: const [
                       DropdownMenuItem(
-                          value: 'DAILY_OVERHEAD',
-                          child: Text('DAILY_OVERHEAD')),
+                          value: 'OFFICE_MANAGEMENT',
+                          child: Text('OFFICE_MANAGEMENT')),
                       DropdownMenuItem(
-                          value: 'TRANSACTION', child: Text('TRANSACTION')),
+                          value: 'TRANSPORT', child: Text('TRANSPORT')),
+                      DropdownMenuItem(
+                          value: 'EMPLOYEE_SALARY',
+                          child: Text('EMPLOYEE_SALARY')),
+                      DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+                      DropdownMenuItem(value: 'RENT', child: Text('RENT')),
+                      DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
                     ],
                     onChanged: (value) => setState(() => _expenseType = value!),
                     decoration:
@@ -379,7 +394,8 @@ class _TradingScreenState extends State<TradingScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _categoryController,
-                    decoration: const InputDecoration(labelText: 'Category'),
+                    decoration:
+                        const InputDecoration(labelText: 'Category Detail (optional)'),
                   ),
                 ],
               ],

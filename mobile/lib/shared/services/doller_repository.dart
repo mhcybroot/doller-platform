@@ -142,7 +142,6 @@ class DollerRepository {
 
   Future<void> createExpense({
     required String expenseType,
-    int? tradeDealId,
     required double amount,
     required String category,
     required String notes,
@@ -151,7 +150,6 @@ class DollerRepository {
       '/expenses',
       data: {
         'expenseType': expenseType,
-        'tradeDealId': tradeDealId,
         'amountBdt': amount,
         'expenseTime': DateTime.now().toIso8601String(),
         'category': category,
@@ -166,6 +164,39 @@ class DollerRepository {
       '/dashboard',
       query: {'from': _date(from), 'to': _date(to)},
       parser: (json) => DashboardMetrics.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<DashboardPnlExplainModel> dashboardPnlExplain(
+      DateTime from, DateTime to) async {
+    return _api.get<DashboardPnlExplainModel>(
+      '/dashboard/pnl-explain',
+      query: {'mode': 'CUSTOM', 'from': _date(from), 'to': _date(to)},
+      parser: (json) =>
+          DashboardPnlExplainModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<DashboardPnlExplainModel> dashboardPnlExplainByMode({
+    required String mode,
+    DateTime? date,
+    int? month,
+    int? year,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    return _api.get<DashboardPnlExplainModel>(
+      '/dashboard/pnl-explain',
+      query: {
+        'mode': mode,
+        if (date != null) 'date': _date(date),
+        if (month != null) 'month': month,
+        if (year != null) 'year': year,
+        if (from != null) 'from': _date(from),
+        if (to != null) 'to': _date(to),
+      },
+      parser: (json) =>
+          DashboardPnlExplainModel.fromJson(json as Map<String, dynamic>),
     );
   }
 

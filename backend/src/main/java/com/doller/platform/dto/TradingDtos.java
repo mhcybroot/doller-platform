@@ -41,7 +41,68 @@ public class TradingDtos {
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}
-    public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal totalPositionValuationBdt, BigDecimal todayPnL, BigDecimal periodPnL, List<InstrumentPosition> positions) {}
+    public record DashboardResponse(
+            BigDecimal receivableBdt,
+            BigDecimal payableBdt,
+            BigDecimal totalPositionValuationBdt,
+            BigDecimal todayPnL,
+            BigDecimal periodPnL,
+            BigDecimal todayBuyBdt,
+            BigDecimal todaySellBdt,
+            BigDecimal todayGrossPnlBdt,
+            BigDecimal todayExpenseBdt,
+            BigDecimal todayNetPnlBdt,
+            BigDecimal periodBuyBdt,
+            BigDecimal periodSellBdt,
+            BigDecimal periodGrossPnlBdt,
+            BigDecimal periodExpenseBdt,
+            BigDecimal periodNetPnlBdt,
+            List<InstrumentPosition> positions
+    ) {}
+    public record PnlExpenseRow(
+            Long expenseId,
+            String expenseType,
+            LocalDateTime time,
+            BigDecimal amountBdt,
+            String category,
+            String notes,
+            String referenceLabel
+    ) {}
+    public record PnlExpenseGroup(
+            String expenseType,
+            BigDecimal totalAmountBdt,
+            List<PnlExpenseRow> rows
+    ) {}
+    public record PnlDealRow(
+            Long dealId,
+            LocalDateTime time,
+            String dealType,
+            String instrumentCode,
+            BigDecimal quantity,
+            BigDecimal bdtRate,
+            BigDecimal bdtAmount,
+            String partyName,
+            String notes,
+            String referenceLabel
+    ) {}
+    public record PnlExplainSection(
+            String label,
+            BigDecimal buyBdt,
+            BigDecimal sellBdt,
+            BigDecimal grossPnlBdt,
+            BigDecimal expenseBdt,
+            BigDecimal netPnlBdt,
+            List<PnlExpenseGroup> expenseGroups,
+            List<PnlDealRow> buyRows,
+            List<PnlDealRow> sellRows
+    ) {}
+    public record DashboardPnlExplainResponse(
+            String mode,
+            LocalDate periodFrom,
+            LocalDate periodTo,
+            PnlExplainSection today,
+            PnlExplainSection period
+    ) {}
     public record PartyDueRow(
             Long partyId,
             String partyName,

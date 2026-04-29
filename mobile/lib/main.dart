@@ -18,7 +18,7 @@ class DollerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Exchange Platform',
+      title: 'NexPay',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
       home: const AppBootstrap(),

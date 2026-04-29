@@ -63,6 +63,16 @@ class DashboardMetrics {
   final double totalPositionValuationBdt;
   final double todayPnL;
   final double periodPnL;
+  final double todayBuyBdt;
+  final double todaySellBdt;
+  final double todayGrossPnlBdt;
+  final double todayExpenseBdt;
+  final double todayNetPnlBdt;
+  final double periodBuyBdt;
+  final double periodSellBdt;
+  final double periodGrossPnlBdt;
+  final double periodExpenseBdt;
+  final double periodNetPnlBdt;
   final List<InstrumentPositionModel> positions;
 
   const DashboardMetrics({
@@ -71,6 +81,16 @@ class DashboardMetrics {
     required this.totalPositionValuationBdt,
     required this.todayPnL,
     required this.periodPnL,
+    required this.todayBuyBdt,
+    required this.todaySellBdt,
+    required this.todayGrossPnlBdt,
+    required this.todayExpenseBdt,
+    required this.todayNetPnlBdt,
+    required this.periodBuyBdt,
+    required this.periodSellBdt,
+    required this.periodGrossPnlBdt,
+    required this.periodExpenseBdt,
+    required this.periodNetPnlBdt,
     required this.positions,
   });
 
@@ -83,10 +103,193 @@ class DashboardMetrics {
               (json["usdPosition"] as num? ?? 0).toDouble(),
       todayPnL: (json["todayPnL"] as num).toDouble(),
       periodPnL: (json["periodPnL"] as num).toDouble(),
+      todayBuyBdt: (json["todayBuyBdt"] as num?)?.toDouble() ?? 0,
+      todaySellBdt: (json["todaySellBdt"] as num?)?.toDouble() ?? 0,
+      todayGrossPnlBdt: (json["todayGrossPnlBdt"] as num?)?.toDouble() ??
+          (json["todayPnL"] as num).toDouble(),
+      todayExpenseBdt: (json["todayExpenseBdt"] as num?)?.toDouble() ?? 0,
+      todayNetPnlBdt: (json["todayNetPnlBdt"] as num?)?.toDouble() ??
+          (json["todayPnL"] as num).toDouble(),
+      periodBuyBdt: (json["periodBuyBdt"] as num?)?.toDouble() ?? 0,
+      periodSellBdt: (json["periodSellBdt"] as num?)?.toDouble() ?? 0,
+      periodGrossPnlBdt: (json["periodGrossPnlBdt"] as num?)?.toDouble() ??
+          (json["periodPnL"] as num).toDouble(),
+      periodExpenseBdt: (json["periodExpenseBdt"] as num?)?.toDouble() ?? 0,
+      periodNetPnlBdt: (json["periodNetPnlBdt"] as num?)?.toDouble() ??
+          (json["periodPnL"] as num).toDouble(),
       positions: (json["positions"] as List<dynamic>? ?? const [])
           .map((item) =>
               InstrumentPositionModel.fromJson(item as Map<String, dynamic>))
           .toList(),
+    );
+  }
+}
+
+class DashboardPnlExplainModel {
+  final String mode;
+  final DateTime periodFrom;
+  final DateTime periodTo;
+  final PnlExplainSectionModel today;
+  final PnlExplainSectionModel period;
+
+  const DashboardPnlExplainModel({
+    required this.mode,
+    required this.periodFrom,
+    required this.periodTo,
+    required this.today,
+    required this.period,
+  });
+
+  factory DashboardPnlExplainModel.fromJson(Map<String, dynamic> json) {
+    return DashboardPnlExplainModel(
+      mode: json["mode"] as String? ?? 'CUSTOM',
+      periodFrom: DateTime.parse(json["periodFrom"] as String),
+      periodTo: DateTime.parse(json["periodTo"] as String),
+      today: PnlExplainSectionModel.fromJson(
+          json["today"] as Map<String, dynamic>),
+      period: PnlExplainSectionModel.fromJson(
+          json["period"] as Map<String, dynamic>),
+    );
+  }
+}
+
+class PnlExplainSectionModel {
+  final String label;
+  final double buyBdt;
+  final double sellBdt;
+  final double grossPnlBdt;
+  final double expenseBdt;
+  final double netPnlBdt;
+  final List<PnlExpenseGroupModel> expenseGroups;
+  final List<PnlDealRowModel> buyRows;
+  final List<PnlDealRowModel> sellRows;
+
+  const PnlExplainSectionModel({
+    required this.label,
+    required this.buyBdt,
+    required this.sellBdt,
+    required this.grossPnlBdt,
+    required this.expenseBdt,
+    required this.netPnlBdt,
+    required this.expenseGroups,
+    required this.buyRows,
+    required this.sellRows,
+  });
+
+  factory PnlExplainSectionModel.fromJson(Map<String, dynamic> json) {
+    return PnlExplainSectionModel(
+      label: json["label"] as String? ?? '',
+      buyBdt: (json["buyBdt"] as num).toDouble(),
+      sellBdt: (json["sellBdt"] as num).toDouble(),
+      grossPnlBdt: (json["grossPnlBdt"] as num).toDouble(),
+      expenseBdt: (json["expenseBdt"] as num).toDouble(),
+      netPnlBdt: (json["netPnlBdt"] as num).toDouble(),
+      expenseGroups: (json["expenseGroups"] as List<dynamic>? ?? const [])
+          .map((item) =>
+              PnlExpenseGroupModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      buyRows: (json["buyRows"] as List<dynamic>? ?? const [])
+          .map((item) => PnlDealRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      sellRows: (json["sellRows"] as List<dynamic>? ?? const [])
+          .map((item) => PnlDealRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class PnlDealRowModel {
+  final int dealId;
+  final DateTime time;
+  final String dealType;
+  final String instrumentCode;
+  final double quantity;
+  final double bdtRate;
+  final double bdtAmount;
+  final String? partyName;
+  final String? notes;
+  final String? referenceLabel;
+
+  const PnlDealRowModel({
+    required this.dealId,
+    required this.time,
+    required this.dealType,
+    required this.instrumentCode,
+    required this.quantity,
+    required this.bdtRate,
+    required this.bdtAmount,
+    required this.partyName,
+    required this.notes,
+    required this.referenceLabel,
+  });
+
+  factory PnlDealRowModel.fromJson(Map<String, dynamic> json) {
+    return PnlDealRowModel(
+      dealId: (json["dealId"] as num).toInt(),
+      time: DateTime.parse(json["time"] as String),
+      dealType: json["dealType"] as String,
+      instrumentCode: json["instrumentCode"] as String,
+      quantity: (json["quantity"] as num).toDouble(),
+      bdtRate: (json["bdtRate"] as num).toDouble(),
+      bdtAmount: (json["bdtAmount"] as num).toDouble(),
+      partyName: json["partyName"] as String?,
+      notes: json["notes"] as String?,
+      referenceLabel: json["referenceLabel"] as String?,
+    );
+  }
+}
+
+class PnlExpenseGroupModel {
+  final String expenseType;
+  final double totalAmountBdt;
+  final List<PnlExpenseRowModel> rows;
+
+  const PnlExpenseGroupModel({
+    required this.expenseType,
+    required this.totalAmountBdt,
+    required this.rows,
+  });
+
+  factory PnlExpenseGroupModel.fromJson(Map<String, dynamic> json) {
+    return PnlExpenseGroupModel(
+      expenseType: json["expenseType"] as String,
+      totalAmountBdt: (json["totalAmountBdt"] as num).toDouble(),
+      rows: (json["rows"] as List<dynamic>? ?? const [])
+          .map((item) =>
+              PnlExpenseRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class PnlExpenseRowModel {
+  final int expenseId;
+  final String expenseType;
+  final DateTime time;
+  final double amountBdt;
+  final String? category;
+  final String? notes;
+  final String? referenceLabel;
+
+  const PnlExpenseRowModel({
+    required this.expenseId,
+    required this.expenseType,
+    required this.time,
+    required this.amountBdt,
+    required this.category,
+    required this.notes,
+    required this.referenceLabel,
+  });
+
+  factory PnlExpenseRowModel.fromJson(Map<String, dynamic> json) {
+    return PnlExpenseRowModel(
+      expenseId: (json["expenseId"] as num).toInt(),
+      expenseType: json["expenseType"] as String,
+      time: DateTime.parse(json["time"] as String),
+      amountBdt: (json["amountBdt"] as num).toDouble(),
+      category: json["category"] as String?,
+      notes: json["notes"] as String?,
+      referenceLabel: json["referenceLabel"] as String?,
     );
   }
 }

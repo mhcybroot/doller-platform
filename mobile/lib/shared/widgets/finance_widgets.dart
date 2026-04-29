@@ -69,19 +69,21 @@ class MetricCard extends StatelessWidget {
     required this.value,
     required this.caption,
     this.positive,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final String caption;
   final bool? positive;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final accent = positive == null
         ? AppTheme.accent
         : (positive! ? AppTheme.success : AppTheme.danger);
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
@@ -106,6 +108,17 @@ class MetricCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(caption, style: Theme.of(context).textTheme.bodySmall),
         ],
+      ),
+    );
+    if (onTap == null) {
+      return content;
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: content,
       ),
     );
   }

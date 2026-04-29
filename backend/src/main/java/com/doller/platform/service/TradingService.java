@@ -3,6 +3,7 @@ package com.doller.platform.service;
 import com.doller.platform.common.ApiException;
 import com.doller.platform.domain.*;
 import com.doller.platform.domain.enums.DealType;
+import com.doller.platform.domain.enums.ExpenseType;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
 import com.doller.platform.dto.TradingDtos;
@@ -132,10 +133,12 @@ public class TradingService {
     @Transactional
     public Expense createExpense(TradingDtos.ExpenseCreateRequest req) {
         requireOpenDay(req.expenseTime().toLocalDate());
-        TradeDeal deal = req.tradeDealId() == null ? null : dealRepo.findById(req.tradeDealId()).orElseThrow(() -> new ApiException("Deal not found"));
+        if (req.expenseType() == ExpenseType.TRANSACTION || req.expenseType() == ExpenseType.DAILY_OVERHEAD) {
+            throw new ApiException("Unsupported expenseType for new entries");
+        }
         Expense ex = expenseRepo.save(Expense.builder()
                 .expenseType(req.expenseType())
-                .tradeDeal(deal)
+                .tradeDeal(null)
                 .amountBdt(req.amountBdt())
                 .expenseTime(req.expenseTime())
                 .category(req.category())
@@ -157,7 +160,7 @@ public class TradingService {
                 .map(TradeDeal::getBdtGross).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal cost = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal pnl = sell.subtract(buy).subtract(cost);
+        BigDecimal pnl = sell.subtract(buy);
         boolean closed = dailyCloseRepo.findByBusinessDate(date).filter(c -> !c.isReopened()).isPresent();
         return new TradingDtos.DayClosePreview(date, buy, sell, cost, pnl, closed);
     }
@@ -253,9 +256,49 @@ public class TradingService {
                 .map(TradingDtos.InstrumentPosition::valuationBdt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal periodPnl = statementRange(from, to).stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal todayPnl = snapshotRepo.findByBusinessDate(LocalDate.now()).map(StatementSnapshot::getRealizedProfitLossBdt).orElse(BigDecimal.ZERO);
-        return new TradingDtos.DashboardResponse(receivable, payable, totalPositionValuation, todayPnl, periodPnl, positions);
+        LocalDate today = LocalDate.now();
+        PnlMetrics todayMetrics = pnlMetrics(today, today);
+        PnlMetrics periodMetrics = pnlMetrics(from, to);
+
+        return new TradingDtos.DashboardResponse(
+                receivable,
+                payable,
+                totalPositionValuation,
+                todayMetrics.netPnlBdt(),
+                periodMetrics.netPnlBdt(),
+                todayMetrics.buyBdt(),
+                todayMetrics.sellBdt(),
+                todayMetrics.grossPnlBdt(),
+                todayMetrics.expenseBdt(),
+                todayMetrics.netPnlBdt(),
+                periodMetrics.buyBdt(),
+                periodMetrics.sellBdt(),
+                periodMetrics.grossPnlBdt(),
+                periodMetrics.expenseBdt(),
+                periodMetrics.netPnlBdt(),
+                positions
+        );
+    }
+
+    public TradingDtos.DashboardPnlExplainResponse dashboardPnlExplain(
+            String mode,
+            LocalDate date,
+            Integer month,
+            Integer year,
+            LocalDate from,
+            LocalDate to
+    ) {
+        LocalDate[] resolved = resolveReportRange(mode, date, month, year, from, to);
+        LocalDate safeFrom = resolved[0];
+        LocalDate safeTo = resolved[1];
+        LocalDate today = LocalDate.now();
+        return new TradingDtos.DashboardPnlExplainResponse(
+                normalizeMode(mode),
+                safeFrom,
+                safeTo,
+                buildExplainSection("Today", today, today),
+                buildExplainSection("Period", safeFrom, safeTo)
+        );
     }
 
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {
@@ -916,11 +959,11 @@ public class TradingService {
     }
 
     private Long expensePartyId(Expense expense) {
-        return expense.getTradeDeal() == null ? null : expense.getTradeDeal().getParty().getId();
+        return null;
     }
 
     private String expensePartyName(Expense expense) {
-        return expense.getTradeDeal() == null ? "Internal" : expense.getTradeDeal().getParty().getName();
+        return null;
     }
 
     private String fxInventoryAccount(String instrumentCode) {
@@ -945,6 +988,98 @@ public class TradingService {
                 || containsIgnoreCase(row.referenceLabel(), search)
                 || containsIgnoreCase(row.directionLabel(), search);
     }
+
+    private TradingDtos.PnlExplainSection buildExplainSection(String label, LocalDate from, LocalDate to) {
+        PnlMetrics metrics = pnlMetrics(from, to);
+        LocalDateTime[] range = dayRange(from, to);
+        List<TradeDeal> deals = dealRepo.findByDealTimeBetween(range[0], range[1]);
+        Map<String, List<Expense>> grouped = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+                .collect(java.util.stream.Collectors.groupingBy(expense -> expense.getExpenseType().name()));
+
+        List<TradingDtos.PnlExpenseGroup> groups = grouped.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    BigDecimal total = entry.getValue().stream()
+                            .map(Expense::getAmountBdt)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    List<TradingDtos.PnlExpenseRow> rows = entry.getValue().stream()
+                            .sorted(Comparator.comparing(Expense::getExpenseTime).reversed())
+                            .map(expense -> new TradingDtos.PnlExpenseRow(
+                                    expense.getId(),
+                                    expense.getExpenseType().name(),
+                                    expense.getExpenseTime(),
+                                    expense.getAmountBdt(),
+                                    expense.getCategory(),
+                                    expense.getNotes(),
+                                    "Expense #" + expense.getId()
+                            ))
+                            .toList();
+                    return new TradingDtos.PnlExpenseGroup(entry.getKey(), total, rows);
+                })
+                .toList();
+
+        return new TradingDtos.PnlExplainSection(
+                label,
+                metrics.buyBdt(),
+                metrics.sellBdt(),
+                metrics.grossPnlBdt(),
+                metrics.expenseBdt(),
+                metrics.netPnlBdt(),
+                groups,
+                deals.stream()
+                        .filter(deal -> deal.getDealType() == DealType.BUY)
+                        .sorted(Comparator.comparing(TradeDeal::getDealTime).reversed())
+                        .map(this::toPnlDealRow)
+                        .toList(),
+                deals.stream()
+                        .filter(deal -> deal.getDealType() == DealType.SELL)
+                        .sorted(Comparator.comparing(TradeDeal::getDealTime).reversed())
+                        .map(this::toPnlDealRow)
+                        .toList()
+        );
+    }
+
+    private TradingDtos.PnlDealRow toPnlDealRow(TradeDeal deal) {
+        return new TradingDtos.PnlDealRow(
+                deal.getId(),
+                deal.getDealTime(),
+                deal.getDealType().name(),
+                deal.getInstrumentCode().name(),
+                deal.getQuantity(),
+                deal.getBdtRate(),
+                deal.getBdtGross(),
+                deal.getParty().getName(),
+                deal.getNotes(),
+                "Deal #" + deal.getId()
+        );
+    }
+
+    private PnlMetrics pnlMetrics(LocalDate from, LocalDate to) {
+        LocalDateTime[] range = dayRange(from, to);
+        List<TradeDeal> deals = dealRepo.findByDealTimeBetween(range[0], range[1]);
+        BigDecimal buy = deals.stream()
+                .filter(d -> d.getDealType() == DealType.BUY)
+                .map(TradeDeal::getBdtGross)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sell = deals.stream()
+                .filter(d -> d.getDealType() == DealType.SELL)
+                .map(TradeDeal::getBdtGross)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal expense = expenseRepo.findByExpenseTimeBetween(range[0], range[1]).stream()
+                .map(Expense::getAmountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal gross = sell.subtract(buy);
+        BigDecimal net = gross.subtract(expense);
+        return new PnlMetrics(buy, sell, gross, expense, net);
+    }
+
+    private record PnlMetrics(
+            BigDecimal buyBdt,
+            BigDecimal sellBdt,
+            BigDecimal grossPnlBdt,
+            BigDecimal expenseBdt,
+            BigDecimal netPnlBdt
+    ) {}
 
     private boolean containsIgnoreCase(String source, String search) {
         return source != null && source.toLowerCase(Locale.ROOT).contains(search);

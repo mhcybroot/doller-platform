@@ -374,7 +374,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
               children: [
                 Text('Buy ${formatBdt(_preview!.totalBuyBdt)}'),
                 Text('Sell ${formatBdt(_preview!.totalSellBdt)}'),
-                Text('Expense ${formatBdt(_preview!.totalExpenseBdt)}'),
+                Text('Owner/Company Expense ${formatBdt(_preview!.totalExpenseBdt)}'),
                 const SizedBox(height: 8),
                 Text(
                   'Projected P/L ${formatBdt(_preview!.realizedProfitLossBdt)}',
