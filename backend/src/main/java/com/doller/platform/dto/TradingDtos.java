@@ -92,11 +92,26 @@ public class TradingDtos {
             String notes,
             String referenceLabel
     ) {}
+    public record PnlOpenInstrumentRow(
+            String instrumentCode,
+            BigDecimal openLongQty,
+            BigDecimal openLongValueBdt,
+            BigDecimal openShortQty,
+            BigDecimal openShortProceedsBdt
+    ) {}
     public record PnlExplainSection(
             String label,
             BigDecimal buyBdt,
             BigDecimal sellBdt,
             BigDecimal grossPnlBdt,
+            String costMethod,
+            BigDecimal longFifoRealizedPnlBdt,
+            BigDecimal shortCoverRealizedPnlBdt,
+            BigDecimal openLongQty,
+            BigDecimal openLongValueBdt,
+            BigDecimal openShortQty,
+            BigDecimal openShortProceedsBdt,
+            List<PnlOpenInstrumentRow> openInstruments,
             BigDecimal expenseBdt,
             BigDecimal netPnlBdt,
             List<PnlExpenseGroup> expenseGroups,

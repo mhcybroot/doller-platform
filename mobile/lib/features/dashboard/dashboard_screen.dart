@@ -233,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Gross = Sell - Buy. Net = Gross - Owner/Company Expense.',
+                  'P/L is inventory-cost based (FIFO). Sell-first profit is realized on buy-back cover.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -270,6 +270,19 @@ class _PnlExplainSection extends StatelessWidget {
         Text('Sell: ${formatBdt(section.sellBdt)}'),
         Text('Buy: ${formatBdt(section.buyBdt)}'),
         Text('Gross: ${formatBdt(section.grossPnlBdt)}'),
+        Text('Long FIFO realized: ${formatBdt(section.longFifoRealizedPnlBdt)}'),
+        Text('Short-cover realized: ${formatBdt(section.shortCoverRealizedPnlBdt)}'),
+        Text('Open long total value: ${formatBdt(section.openLongValueBdt)}'),
+        Text('Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}'),
+        const SizedBox(height: 6),
+        Text('Open inventory by instrument',
+            style: Theme.of(context).textTheme.titleSmall),
+        ...section.openInstruments.map(
+          (row) => Text(
+            '${row.instrumentCode}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
+          ),
+        ),
         Text('Expense: ${formatBdt(section.expenseBdt)}'),
         Text(
           'Net: ${formatBdt(section.netPnlBdt)}',

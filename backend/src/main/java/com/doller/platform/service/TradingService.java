@@ -267,17 +267,18 @@ public class TradingService {
 
     public TradingDtos.DayClosePreview previewDayClose(LocalDate date) {
         var range = dayRange(date);
-        BigDecimal buy = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
-                .filter(d -> d.getDealType() == DealType.BUY)
-                .map(TradeDeal::getBdtGross).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sell = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
-                .filter(d -> d.getDealType() == DealType.SELL)
-                .map(TradeDeal::getBdtGross).reduce(BigDecimal.ZERO, BigDecimal::add);
+        PnlMetrics metrics = pnlMetrics(date, date);
         BigDecimal cost = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal pnl = sell.subtract(buy);
         boolean closed = dailyCloseRepo.findByBusinessDate(date).filter(c -> !c.isReopened()).isPresent();
-        return new TradingDtos.DayClosePreview(date, buy, sell, cost, pnl, closed);
+        return new TradingDtos.DayClosePreview(
+                date,
+                metrics.buyBdt(),
+                metrics.sellBdt(),
+                cost,
+                metrics.grossPnlBdt(),
+                closed
+        );
     }
 
     @Transactional
@@ -1211,6 +1212,14 @@ public class TradingService {
                 metrics.buyBdt(),
                 metrics.sellBdt(),
                 metrics.grossPnlBdt(),
+                "FIFO",
+                metrics.longFifoRealizedPnlBdt(),
+                metrics.shortCoverRealizedPnlBdt(),
+                metrics.openLongQty(),
+                metrics.openLongValueBdt(),
+                metrics.openShortQty(),
+                metrics.openShortProceedsBdt(),
+                metrics.openInstruments(),
                 metrics.expenseBdt(),
                 metrics.netPnlBdt(),
                 groups,
@@ -1244,30 +1253,154 @@ public class TradingService {
 
     private PnlMetrics pnlMetrics(LocalDate from, LocalDate to) {
         LocalDateTime[] range = dayRange(from, to);
-        List<TradeDeal> deals = dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]);
-        BigDecimal buy = deals.stream()
-                .filter(d -> d.getDealType() == DealType.BUY)
-                .map(TradeDeal::getBdtGross)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sell = deals.stream()
-                .filter(d -> d.getDealType() == DealType.SELL)
-                .map(TradeDeal::getBdtGross)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDateTime periodFrom = range[0];
+        LocalDateTime periodTo = range[1];
+        List<TradeDeal> allDealsUntilTo = dealRepo.findByDeletedFalse().stream()
+                .filter(d -> !d.getDealTime().isAfter(periodTo))
+                .sorted(Comparator
+                        .comparing(TradeDeal::getDealTime)
+                        .thenComparing(TradeDeal::getId))
+                .toList();
+
+        BigDecimal buy = BigDecimal.ZERO;
+        BigDecimal sell = BigDecimal.ZERO;
+        BigDecimal longRealized = BigDecimal.ZERO;
+        BigDecimal shortCoverRealized = BigDecimal.ZERO;
+
+        Map<String, InstrumentState> stateByInstrument = new HashMap<>();
+        for (TradeDeal deal : allDealsUntilTo) {
+            String instrument = deal.getInstrumentCode().name();
+            InstrumentState state = stateByInstrument.computeIfAbsent(instrument, ignored -> new InstrumentState());
+            BigDecimal qty = deal.getQuantity();
+            BigDecimal rate = deal.getBdtRate();
+
+            boolean inPeriod = !deal.getDealTime().isBefore(periodFrom) && !deal.getDealTime().isAfter(periodTo);
+            if (inPeriod) {
+                if (deal.getDealType() == DealType.BUY) {
+                    buy = buy.add(deal.getBdtGross());
+                } else {
+                    sell = sell.add(deal.getBdtGross());
+                }
+            }
+
+            if (deal.getDealType() == DealType.BUY) {
+                BigDecimal remaining = qty;
+                while (remaining.compareTo(BigDecimal.ZERO) > 0 && !state.shortLots.isEmpty()) {
+                    Lot shortLot = state.shortLots.peekFirst();
+                    BigDecimal covered = remaining.min(shortLot.quantity());
+                    BigDecimal realized = shortLot.unitRate().subtract(rate).multiply(covered);
+                    if (inPeriod) {
+                        shortCoverRealized = shortCoverRealized.add(realized);
+                    }
+                    remaining = remaining.subtract(covered);
+                    BigDecimal shortLeft = shortLot.quantity().subtract(covered);
+                    state.shortLots.removeFirst();
+                    if (shortLeft.compareTo(BigDecimal.ZERO) > 0) {
+                        state.shortLots.addFirst(new Lot(shortLeft, shortLot.unitRate()));
+                    }
+                }
+                if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                    state.longLots.addLast(new Lot(remaining, rate));
+                }
+            } else {
+                BigDecimal remaining = qty;
+                while (remaining.compareTo(BigDecimal.ZERO) > 0 && !state.longLots.isEmpty()) {
+                    Lot longLot = state.longLots.peekFirst();
+                    BigDecimal matched = remaining.min(longLot.quantity());
+                    BigDecimal realized = rate.subtract(longLot.unitRate()).multiply(matched);
+                    if (inPeriod) {
+                        longRealized = longRealized.add(realized);
+                    }
+                    remaining = remaining.subtract(matched);
+                    BigDecimal longLeft = longLot.quantity().subtract(matched);
+                    state.longLots.removeFirst();
+                    if (longLeft.compareTo(BigDecimal.ZERO) > 0) {
+                        state.longLots.addFirst(new Lot(longLeft, longLot.unitRate()));
+                    }
+                }
+                if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                    state.shortLots.addLast(new Lot(remaining, rate));
+                }
+            }
+        }
+
+        BigDecimal openLongQty = BigDecimal.ZERO;
+        BigDecimal openLongValue = BigDecimal.ZERO;
+        BigDecimal openShortQty = BigDecimal.ZERO;
+        BigDecimal openShortProceeds = BigDecimal.ZERO;
+        List<TradingDtos.PnlOpenInstrumentRow> openInstruments = new ArrayList<>();
+        for (Map.Entry<String, InstrumentState> instrumentEntry : stateByInstrument.entrySet()) {
+            InstrumentState state = instrumentEntry.getValue();
+            BigDecimal instrumentLongQty = BigDecimal.ZERO;
+            BigDecimal instrumentLongValue = BigDecimal.ZERO;
+            BigDecimal instrumentShortQty = BigDecimal.ZERO;
+            BigDecimal instrumentShortProceeds = BigDecimal.ZERO;
+            for (Lot lot : state.longLots) {
+                openLongQty = openLongQty.add(lot.quantity());
+                openLongValue = openLongValue.add(lot.quantity().multiply(lot.unitRate()));
+                instrumentLongQty = instrumentLongQty.add(lot.quantity());
+                instrumentLongValue = instrumentLongValue.add(lot.quantity().multiply(lot.unitRate()));
+            }
+            for (Lot lot : state.shortLots) {
+                openShortQty = openShortQty.add(lot.quantity());
+                openShortProceeds = openShortProceeds.add(lot.quantity().multiply(lot.unitRate()));
+                instrumentShortQty = instrumentShortQty.add(lot.quantity());
+                instrumentShortProceeds = instrumentShortProceeds.add(lot.quantity().multiply(lot.unitRate()));
+            }
+            if (instrumentLongQty.compareTo(BigDecimal.ZERO) > 0 || instrumentShortQty.compareTo(BigDecimal.ZERO) > 0) {
+                openInstruments.add(new TradingDtos.PnlOpenInstrumentRow(
+                        instrumentEntry.getKey(),
+                        instrumentLongQty,
+                        instrumentLongValue,
+                        instrumentShortQty,
+                        instrumentShortProceeds
+                ));
+            }
+        }
+        openInstruments.sort(Comparator.comparing(TradingDtos.PnlOpenInstrumentRow::instrumentCode));
+
         BigDecimal expense = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal gross = sell.subtract(buy);
+        BigDecimal gross = longRealized.add(shortCoverRealized);
         BigDecimal net = gross.subtract(expense);
-        return new PnlMetrics(buy, sell, gross, expense, net);
+        return new PnlMetrics(
+                buy,
+                sell,
+                gross,
+                longRealized,
+                shortCoverRealized,
+                openLongQty,
+                openLongValue,
+                openShortQty,
+                openShortProceeds,
+                openInstruments,
+                expense,
+                net
+        );
     }
 
     private record PnlMetrics(
             BigDecimal buyBdt,
             BigDecimal sellBdt,
             BigDecimal grossPnlBdt,
+            BigDecimal longFifoRealizedPnlBdt,
+            BigDecimal shortCoverRealizedPnlBdt,
+            BigDecimal openLongQty,
+            BigDecimal openLongValueBdt,
+            BigDecimal openShortQty,
+            BigDecimal openShortProceedsBdt,
+            List<TradingDtos.PnlOpenInstrumentRow> openInstruments,
             BigDecimal expenseBdt,
             BigDecimal netPnlBdt
     ) {}
+
+    private record Lot(BigDecimal quantity, BigDecimal unitRate) {}
+
+    private static class InstrumentState {
+        private final Deque<Lot> longLots = new ArrayDeque<>();
+        private final Deque<Lot> shortLots = new ArrayDeque<>();
+    }
 
     private boolean containsIgnoreCase(String source, String search) {
         return source != null && source.toLowerCase(Locale.ROOT).contains(search);

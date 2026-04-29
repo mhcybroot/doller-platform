@@ -86,7 +86,58 @@ class TradingServiceTest {
         tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.OFFICE_MANAGEMENT, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
 
         var preview = tradingService.previewDayClose(businessDate);
-        assertEquals(new BigDecimal("-5900.00"), preview.realizedProfitLossBdt());
+        assertEquals(0, preview.realizedProfitLossBdt().compareTo(new BigDecimal("100.00")));
+    }
+
+    @Test
+    void fifoUsesExistingInventoryCostForRealizedPnl() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p = partyRepository.save(Party.builder().name("FIFO Party").build());
+        LocalDate baseDate = LocalDate.now().plusDays(40);
+        LocalDateTime t1 = baseDate.minusDays(2).atTime(9, 0);
+        LocalDateTime t2 = baseDate.minusDays(1).atTime(9, 0);
+        LocalDateTime t3 = baseDate.atTime(10, 0);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("100"),
+                t1, "old stock"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                t2, "new buy"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("120"),
+                t3, "sell"
+        ));
+
+        var explain = tradingService.dashboardPnlExplain("CUSTOM", null, null, null, baseDate, baseDate);
+        assertEquals(0, explain.period().grossPnlBdt().compareTo(new BigDecimal("40.00")));
+        assertEquals(0, explain.period().longFifoRealizedPnlBdt().compareTo(new BigDecimal("40.00")));
+        assertEquals(0, explain.period().shortCoverRealizedPnlBdt().compareTo(BigDecimal.ZERO));
+    }
+
+    @Test
+    void sellFirstRealizesWhenCovered() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p = partyRepository.save(Party.builder().name("Short Party").build());
+        LocalDate baseDate = LocalDate.now().plusDays(41);
+        LocalDateTime sellAt = baseDate.atTime(10, 0);
+        LocalDateTime buyAt = baseDate.atTime(11, 0);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("5"), new BigDecimal("120"),
+                sellAt, "short open"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                buyAt, "partial cover"
+        ));
+
+        var explain = tradingService.dashboardPnlExplain("CUSTOM", null, null, null, baseDate, baseDate);
+        assertEquals(0, explain.period().grossPnlBdt().compareTo(new BigDecimal("60.00")));
+        assertEquals(0, explain.period().shortCoverRealizedPnlBdt().compareTo(new BigDecimal("60.00")));
+        assertEquals(0, explain.period().openShortQty().compareTo(new BigDecimal("2.000000")));
     }
 
     @Test

@@ -161,6 +161,14 @@ class PnlExplainSectionModel {
   final double buyBdt;
   final double sellBdt;
   final double grossPnlBdt;
+  final String costMethod;
+  final double longFifoRealizedPnlBdt;
+  final double shortCoverRealizedPnlBdt;
+  final double openLongQty;
+  final double openLongValueBdt;
+  final double openShortQty;
+  final double openShortProceedsBdt;
+  final List<PnlOpenInstrumentRowModel> openInstruments;
   final double expenseBdt;
   final double netPnlBdt;
   final List<PnlExpenseGroupModel> expenseGroups;
@@ -172,6 +180,14 @@ class PnlExplainSectionModel {
     required this.buyBdt,
     required this.sellBdt,
     required this.grossPnlBdt,
+    required this.costMethod,
+    required this.longFifoRealizedPnlBdt,
+    required this.shortCoverRealizedPnlBdt,
+    required this.openLongQty,
+    required this.openLongValueBdt,
+    required this.openShortQty,
+    required this.openShortProceedsBdt,
+    required this.openInstruments,
     required this.expenseBdt,
     required this.netPnlBdt,
     required this.expenseGroups,
@@ -185,6 +201,20 @@ class PnlExplainSectionModel {
       buyBdt: (json["buyBdt"] as num).toDouble(),
       sellBdt: (json["sellBdt"] as num).toDouble(),
       grossPnlBdt: (json["grossPnlBdt"] as num).toDouble(),
+      costMethod: json["costMethod"] as String? ?? 'FIFO',
+      longFifoRealizedPnlBdt:
+          (json["longFifoRealizedPnlBdt"] as num?)?.toDouble() ?? 0,
+      shortCoverRealizedPnlBdt:
+          (json["shortCoverRealizedPnlBdt"] as num?)?.toDouble() ?? 0,
+      openLongQty: (json["openLongQty"] as num?)?.toDouble() ?? 0,
+      openLongValueBdt: (json["openLongValueBdt"] as num?)?.toDouble() ?? 0,
+      openShortQty: (json["openShortQty"] as num?)?.toDouble() ?? 0,
+      openShortProceedsBdt:
+          (json["openShortProceedsBdt"] as num?)?.toDouble() ?? 0,
+      openInstruments: (json["openInstruments"] as List<dynamic>? ?? const [])
+          .map((item) =>
+              PnlOpenInstrumentRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
       expenseBdt: (json["expenseBdt"] as num).toDouble(),
       netPnlBdt: (json["netPnlBdt"] as num).toDouble(),
       expenseGroups: (json["expenseGroups"] as List<dynamic>? ?? const [])
@@ -197,6 +227,33 @@ class PnlExplainSectionModel {
       sellRows: (json["sellRows"] as List<dynamic>? ?? const [])
           .map((item) => PnlDealRowModel.fromJson(item as Map<String, dynamic>))
           .toList(),
+    );
+  }
+}
+
+class PnlOpenInstrumentRowModel {
+  final String instrumentCode;
+  final double openLongQty;
+  final double openLongValueBdt;
+  final double openShortQty;
+  final double openShortProceedsBdt;
+
+  const PnlOpenInstrumentRowModel({
+    required this.instrumentCode,
+    required this.openLongQty,
+    required this.openLongValueBdt,
+    required this.openShortQty,
+    required this.openShortProceedsBdt,
+  });
+
+  factory PnlOpenInstrumentRowModel.fromJson(Map<String, dynamic> json) {
+    return PnlOpenInstrumentRowModel(
+      instrumentCode: json["instrumentCode"] as String,
+      openLongQty: (json["openLongQty"] as num?)?.toDouble() ?? 0,
+      openLongValueBdt: (json["openLongValueBdt"] as num?)?.toDouble() ?? 0,
+      openShortQty: (json["openShortQty"] as num?)?.toDouble() ?? 0,
+      openShortProceedsBdt:
+          (json["openShortProceedsBdt"] as num?)?.toDouble() ?? 0,
     );
   }
 }

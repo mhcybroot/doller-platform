@@ -235,11 +235,24 @@ class _ExplainSection extends StatelessWidget {
         Text('Sell: ${formatBdt(section.sellBdt)}'),
         Text('Buy: ${formatBdt(section.buyBdt)}'),
         Text('Gross: ${formatBdt(section.grossPnlBdt)}'),
+        Text('Long FIFO realized: ${formatBdt(section.longFifoRealizedPnlBdt)}'),
+        Text('Short-cover realized: ${formatBdt(section.shortCoverRealizedPnlBdt)}'),
+        Text('Open long total value: ${formatBdt(section.openLongValueBdt)}'),
+        Text('Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}'),
+        const SizedBox(height: 6),
+        Text('Open inventory by instrument',
+            style: Theme.of(context).textTheme.titleSmall),
+        ...section.openInstruments.map(
+          (row) => Text(
+            '${row.instrumentCode}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
+          ),
+        ),
         Text('Expense: ${formatBdt(section.expenseBdt)}'),
         Text('Net: ${formatBdt(section.netPnlBdt)}'),
         const SizedBox(height: 8),
         Text(
-          'Why this amount: it adds your trading result and subtracts your operating expenses.',
+          'P/L is inventory-cost based (FIFO). Sell-first profit is realized when later buy covers short qty.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 10),
