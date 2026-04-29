@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
@@ -193,16 +192,6 @@ public class TradingService {
                 .closingAdvanceToPartyBdt(closingPosition.advanceToPartyBdt())
                 .openingAgingBdt(openingPosition.agingDueBdt())
                 .closingAgingBdt(closingPosition.agingDueBdt())
-                .openingAging0To3Bdt(openingPosition.agingBuckets().days0To3Bdt())
-                .closingAging0To3Bdt(closingPosition.agingBuckets().days0To3Bdt())
-                .openingAging4To7Bdt(openingPosition.agingBuckets().days4To7Bdt())
-                .closingAging4To7Bdt(closingPosition.agingBuckets().days4To7Bdt())
-                .openingAging8To15Bdt(openingPosition.agingBuckets().days8To15Bdt())
-                .closingAging8To15Bdt(closingPosition.agingBuckets().days8To15Bdt())
-                .openingAging15To30Bdt(openingPosition.agingBuckets().days15To30Bdt())
-                .closingAging15To30Bdt(closingPosition.agingBuckets().days15To30Bdt())
-                .openingAging30PlusBdt(openingPosition.agingBuckets().days30PlusBdt())
-                .closingAging30PlusBdt(closingPosition.agingBuckets().days30PlusBdt())
                 .realizedProfitLossBdt(p.realizedProfitLossBdt())
                 .build());
 
@@ -299,8 +288,6 @@ public class TradingService {
         BigDecimal closingAdvanceToParty = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAdvanceToPartyBdt();
         BigDecimal openingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getFirst().openingAgingBdt();
         BigDecimal closingAging = lines.isEmpty() ? BigDecimal.ZERO : lines.getLast().closingAgingBdt();
-        TradingDtos.AgingBuckets openingAgingBuckets = lines.isEmpty() ? zeroAgingBuckets() : lines.getFirst().openingAgingBuckets();
-        TradingDtos.AgingBuckets closingAgingBuckets = lines.isEmpty() ? zeroAgingBuckets() : lines.getLast().closingAgingBuckets();
         BigDecimal totalPnl = lines.stream().map(TradingDtos.StatementLine::pnl).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingDtos.BalanceSheetResponse(
                 normalizeMode(mode),
@@ -320,8 +307,6 @@ public class TradingService {
                 closingAdvanceToParty,
                 openingAging,
                 closingAging,
-                openingAgingBuckets,
-                closingAgingBuckets,
                 totalPnl,
                 lines
         );
@@ -449,37 +434,12 @@ public class TradingService {
     }
 
     public BigDecimal computeAgingDue(Long partyId, int olderThanDays) {
-        TradingDtos.AgingBuckets buckets = computeAgingBuckets(
-                partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"))
-        );
-        if (olderThanDays <= 0) {
-            return buckets.totalAgingBdt();
-        }
-        return switch (olderThanDays) {
-            case 1, 2, 3 -> buckets.days4To7Bdt()
-                    .add(buckets.days8To15Bdt())
-                    .add(buckets.days15To30Bdt())
-                    .add(buckets.days30PlusBdt());
-            case 4, 5, 6, 7 -> buckets.days8To15Bdt()
-                    .add(buckets.days15To30Bdt())
-                    .add(buckets.days30PlusBdt());
-            case 8, 9, 10, 11, 12, 13, 14, 15 -> buckets.days15To30Bdt()
-                    .add(buckets.days30PlusBdt());
-            case 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 -> buckets.days30PlusBdt();
-            default -> BigDecimal.ZERO;
-        };
+        Party party = partyRepo.findById(partyId).orElseThrow(() -> new ApiException("Party not found"));
+        return computeAgingDue(party, LocalDate.now());
     }
 
-    private TradingDtos.AgingBuckets computeAgingBuckets(Party party) {
-        return computeAgingBuckets(party, LocalDate.now());
-    }
-
-    private TradingDtos.AgingBuckets computeAgingBuckets(Party party, LocalDate asOfDate) {
-        BigDecimal days0To3 = BigDecimal.ZERO;
-        BigDecimal days4To7 = BigDecimal.ZERO;
-        BigDecimal days8To15 = BigDecimal.ZERO;
-        BigDecimal days15To30 = BigDecimal.ZERO;
-        BigDecimal days30Plus = BigDecimal.ZERO;
+    private BigDecimal computeAgingDue(Party party, LocalDate asOfDate) {
+        BigDecimal aging = BigDecimal.ZERO;
 
         List<TradeDeal> sellDeals = dealRepo.findAll().stream()
                 .filter(d -> d.getParty().getId().equals(party.getId())
@@ -501,41 +461,9 @@ public class TradingService {
                 continue;
             }
 
-            long ageDays = ChronoUnit.DAYS.between(deal.getDealTime().toLocalDate(), asOfDate);
-            if (ageDays <= 3) {
-                days0To3 = days0To3.add(outstanding);
-            } else if (ageDays <= 7) {
-                days4To7 = days4To7.add(outstanding);
-            } else if (ageDays <= 15) {
-                days8To15 = days8To15.add(outstanding);
-            } else if (ageDays <= 30) {
-                days15To30 = days15To30.add(outstanding);
-            } else {
-                days30Plus = days30Plus.add(outstanding);
-            }
+            aging = aging.add(outstanding);
         }
-
-        BigDecimal total = days0To3.add(days4To7).add(days8To15).add(days15To30).add(days30Plus);
-        return new TradingDtos.AgingBuckets(days0To3, days4To7, days8To15, days15To30, days30Plus, total);
-    }
-
-    private TradingDtos.AgingBuckets applySettlementToAging(TradingDtos.AgingBuckets current, BigDecimal settlementApplied) {
-        BigDecimal remaining = settlementApplied.max(BigDecimal.ZERO);
-        BigDecimal days30Plus = reduceBucket(current.days30PlusBdt(), remaining);
-        remaining = remaining.subtract(current.days30PlusBdt().subtract(days30Plus)).max(BigDecimal.ZERO);
-        BigDecimal days15To30 = reduceBucket(current.days15To30Bdt(), remaining);
-        remaining = remaining.subtract(current.days15To30Bdt().subtract(days15To30)).max(BigDecimal.ZERO);
-        BigDecimal days8To15 = reduceBucket(current.days8To15Bdt(), remaining);
-        remaining = remaining.subtract(current.days8To15Bdt().subtract(days8To15)).max(BigDecimal.ZERO);
-        BigDecimal days4To7 = reduceBucket(current.days4To7Bdt(), remaining);
-        remaining = remaining.subtract(current.days4To7Bdt().subtract(days4To7)).max(BigDecimal.ZERO);
-        BigDecimal days0To3 = reduceBucket(current.days0To3Bdt(), remaining);
-        BigDecimal total = days0To3.add(days4To7).add(days8To15).add(days15To30).add(days30Plus);
-        return new TradingDtos.AgingBuckets(days0To3, days4To7, days8To15, days15To30, days30Plus, total);
-    }
-
-    private BigDecimal reduceBucket(BigDecimal currentValue, BigDecimal reduction) {
-        return currentValue.subtract(reduction.min(currentValue)).max(BigDecimal.ZERO);
+        return aging;
     }
 
     private TradingDtos.PartyBalanceSummary partyBalanceSummary(Party party) {
@@ -584,12 +512,9 @@ public class TradingService {
         payable = payable.max(BigDecimal.ZERO);
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
-        TradingDtos.AgingBuckets agingBuckets = asOfDate == null
-                ? computeAgingBuckets(party)
-                : computeAgingBuckets(party, asOfDate);
-        BigDecimal aging = agingBuckets.totalAgingBdt();
+        BigDecimal aging = computeAgingDue(party, asOfDate == null ? LocalDate.now() : asOfDate);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging, agingBuckets);
+        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging);
     }
 
     private TradingDtos.SettlementInferenceResponse toInferenceResponse(Party party, TradeDeal deal, BigDecimal amount) {
@@ -722,12 +647,12 @@ public class TradingService {
         payable = payable.max(BigDecimal.ZERO);
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
-        TradingDtos.AgingBuckets agingBuckets = current.agingBuckets();
+        BigDecimal agingDue = current.agingDueBdt();
         if (plan.direction() == SettlementDirection.INCOMING && plan.basis() == SettlementBasis.RECEIVABLE) {
-            agingBuckets = applySettlementToAging(agingBuckets, plan.appliedAmount());
+            agingDue = agingDue.subtract(plan.appliedAmount()).max(BigDecimal.ZERO);
         }
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, agingBuckets.totalAgingBdt(), agingBuckets);
+        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
     }
 
     private TradingDtos.StatementLine toStatementLine(StatementSnapshot snapshot) {
@@ -747,22 +672,6 @@ public class TradingService {
                 snapshot.getClosingAdvanceToPartyBdt(),
                 snapshot.getOpeningAgingBdt(),
                 snapshot.getClosingAgingBdt(),
-                agingBucketsFromSnapshot(
-                        snapshot.getOpeningAging0To3Bdt(),
-                        snapshot.getOpeningAging4To7Bdt(),
-                        snapshot.getOpeningAging8To15Bdt(),
-                        snapshot.getOpeningAging15To30Bdt(),
-                        snapshot.getOpeningAging30PlusBdt(),
-                        snapshot.getOpeningAgingBdt()
-                ),
-                agingBucketsFromSnapshot(
-                        snapshot.getClosingAging0To3Bdt(),
-                        snapshot.getClosingAging4To7Bdt(),
-                        snapshot.getClosingAging8To15Bdt(),
-                        snapshot.getClosingAging15To30Bdt(),
-                        snapshot.getClosingAging30PlusBdt(),
-                        snapshot.getClosingAgingBdt()
-                ),
                 snapshot.getRealizedProfitLossBdt()
         );
     }
@@ -772,7 +681,7 @@ public class TradingService {
         BigDecimal payable = BigDecimal.ZERO;
         BigDecimal advanceFromParty = BigDecimal.ZERO;
         BigDecimal advanceToParty = BigDecimal.ZERO;
-        TradingDtos.AgingBuckets buckets = zeroAgingBuckets();
+        BigDecimal agingDue = BigDecimal.ZERO;
 
         for (Party party : partyRepo.findAll()) {
             TradingDtos.PartyBalanceSummary summary = partyBalanceSummary(party, asOfDate);
@@ -780,11 +689,11 @@ public class TradingService {
             payable = payable.add(summary.payableBdt());
             advanceFromParty = advanceFromParty.add(summary.advanceFromPartyBdt());
             advanceToParty = advanceToParty.add(summary.advanceToPartyBdt());
-            buckets = sumAgingBuckets(buckets, summary.agingBuckets());
+            agingDue = agingDue.add(summary.agingDueBdt());
         }
 
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, buckets.totalAgingBdt(), buckets);
+        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
     }
 
     private BalancePosition closingPositionFromSnapshot(StatementSnapshot snapshot) {
@@ -797,48 +706,7 @@ public class TradingService {
                         .add(snapshot.getClosingAdvanceToPartyBdt())
                         .subtract(snapshot.getClosingPayableBdt())
                         .subtract(snapshot.getClosingAdvanceFromPartyBdt()),
-                snapshot.getClosingAgingBdt(),
-                agingBucketsFromSnapshot(
-                        snapshot.getClosingAging0To3Bdt(),
-                        snapshot.getClosingAging4To7Bdt(),
-                        snapshot.getClosingAging8To15Bdt(),
-                        snapshot.getClosingAging15To30Bdt(),
-                        snapshot.getClosingAging30PlusBdt(),
-                        snapshot.getClosingAgingBdt()
-                )
-        );
-    }
-
-    private TradingDtos.AgingBuckets sumAgingBuckets(TradingDtos.AgingBuckets left, TradingDtos.AgingBuckets right) {
-        return new TradingDtos.AgingBuckets(
-                left.days0To3Bdt().add(right.days0To3Bdt()),
-                left.days4To7Bdt().add(right.days4To7Bdt()),
-                left.days8To15Bdt().add(right.days8To15Bdt()),
-                left.days15To30Bdt().add(right.days15To30Bdt()),
-                left.days30PlusBdt().add(right.days30PlusBdt()),
-                left.totalAgingBdt().add(right.totalAgingBdt())
-        );
-    }
-
-    private TradingDtos.AgingBuckets agingBucketsFromSnapshot(
-            BigDecimal days0To3,
-            BigDecimal days4To7,
-            BigDecimal days8To15,
-            BigDecimal days15To30,
-            BigDecimal days30Plus,
-            BigDecimal total
-    ) {
-        return new TradingDtos.AgingBuckets(days0To3, days4To7, days8To15, days15To30, days30Plus, total);
-    }
-
-    private TradingDtos.AgingBuckets zeroAgingBuckets() {
-        return new TradingDtos.AgingBuckets(
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                snapshot.getClosingAgingBdt()
         );
     }
 
@@ -849,8 +717,7 @@ public class TradingService {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                zeroAgingBuckets()
+                BigDecimal.ZERO
         );
     }
 
@@ -943,8 +810,7 @@ public class TradingService {
             BigDecimal advanceFromPartyBdt,
             BigDecimal advanceToPartyBdt,
             BigDecimal netBalanceBdt,
-            BigDecimal agingDueBdt,
-            TradingDtos.AgingBuckets agingBuckets
+            BigDecimal agingDueBdt
     ) {}
 
     private record SettlementPlan(

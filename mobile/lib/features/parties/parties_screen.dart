@@ -63,18 +63,26 @@ class _PartiesScreenState extends State<PartiesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Create Party', style: Theme.of(context).textTheme.titleLarge),
+              Text('Create Party',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+              TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Name')),
               const SizedBox(height: 12),
-              TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+              TextField(
+                  controller: phone,
+                  decoration: const InputDecoration(labelText: 'Phone')),
               const SizedBox(height: 12),
-              TextField(controller: notes, decoration: const InputDecoration(labelText: 'Notes')),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: () async {
                   try {
-                    await widget.repository.createParty(name.text.trim(), phone.text.trim(), notes.text.trim());
+                    await widget.repository.createParty(
+                        name.text.trim(), phone.text.trim(), notes.text.trim());
                     if (!context.mounted) {
                       return;
                     }
@@ -112,7 +120,8 @@ class _PartiesScreenState extends State<PartiesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(ledger.partyName, style: Theme.of(context).textTheme.titleLarge),
+                    Text(ledger.partyName,
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 10,
@@ -148,10 +157,6 @@ class _PartiesScreenState extends State<PartiesScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    if (ledger.balances.agingBuckets.totalAgingBdt > 0) ...[
-                      AgingBucketsCard(buckets: ledger.balances.agingBuckets),
-                      const SizedBox(height: 16),
-                    ],
                     Expanded(
                       child: ListView.builder(
                         controller: controller,
@@ -161,11 +166,14 @@ class _PartiesScreenState extends State<PartiesScreen> {
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(line.kind),
-                            subtitle: Text('${formatDateTime(line.time)}  ${line.note ?? ''}'),
+                            subtitle: Text(
+                                '${formatDateTime(line.time)}  ${line.note ?? ''}'),
                             trailing: Text(
                               formatBdt(line.amount),
                               style: TextStyle(
-                                color: line.amount >= 0 ? Colors.black : Colors.red.shade700,
+                                color: line.amount >= 0
+                                    ? Colors.black
+                                    : Colors.red.shade700,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -192,7 +200,9 @@ class _PartiesScreenState extends State<PartiesScreen> {
   Widget build(BuildContext context) {
     final filtered = _parties.where((party) {
       final q = _search.text.trim().toLowerCase();
-      return q.isEmpty || party.name.toLowerCase().contains(q) || (party.phone ?? '').contains(q);
+      return q.isEmpty ||
+          party.name.toLowerCase().contains(q) ||
+          (party.phone ?? '').contains(q);
     }).toList();
 
     if (_loading) {
@@ -204,8 +214,12 @@ class _PartiesScreenState extends State<PartiesScreen> {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Parties', style: Theme.of(context).textTheme.headlineMedium)),
-            IconButton(onPressed: _createParty, icon: const Icon(Icons.add_circle_outline)),
+            Expanded(
+                child: Text('Parties',
+                    style: Theme.of(context).textTheme.headlineMedium)),
+            IconButton(
+                onPressed: _createParty,
+                icon: const Icon(Icons.add_circle_outline)),
           ],
         ),
         const SizedBox(height: 8),
@@ -221,8 +235,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
         if (filtered.isEmpty)
           EmptyStateCard(
             title: 'No parties yet',
-            message: 'Create your counterparty list first so trading forms can use selectors instead of manual IDs.',
-            action: ElevatedButton(onPressed: _createParty, child: const Text('Create Party')),
+            message:
+                'Create your counterparty list first so trading forms can use selectors instead of manual IDs.',
+            action: ElevatedButton(
+                onPressed: _createParty, child: const Text('Create Party')),
           )
         else
           ...filtered.map(
@@ -230,7 +246,8 @@ class _PartiesScreenState extends State<PartiesScreen> {
               child: ListTile(
                 onTap: () => _openLedger(party),
                 title: Text(party.name),
-                subtitle: Text('${party.phone ?? 'No phone'}  ${party.notes ?? ''}'),
+                subtitle:
+                    Text('${party.phone ?? 'No phone'}  ${party.notes ?? ''}'),
                 trailing: const Icon(Icons.chevron_right),
               ),
             ),

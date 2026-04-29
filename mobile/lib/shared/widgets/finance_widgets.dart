@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/app_theme.dart';
-import '../models/domain_models.dart';
 
 final _money = NumberFormat.currency(symbol: 'BDT ', decimalDigits: 2);
 final _usd = NumberFormat.currency(symbol: 'USD ', decimalDigits: 2);
@@ -10,9 +9,11 @@ final _usd = NumberFormat.currency(symbol: 'USD ', decimalDigits: 2);
 String formatBdt(double value) => _money.format(value);
 String formatUsd(double value) => _usd.format(value);
 String formatDate(DateTime value) => DateFormat('dd MMM yyyy').format(value);
-String formatDateTime(DateTime value) => DateFormat('dd MMM, hh:mm a').format(value);
+String formatDateTime(DateTime value) =>
+    DateFormat('dd MMM, hh:mm a').format(value);
 
-void showAppMessage(BuildContext context, String message, {bool isError = false}) {
+void showAppMessage(BuildContext context, String message,
+    {bool isError = false}) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
@@ -270,59 +271,5 @@ class BalancePill extends StatelessWidget {
           AppTheme.ink,
         ),
     };
-  }
-}
-
-class AgingBucketsCard extends StatelessWidget {
-  const AgingBucketsCard({
-    super.key,
-    required this.buckets,
-    this.title = 'Receivable Aging',
-  });
-
-  final AgingBucketsModel buckets;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return FinanceSection(
-      title: title,
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: [
-          BalancePill(
-            label: '0-3 Days',
-            value: formatBdt(buckets.days0To3Bdt),
-            tone: BalancePillTone.aging0To3,
-          ),
-          BalancePill(
-            label: '4-7 Days',
-            value: formatBdt(buckets.days4To7Bdt),
-            tone: BalancePillTone.aging4To7,
-          ),
-          BalancePill(
-            label: '8-15 Days',
-            value: formatBdt(buckets.days8To15Bdt),
-            tone: BalancePillTone.aging8To15,
-          ),
-          BalancePill(
-            label: '15-30 Days',
-            value: formatBdt(buckets.days15To30Bdt),
-            tone: BalancePillTone.aging15To30,
-          ),
-          BalancePill(
-            label: '30+ Days',
-            value: formatBdt(buckets.days30PlusBdt),
-            tone: BalancePillTone.aging30Plus,
-          ),
-          BalancePill(
-            label: 'Total Aging',
-            value: formatBdt(buckets.totalAgingBdt),
-            tone: BalancePillTone.aging,
-          ),
-        ],
-      ),
-    );
   }
 }

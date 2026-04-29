@@ -9,8 +9,8 @@ import com.doller.platform.domain.enums.Role;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
 import com.doller.platform.dto.TradingDtos;
-import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.DailyCloseRepository;
+import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.SettlementRepository;
 import com.doller.platform.repo.StatementSnapshotRepository;
 import com.doller.platform.repo.TradeDealRepository;
@@ -63,27 +63,18 @@ class TradingServiceAgingBucketsTest {
     }
 
     @Test
-    void bucketsSpreadAcrossConfiguredRanges() {
+    void agingDueTotalsOpenReceivable() {
         Party party = partyRepository.save(Party.builder().name("Aging Party").build());
         saveSellDeal(party, 1000, 2);
         saveSellDeal(party, 2000, 6);
         saveSellDeal(party, 3000, 10);
-        saveSellDeal(party, 4000, 20);
-        saveSellDeal(party, 5000, 40);
 
         TradingDtos.PartyLedgerResponse ledger = tradingService.partyLedger(party.getId());
-
-        assertThat(ledger.balances().agingBuckets().days0To3Bdt()).isEqualByComparingTo("1000.00");
-        assertThat(ledger.balances().agingBuckets().days4To7Bdt()).isEqualByComparingTo("2000.00");
-        assertThat(ledger.balances().agingBuckets().days8To15Bdt()).isEqualByComparingTo("3000.00");
-        assertThat(ledger.balances().agingBuckets().days15To30Bdt()).isEqualByComparingTo("4000.00");
-        assertThat(ledger.balances().agingBuckets().days30PlusBdt()).isEqualByComparingTo("5000.00");
-        assertThat(ledger.balances().agingBuckets().totalAgingBdt()).isEqualByComparingTo("15000.00");
-        assertThat(ledger.balances().agingDueBdt()).isEqualByComparingTo("15000.00");
+        assertThat(ledger.balances().agingDueBdt()).isEqualByComparingTo("6000.00");
     }
 
     @Test
-    void partialSettlementReducesOldestAgingFirst() {
+    void incomingSettlementReducesAgingDue() {
         Party party = partyRepository.save(Party.builder().name("Settlement Party").build());
         saveSellDeal(party, 1200, 12);
         saveSellDeal(party, 800, 2);
@@ -96,12 +87,9 @@ class TradingServiceAgingBucketsTest {
                 BigDecimal.valueOf(400)
         );
 
-        assertThat(ledger.balances().agingBuckets().days8To15Bdt()).isEqualByComparingTo("500.00");
-        assertThat(ledger.balances().agingBuckets().days0To3Bdt()).isEqualByComparingTo("800.00");
-        assertThat(inference.current().agingBuckets().days8To15Bdt()).isEqualByComparingTo("500.00");
-        assertThat(inference.projected().agingBuckets().days8To15Bdt()).isEqualByComparingTo("100.00");
-        assertThat(inference.projected().agingBuckets().days0To3Bdt()).isEqualByComparingTo("800.00");
-        assertThat(inference.projected().agingBuckets().totalAgingBdt()).isEqualByComparingTo("900.00");
+        assertThat(ledger.balances().agingDueBdt()).isEqualByComparingTo("1300.00");
+        assertThat(inference.current().agingDueBdt()).isEqualByComparingTo("1300.00");
+        assertThat(inference.projected().agingDueBdt()).isEqualByComparingTo("900.00");
     }
 
     private void saveSellDeal(Party party, double amount, int daysAgo) {

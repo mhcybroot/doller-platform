@@ -54,13 +54,16 @@ class _TradingScreenState extends State<TradingScreen> {
           _selectedPartyId = null;
           _selectedDealId = null;
         } else {
-          final hasSelectedParty = parties.any((party) => party.id == _selectedPartyId);
-          _selectedPartyId = hasSelectedParty ? _selectedPartyId : parties.first.id;
+          final hasSelectedParty =
+              parties.any((party) => party.id == _selectedPartyId);
+          _selectedPartyId =
+              hasSelectedParty ? _selectedPartyId : parties.first.id;
           final allowedDealIds = deals
               .where((deal) => deal.partyName == _selectedParty?.name)
               .map((deal) => deal.id)
               .toSet();
-          if (_selectedDealId != null && !allowedDealIds.contains(_selectedDealId)) {
+          if (_selectedDealId != null &&
+              !allowedDealIds.contains(_selectedDealId)) {
             _selectedDealId = null;
           }
         }
@@ -162,7 +165,8 @@ class _TradingScreenState extends State<TradingScreen> {
     } on ApiException catch (error) {
       showAppMessage(context, error.message, isError: true);
     } on FormatException {
-      showAppMessage(context, 'Please enter valid numeric values', isError: true);
+      showAppMessage(context, 'Please enter valid numeric values',
+          isError: true);
     }
   }
 
@@ -174,14 +178,17 @@ class _TradingScreenState extends State<TradingScreen> {
     if (_parties.isEmpty) {
       return const EmptyStateCard(
         title: 'Trading needs parties first',
-        message: 'Create at least one party so deal and settlement forms can use proper selectors.',
+        message:
+            'Create at least one party so deal and settlement forms can use proper selectors.',
       );
     }
 
     final selectedParty = _selectedParty;
     final selectableDeals = _selectedParty == null
         ? _deals
-        : _deals.where((deal) => deal.partyName == _selectedParty!.name).toList();
+        : _deals
+            .where((deal) => deal.partyName == _selectedParty!.name)
+            .toList();
     final selectedDeal = _selectedDeal;
     final amountLabel = _mode == 1
         ? (_inference?.amountLabel ?? 'Settlement Amount (BDT)')
@@ -214,13 +221,16 @@ class _TradingScreenState extends State<TradingScreen> {
         ),
         const SizedBox(height: 16),
         FinanceSection(
-          title: _mode == 0 ? 'Deal Capture' : (_mode == 1 ? 'Settlement Capture' : 'Expense Capture'),
+          title: _mode == 0
+              ? 'Deal Capture'
+              : (_mode == 1 ? 'Settlement Capture' : 'Expense Capture'),
           child: Column(
             children: [
               DropdownButtonFormField<int>(
                 initialValue: selectedParty?.id,
                 items: _parties
-                    .map((party) => DropdownMenuItem(value: party.id, child: Text(party.name)))
+                    .map((party) => DropdownMenuItem(
+                        value: party.id, child: Text(party.name)))
                     .toList(),
                 onChanged: (value) {
                   setState(() {
@@ -259,11 +269,13 @@ class _TradingScreenState extends State<TradingScreen> {
                 DropdownButtonFormField<int?>(
                   initialValue: selectedDeal?.id,
                   items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('No specific deal')),
+                    const DropdownMenuItem<int?>(
+                        value: null, child: Text('No specific deal')),
                     ...selectableDeals.map(
                       (deal) => DropdownMenuItem(
                         value: deal.id,
-                        child: Text('#${deal.id} ${deal.dealType} ${formatUsd(deal.usdAmount)}'),
+                        child: Text(
+                            '#${deal.id} ${deal.dealType} ${formatUsd(deal.usdAmount)}'),
                       ),
                     ),
                   ],
@@ -284,13 +296,15 @@ class _TradingScreenState extends State<TradingScreen> {
                 ),
                 if (_mode == 1) ...[
                   const SizedBox(height: 12),
-                  if (_inference != null) _SettlementPreviewCard(inference: _inference!),
+                  if (_inference != null)
+                    _SettlementPreviewCard(inference: _inference!),
                   if (_inferenceError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         _inferenceError!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
                       ),
                     ),
                   const SizedBox(height: 6),
@@ -310,11 +324,15 @@ class _TradingScreenState extends State<TradingScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: _expenseType,
                     items: const [
-                      DropdownMenuItem(value: 'DAILY_OVERHEAD', child: Text('DAILY_OVERHEAD')),
-                      DropdownMenuItem(value: 'TRANSACTION', child: Text('TRANSACTION')),
+                      DropdownMenuItem(
+                          value: 'DAILY_OVERHEAD',
+                          child: Text('DAILY_OVERHEAD')),
+                      DropdownMenuItem(
+                          value: 'TRANSACTION', child: Text('TRANSACTION')),
                     ],
                     onChanged: (value) => setState(() => _expenseType = value!),
-                    decoration: const InputDecoration(labelText: 'Expense Type'),
+                    decoration:
+                        const InputDecoration(labelText: 'Expense Type'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -332,7 +350,9 @@ class _TradingScreenState extends State<TradingScreen> {
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: _submit,
-                child: Text(_mode == 0 ? 'Save Deal' : (_mode == 1 ? 'Save Settlement' : 'Save Expense')),
+                child: Text(_mode == 0
+                    ? 'Save Deal'
+                    : (_mode == 1 ? 'Save Settlement' : 'Save Expense')),
               ),
             ],
           ),
@@ -372,7 +392,8 @@ class _SettlementPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(inference.summary, style: Theme.of(context).textTheme.bodyMedium),
+          Text(inference.summary,
+              style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
@@ -400,13 +421,6 @@ class _SettlementPreviewCard extends StatelessWidget {
               ),
             ],
           ),
-          if (inference.current.agingBuckets.totalAgingBdt > 0) ...[
-            const SizedBox(height: 14),
-            AgingBucketsCard(
-              buckets: inference.current.agingBuckets,
-              title: 'Current Receivable Aging',
-            ),
-          ],
           const SizedBox(height: 14),
           Text('After save', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),

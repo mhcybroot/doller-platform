@@ -49,7 +49,8 @@ class _StatementsScreenState extends State<StatementsScreen> {
         ),
         const SizedBox(height: 16),
         if (_tab == 0)
-          _BalanceSheetTab(repository: widget.repository, session: widget.session)
+          _BalanceSheetTab(
+              repository: widget.repository, session: widget.session)
         else
           _TransactionDetailsTab(repository: widget.repository),
       ],
@@ -129,7 +130,10 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
     }
   }
 
-  Future<void> _pickDate({required bool fromField, bool yearOnly = false, bool monthPicker = false}) async {
+  Future<void> _pickDate(
+      {required bool fromField,
+      bool yearOnly = false,
+      bool monthPicker = false}) async {
     final initial = yearOnly
         ? DateTime(_selectedYear)
         : monthPicker
@@ -228,14 +232,17 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => _pickDate(fromField: true, monthPicker: true),
-                        child: Text('Month ${_selectedMonth.toString().padLeft(2, '0')}'),
+                        onPressed: () =>
+                            _pickDate(fromField: true, monthPicker: true),
+                        child: Text(
+                            'Month ${_selectedMonth.toString().padLeft(2, '0')}'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => _pickDate(fromField: true, yearOnly: true),
+                        onPressed: () =>
+                            _pickDate(fromField: true, yearOnly: true),
                         child: Text('Year $_selectedYear'),
                       ),
                     ),
@@ -279,10 +286,14 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill('Opening Cash', formatBdt(report.openingCash), BalancePillTone.neutral),
-                  _reportPill('Closing Cash', formatBdt(report.closingCash), BalancePillTone.neutral),
-                  _reportPill('Opening USD', formatUsd(report.openingUsd), BalancePillTone.neutral),
-                  _reportPill('Closing USD', formatUsd(report.closingUsd), BalancePillTone.neutral),
+                  _reportPill('Opening Cash', formatBdt(report.openingCash),
+                      BalancePillTone.neutral),
+                  _reportPill('Closing Cash', formatBdt(report.closingCash),
+                      BalancePillTone.neutral),
+                  _reportPill('Opening USD', formatUsd(report.openingUsd),
+                      BalancePillTone.neutral),
+                  _reportPill('Closing USD', formatUsd(report.closingUsd),
+                      BalancePillTone.neutral),
                 ],
               ),
               const SizedBox(height: 12),
@@ -292,14 +303,38 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill('Opening Receivable', formatBdt(report.openingReceivableBdt), BalancePillTone.receivable),
-                  _reportPill('Closing Receivable', formatBdt(report.closingReceivableBdt), BalancePillTone.receivable),
-                  _reportPill('Opening Payable', formatBdt(report.openingPayableBdt), BalancePillTone.payable),
-                  _reportPill('Closing Payable', formatBdt(report.closingPayableBdt), BalancePillTone.payable),
-                  _reportPill('Opening Advance In', formatBdt(report.openingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
-                  _reportPill('Closing Advance In', formatBdt(report.closingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
-                  _reportPill('Opening Advance Out', formatBdt(report.openingAdvanceToPartyBdt), BalancePillTone.advanceOut),
-                  _reportPill('Closing Advance Out', formatBdt(report.closingAdvanceToPartyBdt), BalancePillTone.advanceOut),
+                  _reportPill(
+                      'Opening Receivable',
+                      formatBdt(report.openingReceivableBdt),
+                      BalancePillTone.receivable),
+                  _reportPill(
+                      'Closing Receivable',
+                      formatBdt(report.closingReceivableBdt),
+                      BalancePillTone.receivable),
+                  _reportPill(
+                      'Opening Payable',
+                      formatBdt(report.openingPayableBdt),
+                      BalancePillTone.payable),
+                  _reportPill(
+                      'Closing Payable',
+                      formatBdt(report.closingPayableBdt),
+                      BalancePillTone.payable),
+                  _reportPill(
+                      'Opening Advance In',
+                      formatBdt(report.openingAdvanceFromPartyBdt),
+                      BalancePillTone.advanceIn),
+                  _reportPill(
+                      'Closing Advance In',
+                      formatBdt(report.closingAdvanceFromPartyBdt),
+                      BalancePillTone.advanceIn),
+                  _reportPill(
+                      'Opening Advance Out',
+                      formatBdt(report.openingAdvanceToPartyBdt),
+                      BalancePillTone.advanceOut),
+                  _reportPill(
+                      'Closing Advance Out',
+                      formatBdt(report.closingAdvanceToPartyBdt),
+                      BalancePillTone.advanceOut),
                 ],
               ),
               const SizedBox(height: 12),
@@ -309,31 +344,21 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _reportPill('Opening Aging', formatBdt(report.openingAgingBdt), BalancePillTone.aging),
-                  _reportPill('Closing Aging', formatBdt(report.closingAgingBdt), BalancePillTone.aging),
+                  _reportPill('Opening Aging',
+                      formatBdt(report.openingAgingBdt), BalancePillTone.aging),
+                  _reportPill('Closing Aging',
+                      formatBdt(report.closingAgingBdt), BalancePillTone.aging),
                 ],
               ),
-              if (report.openingAgingBuckets.totalAgingBdt > 0) ...[
-                const SizedBox(height: 12),
-                AgingBucketsCard(
-                  title: 'Opening Aging Breakdown',
-                  buckets: report.openingAgingBuckets,
-                ),
-              ],
-              if (report.closingAgingBuckets.totalAgingBdt > 0) ...[
-                const SizedBox(height: 12),
-                AgingBucketsCard(
-                  title: 'Closing Aging Breakdown',
-                  buckets: report.closingAgingBuckets,
-                ),
-              ],
               const SizedBox(height: 12),
-              Text('Performance', style: Theme.of(context).textTheme.titleSmall),
+              Text('Performance',
+                  style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
               MetricCard(
                 label: 'Total P/L',
                 value: formatBdt(report.totalPnl),
-                caption: '${formatDate(report.from)} to ${formatDate(report.to)}',
+                caption:
+                    '${formatDate(report.from)} to ${formatDate(report.to)}',
                 positive: report.totalPnl >= 0,
               ),
             ],
@@ -370,18 +395,22 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                           child: ElevatedButton(
                             onPressed: () async {
                               try {
-                                final result = await widget.repository.confirmDayClose(_selectedDate);
+                                final result = await widget.repository
+                                    .confirmDayClose(_selectedDate);
                                 if (!mounted) return;
-                                showAppMessage(context, 'Day closed: ${result.auditRef}');
+                                showAppMessage(
+                                    context, 'Day closed: ${result.auditRef}');
                                 await _load();
                               } on ApiException catch (error) {
                                 if (!mounted) return;
                                 if (error.message == 'Day already closed') {
-                                  showAppMessage(context, 'This day is already closed. Reloading status.');
+                                  showAppMessage(context,
+                                      'This day is already closed. Reloading status.');
                                   await _load();
                                   return;
                                 }
-                                showAppMessage(context, error.message, isError: true);
+                                showAppMessage(context, error.message,
+                                    isError: true);
                               }
                             },
                             child: const Text('Confirm Close'),
@@ -394,17 +423,20 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                             onPressed: isDailyClosed
                                 ? () async {
                                     try {
-                                      await widget.repository.reopenDay(_selectedDate, 'Owner correction');
+                                      await widget.repository.reopenDay(
+                                          _selectedDate, 'Owner correction');
                                       if (!mounted) return;
                                       showAppMessage(context, 'Day reopened');
                                       await _load();
                                     } on ApiException catch (error) {
                                       if (!mounted) return;
-                                      showAppMessage(context, error.message, isError: true);
+                                      showAppMessage(context, error.message,
+                                          isError: true);
                                     }
                                   }
                                 : null,
-                            child: Text(isDailyClosed ? 'Reopen Day' : 'Closed'),
+                            child:
+                                Text(isDailyClosed ? 'Reopen Day' : 'Closed'),
                           ),
                         ),
                       ],
@@ -418,7 +450,8 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         if (report.lines.isEmpty)
           const EmptyStateCard(
             title: 'No balance sheet lines',
-            message: 'Close operational days first to build balance-sheet history.',
+            message:
+                'Close operational days first to build balance-sheet history.',
           )
         else
           FinanceSection(
@@ -434,8 +467,10 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                         color: Colors.white,
                       ),
                       child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         title: Text(formatDate(line.date)),
                         subtitle: Text(
                           'Cash ${formatBdt(line.openingCash)} -> ${formatBdt(line.closingCash)} • '
@@ -445,7 +480,9 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                           formatBdt(line.pnl),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: line.pnl >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                            color: line.pnl >= 0
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
                           ),
                         ),
                         children: [
@@ -453,32 +490,48 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                             spacing: 10,
                             runSpacing: 10,
                             children: [
-                              _reportPill('Open Receivable', formatBdt(line.openingReceivableBdt), BalancePillTone.receivable),
-                              _reportPill('Close Receivable', formatBdt(line.closingReceivableBdt), BalancePillTone.receivable),
-                              _reportPill('Open Payable', formatBdt(line.openingPayableBdt), BalancePillTone.payable),
-                              _reportPill('Close Payable', formatBdt(line.closingPayableBdt), BalancePillTone.payable),
-                              _reportPill('Open Advance In', formatBdt(line.openingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
-                              _reportPill('Close Advance In', formatBdt(line.closingAdvanceFromPartyBdt), BalancePillTone.advanceIn),
-                              _reportPill('Open Advance Out', formatBdt(line.openingAdvanceToPartyBdt), BalancePillTone.advanceOut),
-                              _reportPill('Close Advance Out', formatBdt(line.closingAdvanceToPartyBdt), BalancePillTone.advanceOut),
-                              _reportPill('Open Aging', formatBdt(line.openingAgingBdt), BalancePillTone.aging),
-                              _reportPill('Close Aging', formatBdt(line.closingAgingBdt), BalancePillTone.aging),
+                              _reportPill(
+                                  'Open Receivable',
+                                  formatBdt(line.openingReceivableBdt),
+                                  BalancePillTone.receivable),
+                              _reportPill(
+                                  'Close Receivable',
+                                  formatBdt(line.closingReceivableBdt),
+                                  BalancePillTone.receivable),
+                              _reportPill(
+                                  'Open Payable',
+                                  formatBdt(line.openingPayableBdt),
+                                  BalancePillTone.payable),
+                              _reportPill(
+                                  'Close Payable',
+                                  formatBdt(line.closingPayableBdt),
+                                  BalancePillTone.payable),
+                              _reportPill(
+                                  'Open Advance In',
+                                  formatBdt(line.openingAdvanceFromPartyBdt),
+                                  BalancePillTone.advanceIn),
+                              _reportPill(
+                                  'Close Advance In',
+                                  formatBdt(line.closingAdvanceFromPartyBdt),
+                                  BalancePillTone.advanceIn),
+                              _reportPill(
+                                  'Open Advance Out',
+                                  formatBdt(line.openingAdvanceToPartyBdt),
+                                  BalancePillTone.advanceOut),
+                              _reportPill(
+                                  'Close Advance Out',
+                                  formatBdt(line.closingAdvanceToPartyBdt),
+                                  BalancePillTone.advanceOut),
+                              _reportPill(
+                                  'Open Aging',
+                                  formatBdt(line.openingAgingBdt),
+                                  BalancePillTone.aging),
+                              _reportPill(
+                                  'Close Aging',
+                                  formatBdt(line.closingAgingBdt),
+                                  BalancePillTone.aging),
                             ],
                           ),
-                          if (line.openingAgingBuckets.totalAgingBdt > 0) ...[
-                            const SizedBox(height: 12),
-                            AgingBucketsCard(
-                              title: 'Opening Aging',
-                              buckets: line.openingAgingBuckets,
-                            ),
-                          ],
-                          if (line.closingAgingBuckets.totalAgingBdt > 0) ...[
-                            const SizedBox(height: 12),
-                            AgingBucketsCard(
-                              title: 'Closing Aging',
-                              buckets: line.closingAgingBuckets,
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -658,11 +711,13 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                 items: const [
                   DropdownMenuItem(value: 'ALL', child: Text('All Types')),
                   DropdownMenuItem(value: 'DEAL', child: Text('Deals')),
-                  DropdownMenuItem(value: 'SETTLEMENT', child: Text('Settlements')),
+                  DropdownMenuItem(
+                      value: 'SETTLEMENT', child: Text('Settlements')),
                   DropdownMenuItem(value: 'EXPENSE', child: Text('Expenses')),
                 ],
                 onChanged: (value) async {
-                  setState(() => _type = value == null || value == 'ALL' ? '' : value);
+                  setState(() =>
+                      _type = value == null || value == 'ALL' ? '' : value);
                   await _load();
                 },
                 decoration: const InputDecoration(labelText: 'Type'),
@@ -672,7 +727,8 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                 initialValue: _partyId,
                 isExpanded: true,
                 items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('All Parties')),
+                  const DropdownMenuItem<int?>(
+                      value: null, child: Text('All Parties')),
                   ..._parties.map(
                     (party) => DropdownMenuItem<int?>(
                       value: party.id,
@@ -693,10 +749,14 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                     initialValue: _sortField,
                     isExpanded: true,
                     items: const [
-                      DropdownMenuItem(value: 'occurredAt', child: Text('Sort by Date')),
-                      DropdownMenuItem(value: 'amountBdt', child: Text('Sort by Amount')),
-                      DropdownMenuItem(value: 'entryType', child: Text('Sort by Type')),
-                      DropdownMenuItem(value: 'partyName', child: Text('Sort by Party')),
+                      DropdownMenuItem(
+                          value: 'occurredAt', child: Text('Sort by Date')),
+                      DropdownMenuItem(
+                          value: 'amountBdt', child: Text('Sort by Amount')),
+                      DropdownMenuItem(
+                          value: 'entryType', child: Text('Sort by Type')),
+                      DropdownMenuItem(
+                          value: 'partyName', child: Text('Sort by Party')),
                     ],
                     onChanged: (value) async {
                       setState(() => _sortField = value ?? 'occurredAt');
@@ -709,14 +769,17 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                     initialValue: _sortDirection,
                     isExpanded: true,
                     items: const [
-                      DropdownMenuItem(value: 'desc', child: Text('Newest / Highest')),
-                      DropdownMenuItem(value: 'asc', child: Text('Oldest / Lowest')),
+                      DropdownMenuItem(
+                          value: 'desc', child: Text('Newest / Highest')),
+                      DropdownMenuItem(
+                          value: 'asc', child: Text('Oldest / Lowest')),
                     ],
                     onChanged: (value) async {
                       setState(() => _sortDirection = value ?? 'desc');
                       await _load();
                     },
-                    decoration: const InputDecoration(labelText: 'Sort Direction'),
+                    decoration:
+                        const InputDecoration(labelText: 'Sort Direction'),
                   ),
                 ],
               ),
@@ -727,7 +790,8 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         if (details.rows.isEmpty)
           const EmptyStateCard(
             title: 'No transactions found',
-            message: 'Try another date range, type, search term, or party filter.',
+            message:
+                'Try another date range, type, search term, or party filter.',
           )
         else
           FinanceSection(
@@ -746,13 +810,18 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    row.referenceLabel ?? '${row.entryType} #${row.entryId}',
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    row.referenceLabel ??
+                                        '${row.entryType} #${row.entryId}',
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium,
                                   ),
                                 ),
                                 Text(
                                   formatBdt(row.amountBdt),
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
                                         color: row.entryType == 'EXPENSE'
                                             ? Colors.red.shade700
                                             : AppTheme.ink,
@@ -761,12 +830,18 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text('${row.entryType} • ${formatDateTime(row.occurredAt)}'),
-                            if ((row.partyName ?? '').isNotEmpty) Text('Party: ${row.partyName}'),
-                            if ((row.directionLabel ?? '').isNotEmpty) Text('Direction: ${row.directionLabel}'),
-                            if (row.usdAmount != null) Text('USD: ${formatUsd(row.usdAmount!)}'),
-                            if (row.bdtRate != null) Text('Rate: ${row.bdtRate}'),
-                            if ((row.category ?? '').isNotEmpty) Text('Category: ${row.category}'),
+                            Text(
+                                '${row.entryType} • ${formatDateTime(row.occurredAt)}'),
+                            if ((row.partyName ?? '').isNotEmpty)
+                              Text('Party: ${row.partyName}'),
+                            if ((row.directionLabel ?? '').isNotEmpty)
+                              Text('Direction: ${row.directionLabel}'),
+                            if (row.usdAmount != null)
+                              Text('USD: ${formatUsd(row.usdAmount!)}'),
+                            if (row.bdtRate != null)
+                              Text('Rate: ${row.bdtRate}'),
+                            if ((row.category ?? '').isNotEmpty)
+                              Text('Category: ${row.category}'),
                             if ((row.notes ?? '').isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(row.notes!),

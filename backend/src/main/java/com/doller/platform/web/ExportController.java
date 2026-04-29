@@ -127,27 +127,7 @@ public class ExportController {
                         response.openingAgingBdt(), response.closingAgingBdt()));
                 cs.endText();
 
-                cs.beginText();
-                cs.newLineAtOffset(50, 692);
-                cs.showText(String.format("Open Aging Buckets 0-3=%s 4-7=%s 8-15=%s 15-30=%s 30+=%s",
-                        response.openingAgingBuckets().days0To3Bdt(),
-                        response.openingAgingBuckets().days4To7Bdt(),
-                        response.openingAgingBuckets().days8To15Bdt(),
-                        response.openingAgingBuckets().days15To30Bdt(),
-                        response.openingAgingBuckets().days30PlusBdt()));
-                cs.endText();
-
-                cs.beginText();
-                cs.newLineAtOffset(50, 676);
-                cs.showText(String.format("Close Aging Buckets 0-3=%s 4-7=%s 8-15=%s 15-30=%s 30+=%s",
-                        response.closingAgingBuckets().days0To3Bdt(),
-                        response.closingAgingBuckets().days4To7Bdt(),
-                        response.closingAgingBuckets().days8To15Bdt(),
-                        response.closingAgingBuckets().days15To30Bdt(),
-                        response.closingAgingBuckets().days30PlusBdt()));
-                cs.endText();
-
-                float y = 648;
+                float y = 692;
                 for (TradingDtos.StatementLine line : response.lines()) {
                     if (y < 60) break;
                     cs.beginText();
