@@ -13,42 +13,31 @@ class StatementsScreen extends StatefulWidget {
     super.key,
     required this.repository,
     required this.session,
+    this.initialTab = 0,
   });
 
   final DollerRepository repository;
   final AuthSession session;
+  final int initialTab;
 
   @override
   State<StatementsScreen> createState() => _StatementsScreenState();
 }
 
 class _StatementsScreenState extends State<StatementsScreen> {
-  int _tab = 0;
+  late int _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab == 1 ? 1 : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text('Reports', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(
-          'Balance sheets, transaction details, exports, and day-close oversight.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 18),
-        FinanceSection(
-          title: 'Report Type',
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Balance Sheet')),
-              ButtonSegment(value: 1, label: Text('Transaction Details')),
-            ],
-            selected: {_tab},
-            onSelectionChanged: (value) => setState(() => _tab = value.first),
-          ),
-        ),
-        const SizedBox(height: 16),
         if (_tab == 0)
           _BalanceSheetTab(
               repository: widget.repository, session: widget.session)
@@ -821,7 +810,10 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                   ),
                                 ),
                                 Text(
-                                  formatBdt(row.amountBdt),
+                                  _formatSignedAmount(
+                                    row.amountBdt,
+                                    isExpense: row.entryType == 'EXPENSE',
+                                  ),
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleMedium
@@ -883,5 +875,13 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       default:
         return entryType;
     }
+  }
+
+  String _formatSignedAmount(double amount, {required bool isExpense}) {
+    if (amount == 0) {
+      return formatBdt(0);
+    }
+    final sign = isExpense ? '-' : '+';
+    return '$sign${formatBdt(amount.abs())}';
   }
 }

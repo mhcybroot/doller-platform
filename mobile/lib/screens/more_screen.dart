@@ -67,15 +67,49 @@ class MoreScreen extends StatelessWidget {
         ),
         Card(
           child: ListTile(
-            leading: const Icon(Icons.assessment_outlined),
-            title: const Text('Reports'),
-            subtitle: const Text('Statements and exports'),
+            leading: const Icon(Icons.balance_outlined),
+            title: const Text('Balance Sheet'),
+            subtitle: const Text('Opening/closing balances and day-close view'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => StatementsScreen(
-                      repository: repository, session: session),
+                  builder: (_) => Scaffold(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    appBar: AppBar(title: const Text('Balance Sheet')),
+                    body: SafeArea(
+                      child: StatementsScreen(
+                        repository: repository,
+                        session: session,
+                        initialTab: 0,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Transaction Details'),
+            subtitle: const Text('Filterable deal, settlement, and expense rows'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    appBar: AppBar(title: const Text('Transaction Details')),
+                    body: SafeArea(
+                      child: StatementsScreen(
+                        repository: repository,
+                        session: session,
+                        initialTab: 1,
+                      ),
+                    ),
+                  ),
                 ),
               );
             },
