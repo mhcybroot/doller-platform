@@ -811,8 +811,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                 ),
                                 Text(
                                   _formatSignedAmount(
-                                    row.amountBdt,
-                                    isExpense: row.entryType == 'EXPENSE',
+                                    row,
                                   ),
                                   style: Theme.of(context)
                                       .textTheme
@@ -877,11 +876,15 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     }
   }
 
-  String _formatSignedAmount(double amount, {required bool isExpense}) {
+  String _formatSignedAmount(TransactionDetailRowModel row) {
+    final amount = row.amountBdt;
     if (amount == 0) {
       return formatBdt(0);
     }
-    final sign = isExpense ? '-' : '+';
+    final direction = (row.directionLabel ?? '').toUpperCase();
+    final isOutgoingSettlement =
+        row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
+    final sign = row.entryType == 'EXPENSE' || isOutgoingSettlement ? '-' : '+';
     return '$sign${formatBdt(amount.abs())}';
   }
 }
