@@ -83,4 +83,9 @@ public class TradingController {
 
     @GetMapping("/dashboard")
     public TradingDtos.DashboardResponse dashboard(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) { return service.dashboard(from, to); }
+
+    @GetMapping("/dues/snapshot")
+    public TradingDtos.DuesSnapshotResponse duesSnapshot() {
+        return service.duesSnapshot();
+    }
 }

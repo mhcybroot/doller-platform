@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -21,7 +22,7 @@ class ApiClient {
   ApiClient(this._store)
       : _dio = Dio(
           BaseOptions(
-            baseUrl: 'http://76.13.221.43:8088',
+            baseUrl: Platform.isAndroid ? 'http://10.0.2.2:8088' : 'http://localhost:8088',
             connectTimeout: const Duration(seconds: 20),
             receiveTimeout: const Duration(seconds: 20),
           ),

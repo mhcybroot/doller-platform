@@ -79,6 +79,72 @@ class DashboardMetrics {
   }
 }
 
+class PartyDueRowModel {
+  final int partyId;
+  final String partyName;
+  final String? phone;
+  final String? notes;
+  final double receivableBdt;
+  final double payableBdt;
+  final double netBdt;
+  final DateTime? lastActivityAt;
+
+  const PartyDueRowModel({
+    required this.partyId,
+    required this.partyName,
+    required this.phone,
+    required this.notes,
+    required this.receivableBdt,
+    required this.payableBdt,
+    required this.netBdt,
+    required this.lastActivityAt,
+  });
+
+  factory PartyDueRowModel.fromJson(Map<String, dynamic> json) {
+    return PartyDueRowModel(
+      partyId: (json["partyId"] as num).toInt(),
+      partyName: json["partyName"] as String,
+      phone: json["phone"] as String?,
+      notes: json["notes"] as String?,
+      receivableBdt: (json["receivableBdt"] as num).toDouble(),
+      payableBdt: (json["payableBdt"] as num).toDouble(),
+      netBdt: (json["netBdt"] as num).toDouble(),
+      lastActivityAt: (json["lastActivityAt"] as String?) == null
+          ? null
+          : DateTime.parse(json["lastActivityAt"] as String),
+    );
+  }
+}
+
+class DuesSnapshotModel {
+  final double totalReceivableBdt;
+  final double totalPayableBdt;
+  final double grossBdt;
+  final double netBdt;
+  final List<PartyDueRowModel> rows;
+
+  const DuesSnapshotModel({
+    required this.totalReceivableBdt,
+    required this.totalPayableBdt,
+    required this.grossBdt,
+    required this.netBdt,
+    required this.rows,
+  });
+
+  factory DuesSnapshotModel.fromJson(Map<String, dynamic> json) {
+    return DuesSnapshotModel(
+      totalReceivableBdt: (json["totalReceivableBdt"] as num).toDouble(),
+      totalPayableBdt: (json["totalPayableBdt"] as num).toDouble(),
+      grossBdt: (json["grossBdt"] as num).toDouble(),
+      netBdt: (json["netBdt"] as num).toDouble(),
+      rows: (json["rows"] as List<dynamic>)
+          .map(
+              (item) => PartyDueRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class StatementLineModel {
   final DateTime date;
   final double openingCash;
@@ -127,21 +193,29 @@ class StatementLineModel {
       closingCash: (json["closingCash"] as num).toDouble(),
       openingUsd: (json["openingUsd"] as num).toDouble(),
       closingUsd: (json["closingUsd"] as num).toDouble(),
-      openingReceivableBdt: (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
-      closingReceivableBdt: (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
+      openingReceivableBdt:
+          (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
+      closingReceivableBdt:
+          (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
       openingPayableBdt: (json["openingPayableBdt"] as num? ?? 0).toDouble(),
       closingPayableBdt: (json["closingPayableBdt"] as num? ?? 0).toDouble(),
-      openingAdvanceFromPartyBdt: (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
-      closingAdvanceFromPartyBdt: (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
-      openingAdvanceToPartyBdt: (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
-      closingAdvanceToPartyBdt: (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceFromPartyBdt:
+          (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceFromPartyBdt:
+          (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceToPartyBdt:
+          (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceToPartyBdt:
+          (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
       openingAgingBdt: (json["openingAgingBdt"] as num? ?? 0).toDouble(),
       closingAgingBdt: (json["closingAgingBdt"] as num? ?? 0).toDouble(),
       openingAgingBuckets: AgingBucketsModel.fromJson(
-        (json["openingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+        (json["openingAgingBuckets"] as Map<String, dynamic>?) ??
+            _zeroAgingJson(),
       ),
       closingAgingBuckets: AgingBucketsModel.fromJson(
-        (json["closingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+        (json["closingAgingBuckets"] as Map<String, dynamic>?) ??
+            _zeroAgingJson(),
       ),
       pnl: (json["pnl"] as num).toDouble(),
     );
@@ -204,25 +278,34 @@ class BalanceSheetModel {
       closingCash: (json["closingCash"] as num).toDouble(),
       openingUsd: (json["openingUsd"] as num).toDouble(),
       closingUsd: (json["closingUsd"] as num).toDouble(),
-      openingReceivableBdt: (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
-      closingReceivableBdt: (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
+      openingReceivableBdt:
+          (json["openingReceivableBdt"] as num? ?? 0).toDouble(),
+      closingReceivableBdt:
+          (json["closingReceivableBdt"] as num? ?? 0).toDouble(),
       openingPayableBdt: (json["openingPayableBdt"] as num? ?? 0).toDouble(),
       closingPayableBdt: (json["closingPayableBdt"] as num? ?? 0).toDouble(),
-      openingAdvanceFromPartyBdt: (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
-      closingAdvanceFromPartyBdt: (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
-      openingAdvanceToPartyBdt: (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
-      closingAdvanceToPartyBdt: (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceFromPartyBdt:
+          (json["openingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceFromPartyBdt:
+          (json["closingAdvanceFromPartyBdt"] as num? ?? 0).toDouble(),
+      openingAdvanceToPartyBdt:
+          (json["openingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
+      closingAdvanceToPartyBdt:
+          (json["closingAdvanceToPartyBdt"] as num? ?? 0).toDouble(),
       openingAgingBdt: (json["openingAgingBdt"] as num? ?? 0).toDouble(),
       closingAgingBdt: (json["closingAgingBdt"] as num? ?? 0).toDouble(),
       openingAgingBuckets: AgingBucketsModel.fromJson(
-        (json["openingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+        (json["openingAgingBuckets"] as Map<String, dynamic>?) ??
+            _zeroAgingJson(),
       ),
       closingAgingBuckets: AgingBucketsModel.fromJson(
-        (json["closingAgingBuckets"] as Map<String, dynamic>?) ?? _zeroAgingJson(),
+        (json["closingAgingBuckets"] as Map<String, dynamic>?) ??
+            _zeroAgingJson(),
       ),
       totalPnl: (json["totalPnl"] as num).toDouble(),
       lines: (json["lines"] as List<dynamic>)
-          .map((item) => StatementLineModel.fromJson(item as Map<String, dynamic>))
+          .map((item) =>
+              StatementLineModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -268,7 +351,8 @@ class TransactionDetailsModel {
       sortField: json["sortField"] as String? ?? 'occurredAt',
       sortDirection: json["sortDirection"] as String? ?? 'desc',
       rows: (json["rows"] as List<dynamic>)
-          .map((item) => TransactionDetailRowModel.fromJson(item as Map<String, dynamic>))
+          .map((item) =>
+              TransactionDetailRowModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -435,7 +519,8 @@ class PartyBalanceSummaryModel {
       advanceToPartyBdt: (json["advanceToPartyBdt"] as num).toDouble(),
       netBalanceBdt: (json["netBalanceBdt"] as num).toDouble(),
       agingDueBdt: (json["agingDueBdt"] as num).toDouble(),
-      agingBuckets: AgingBucketsModel.fromJson(json["agingBuckets"] as Map<String, dynamic>),
+      agingBuckets: AgingBucketsModel.fromJson(
+          json["agingBuckets"] as Map<String, dynamic>),
     );
   }
 }
@@ -486,9 +571,11 @@ class PartyLedgerModel {
     return PartyLedgerModel(
       partyId: (json["partyId"] as num).toInt(),
       partyName: json["partyName"] as String,
-      balances: PartyBalanceSummaryModel.fromJson(json["balances"] as Map<String, dynamic>),
+      balances: PartyBalanceSummaryModel.fromJson(
+          json["balances"] as Map<String, dynamic>),
       lines: (json["lines"] as List<dynamic>)
-          .map((line) => PartyLedgerLineModel.fromJson(line as Map<String, dynamic>))
+          .map((line) =>
+              PartyLedgerLineModel.fromJson(line as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -523,8 +610,10 @@ class SettlementInferenceModel {
     return SettlementInferenceModel(
       partyId: (json["partyId"] as num).toInt(),
       tradeDealId: (json["tradeDealId"] as num?)?.toInt(),
-      current: PartyBalanceSummaryModel.fromJson(json["current"] as Map<String, dynamic>),
-      projected: PartyBalanceSummaryModel.fromJson(json["projected"] as Map<String, dynamic>),
+      current: PartyBalanceSummaryModel.fromJson(
+          json["current"] as Map<String, dynamic>),
+      projected: PartyBalanceSummaryModel.fromJson(
+          json["projected"] as Map<String, dynamic>),
       direction: json["direction"] as String,
       basis: json["basis"] as String,
       appliedAmount: (json["appliedAmount"] as num).toDouble(),

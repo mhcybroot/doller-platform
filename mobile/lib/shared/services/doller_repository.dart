@@ -56,7 +56,8 @@ class DollerRepository {
     );
   }
 
-  Future<PartyModel> createParty(String name, String phone, String notes) async {
+  Future<PartyModel> createParty(
+      String name, String phone, String notes) async {
     return _api.post<PartyModel>(
       '/parties',
       data: {'name': name, 'phone': phone, 'notes': notes},
@@ -128,7 +129,8 @@ class DollerRepository {
         if (tradeDealId != null) 'tradeDealId': tradeDealId,
         'amount': amount,
       },
-      parser: (json) => SettlementInferenceModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          SettlementInferenceModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -161,13 +163,25 @@ class DollerRepository {
     );
   }
 
-  Future<List<StatementLineModel>> statements(DateTime from, DateTime to) async {
+  Future<DuesSnapshotModel> fetchDuesSnapshot() async {
+    return _api.get<DuesSnapshotModel>(
+      '/dues/snapshot',
+      parser: (json) =>
+          DuesSnapshotModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<List<StatementLineModel>> statements(
+      DateTime from, DateTime to) async {
     final isSameDay = _date(from) == _date(to);
     return _api.get<List<StatementLineModel>>(
       isSameDay ? '/statements/daily' : '/statements/range',
-      query: isSameDay ? {'date': _date(from)} : {'from': _date(from), 'to': _date(to)},
+      query: isSameDay
+          ? {'date': _date(from)}
+          : {'from': _date(from), 'to': _date(to)},
       parser: (json) => (json as List<dynamic>)
-          .map((item) => StatementLineModel.fromJson(item as Map<String, dynamic>))
+          .map((item) =>
+              StatementLineModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -190,7 +204,8 @@ class DollerRepository {
         if (from != null) 'from': _date(from),
         if (to != null) 'to': _date(to),
       },
-      parser: (json) => BalanceSheetModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          BalanceSheetModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -214,14 +229,16 @@ class DollerRepository {
         if (sortField != null) 'sortField': sortField,
         if (sortDirection != null) 'sortDirection': sortDirection,
       },
-      parser: (json) => TransactionDetailsModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          TransactionDetailsModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
   Future<DayClosePreviewModel> previewDayClose(DateTime date) async {
     return _api.get<DayClosePreviewModel>(
       '/day-close/${_date(date)}',
-      parser: (json) => DayClosePreviewModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          DayClosePreviewModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -229,7 +246,8 @@ class DollerRepository {
     return _api.post<DayCloseResultModel>(
       '/day-close/${_date(date)}',
       data: const {},
-      parser: (json) => DayCloseResultModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          DayCloseResultModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -237,7 +255,8 @@ class DollerRepository {
     return _api.post<DayCloseResultModel>(
       '/day-close/${_date(date)}/reopen',
       data: {'reason': reason},
-      parser: (json) => DayCloseResultModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          DayCloseResultModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -257,7 +276,8 @@ class DollerRepository {
     );
   }
 
-  Future<UserModel> createUser(String username, String password, String role) async {
+  Future<UserModel> createUser(
+      String username, String password, String role) async {
     return _api.post<UserModel>(
       '/users',
       data: {'username': username, 'password': password, 'role': role},
@@ -303,7 +323,8 @@ class DollerRepository {
       },
     );
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/balance_sheet_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    final file = File(
+        '${tempDir.path}/balance_sheet_${DateTime.now().millisecondsSinceEpoch}.pdf');
     await file.writeAsBytes(bytes);
     await Share.shareXFiles([XFile(file.path)]);
   }
@@ -331,7 +352,8 @@ class DollerRepository {
       },
     );
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/transaction_details_${_date(from)}_${_date(to)}.pdf');
+    final file = File(
+        '${tempDir.path}/transaction_details_${_date(from)}_${_date(to)}.pdf');
     await file.writeAsBytes(bytes);
     await Share.shareXFiles([XFile(file.path)]);
   }

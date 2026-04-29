@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../features/control/control_center_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/parties/parties_screen.dart';
-import '../features/statements/statements_screen.dart';
 import '../features/trading/trading_screen.dart';
 import '../features/auth/login_screen.dart';
+import 'more_screen.dart';
 import '../shared/models/auth_models.dart';
 import '../shared/services/doller_repository.dart';
 
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
       DashboardScreen(repository: widget.repository),
       TradingScreen(repository: widget.repository),
       PartiesScreen(repository: widget.repository),
-      StatementsScreen(repository: widget.repository, session: widget.session),
+      MoreScreen(repository: widget.repository, session: widget.session),
     ];
 
     return Scaffold(
@@ -73,10 +73,13 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.pie_chart_outline), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.candlestick_chart), label: 'Trading'),
-          NavigationDestination(icon: Icon(Icons.people_alt_outlined), label: 'Party'),
-          NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'Reports'),
+          NavigationDestination(
+              icon: Icon(Icons.pie_chart_outline), label: 'Dashboard'),
+          NavigationDestination(
+              icon: Icon(Icons.candlestick_chart), label: 'Trading'),
+          NavigationDestination(
+              icon: Icon(Icons.people_alt_outlined), label: 'Party'),
+          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
         ],
       ),
     );

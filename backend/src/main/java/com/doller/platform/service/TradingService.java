@@ -250,6 +250,32 @@ public class TradingService {
         return new TradingDtos.DashboardResponse(receivable, payable, usd, todayPnl, periodPnl);
     }
 
+    public TradingDtos.DuesSnapshotResponse duesSnapshot() {
+        BigDecimal totalReceivable = BigDecimal.ZERO;
+        BigDecimal totalPayable = BigDecimal.ZERO;
+        List<TradingDtos.PartyDueRow> rows = new ArrayList<>();
+
+        for (Party party : partyRepo.findAll()) {
+            TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
+            totalReceivable = totalReceivable.add(balances.receivableBdt());
+            totalPayable = totalPayable.add(balances.payableBdt());
+            rows.add(new TradingDtos.PartyDueRow(
+                    party.getId(),
+                    party.getName(),
+                    party.getPhone(),
+                    party.getNotes(),
+                    balances.receivableBdt(),
+                    balances.payableBdt(),
+                    balances.netBalanceBdt(),
+                    latestActivityAtForParty(party.getId())
+            ));
+        }
+
+        BigDecimal gross = totalReceivable.add(totalPayable);
+        BigDecimal net = totalReceivable.subtract(totalPayable);
+        return new TradingDtos.DuesSnapshotResponse(totalReceivable, totalPayable, gross, net, rows);
+    }
+
     public List<TradingDtos.StatementLine> statementRange(LocalDate from, LocalDate to) {
         return snapshotRepo.findByBusinessDateBetweenOrderByBusinessDateAsc(from, to).stream()
                 .map(this::toStatementLine)
@@ -890,6 +916,25 @@ public class TradingService {
                 .filter(d -> d.getParty().getId().equals(partyId))
                 .max(Comparator.comparing(TradeDeal::getDealTime))
                 .orElse(null);
+    }
+
+    private LocalDateTime latestActivityAtForParty(Long partyId) {
+        Optional<LocalDateTime> latestDealTime = dealRepo.findAll().stream()
+                .filter(d -> d.getParty().getId().equals(partyId))
+                .map(TradeDeal::getDealTime)
+                .max(LocalDateTime::compareTo);
+        Optional<LocalDateTime> latestSettlementTime = settlementRepo.findAll().stream()
+                .filter(s -> s.getParty().getId().equals(partyId))
+                .map(Settlement::getSettlementTime)
+                .max(LocalDateTime::compareTo);
+
+        if (latestDealTime.isEmpty()) {
+            return latestSettlementTime.orElse(null);
+        }
+        if (latestSettlementTime.isEmpty()) {
+            return latestDealTime.get();
+        }
+        return latestDealTime.get().isAfter(latestSettlementTime.get()) ? latestDealTime.get() : latestSettlementTime.get();
     }
 
     private record BalancePosition(

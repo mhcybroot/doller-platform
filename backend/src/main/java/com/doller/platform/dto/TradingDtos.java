@@ -47,6 +47,23 @@ public class TradingDtos {
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record DashboardResponse(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal usdPosition, BigDecimal todayPnL, BigDecimal periodPnL) {}
+    public record PartyDueRow(
+            Long partyId,
+            String partyName,
+            String phone,
+            String notes,
+            BigDecimal receivableBdt,
+            BigDecimal payableBdt,
+            BigDecimal netBdt,
+            LocalDateTime lastActivityAt
+    ) {}
+    public record DuesSnapshotResponse(
+            BigDecimal totalReceivableBdt,
+            BigDecimal totalPayableBdt,
+            BigDecimal grossBdt,
+            BigDecimal netBdt,
+            List<PartyDueRow> rows
+    ) {}
     public record StatementLine(
             LocalDate date,
             BigDecimal openingCash,
