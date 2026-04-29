@@ -80,10 +80,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Exchange Platform',
+                      'NexPay',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             color: Colors.white,
                           ),
+                    ),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'web/icons/Icon-512.png',
+                        height: 56,
+                        width: 56,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Text(
