@@ -1241,12 +1241,10 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                       .textTheme
                                       .titleMedium
                                       ?.copyWith(
-                                        color: row.entryType == 'EXPENSE'
-                                            ? Colors.red.shade700
-                                            : AppTheme.ink,
+                                        color: _amountColor(row),
                                       ),
                                 ),
-                                if (widget.session.isOwner)
+                                if (_canMutate(row))
                                   PopupMenuButton<String>(
                                     onSelected: (value) async {
                                       if (value == 'edit') {
@@ -1257,27 +1255,13 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                         await _deleteRow(row);
                                       }
                                     },
-                                    itemBuilder: (context) {
-                                      if (_canMutate(row)) {
-                                        return const [
-                                          PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('Edit')),
-                                          PopupMenuItem(
-                                              value: 'delete',
-                                              child: Text('Delete')),
-                                        ];
-                                      }
-                                      return const [
-                                        PopupMenuItem(
-                                            value: 'edit',
-                                            child: Text('Edit not available')),
-                                        PopupMenuItem(
-                                            value: 'delete',
-                                            child:
-                                                Text('Delete not available')),
-                                      ];
-                                    },
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(
+                                          value: 'edit', child: Text('Edit')),
+                                      PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('Delete')),
+                                    ],
                                   ),
                               ],
                             ),
@@ -1339,9 +1323,24 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       return formatBdt(0);
     }
     final direction = (row.directionLabel ?? '').toUpperCase();
+    final isOpeningPayable =
+        row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
     final isOutgoingSettlement =
         row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
-    final sign = row.entryType == 'EXPENSE' || isOutgoingSettlement ? '-' : '+';
+    final sign = row.entryType == 'EXPENSE' || isOutgoingSettlement || isOpeningPayable
+        ? '-'
+        : '+';
     return '$sign${formatBdt(amount.abs())}';
+  }
+
+  Color _amountColor(TransactionDetailRowModel row) {
+    final direction = (row.directionLabel ?? '').toUpperCase();
+    final isOpeningPayable =
+        row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
+    final isNegative =
+        row.entryType == 'EXPENSE' ||
+        (row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING')) ||
+        isOpeningPayable;
+    return isNegative ? Colors.red.shade700 : Colors.green.shade700;
   }
 }
