@@ -112,6 +112,8 @@ public class TradingService {
                 .bdtAmount(req.bdtAmount())
                 .appliedAmount(plan.appliedAmount())
                 .advanceAmount(plan.advanceAmount())
+                .paymentMethod(req.paymentMethod())
+                .paymentReference(req.paymentReference())
                 .settlementTime(req.settlementTime())
                 .notes(req.notes())
                 .build());
@@ -363,6 +365,8 @@ public class TradingService {
                         deal.getBdtRate(),
                         deal.getDealType().name(),
                         "Deal #" + deal.getId(),
+                        null,
+                        null,
                         deal.getNotes(),
                         null
                 ))
@@ -383,6 +387,8 @@ public class TradingService {
                         null,
                         settlement.getDirection().name() + " / " + settlement.getBasis().name(),
                         "Settlement #" + settlement.getId(),
+                        settlement.getPaymentMethod() == null ? null : settlement.getPaymentMethod().name(),
+                        settlement.getPaymentReference(),
                         settlement.getNotes(),
                         null
                 ))
@@ -403,6 +409,8 @@ public class TradingService {
                         null,
                         expense.getExpenseType().name(),
                         "Expense #" + expense.getId(),
+                        null,
+                        null,
                         expense.getNotes(),
                         expense.getCategory()
                 ))

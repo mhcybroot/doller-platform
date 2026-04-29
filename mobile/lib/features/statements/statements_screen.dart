@@ -837,6 +837,11 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                               Text('Party: ${row.partyName}'),
                             if ((row.directionLabel ?? '').isNotEmpty)
                               Text('Direction: ${row.directionLabel}'),
+                            if ((row.paymentMethod ?? '').isNotEmpty)
+                              Text(
+                                  'Payment: ${row.paymentMethod == 'CHECK' ? 'CHEQUE' : row.paymentMethod}'),
+                            if ((row.paymentReference ?? '').isNotEmpty)
+                              Text('Reference: ${row.paymentReference}'),
                             if ((row.instrumentCode ?? '').isNotEmpty)
                               Text(
                                   'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),

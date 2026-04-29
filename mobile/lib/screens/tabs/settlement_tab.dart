@@ -13,6 +13,8 @@ class _SettlementTabState extends State<SettlementTab> {
   final partyId = TextEditingController();
   final dealId = TextEditingController();
   final amount = TextEditingController();
+  final paymentReference = TextEditingController();
+  String paymentMethod = 'CASH';
   bool allowAdvance = false;
 
   @override
@@ -23,6 +25,20 @@ class _SettlementTabState extends State<SettlementTab> {
         TextField(controller: partyId, decoration: const InputDecoration(labelText: 'Party ID')),
         TextField(controller: dealId, decoration: const InputDecoration(labelText: 'Deal ID (optional)')),
         TextField(controller: amount, decoration: const InputDecoration(labelText: 'Settlement BDT Amount')),
+        DropdownButtonFormField<String>(
+          initialValue: paymentMethod,
+          items: const [
+            DropdownMenuItem(value: 'CASH', child: Text('CASH')),
+            DropdownMenuItem(value: 'BANK', child: Text('BANK')),
+            DropdownMenuItem(value: 'CHECK', child: Text('CHEQUE')),
+          ],
+          onChanged: (value) => setState(() => paymentMethod = value ?? 'CASH'),
+          decoration: const InputDecoration(labelText: 'Payment Method'),
+        ),
+        TextField(
+          controller: paymentReference,
+          decoration: const InputDecoration(labelText: 'Payment Reference (optional)'),
+        ),
         SwitchListTile(
           value: allowAdvance,
           onChanged: (v) => setState(() => allowAdvance = v),
@@ -36,6 +52,8 @@ class _SettlementTabState extends State<SettlementTab> {
               'tradeDealId': dealId.text.isEmpty ? null : int.parse(dealId.text),
               'bdtAmount': amount.text,
               'settlementTime': DateTime.now().toIso8601String(),
+              'paymentMethod': paymentMethod,
+              'paymentReference': paymentReference.text.trim().isEmpty ? null : paymentReference.text.trim(),
               'notes': '',
               'allowAdvance': allowAdvance,
             });

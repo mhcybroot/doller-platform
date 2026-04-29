@@ -20,10 +20,12 @@ class _TradingScreenState extends State<TradingScreen> {
   final _rateController = TextEditingController();
   final _amountController = TextEditingController();
   final _categoryController = TextEditingController(text: 'staff');
+  final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _dealType = 'BUY';
   String _instrumentCode = 'USD';
   String _expenseType = 'DAILY_OVERHEAD';
+  String _paymentMethod = 'CASH';
   bool _allowAdvance = false;
   int _mode = 0;
   int? _selectedPartyId;
@@ -145,6 +147,10 @@ class _TradingScreenState extends State<TradingScreen> {
           partyId: _selectedParty!.id,
           tradeDealId: _selectedDealId,
           amount: double.parse(_amountController.text),
+          paymentMethod: _paymentMethod,
+          paymentReference: _paymentReferenceController.text.trim().isEmpty
+              ? null
+              : _paymentReferenceController.text.trim(),
           allowAdvance: _allowAdvance,
           notes: _noteController.text.trim(),
         );
@@ -163,6 +169,7 @@ class _TradingScreenState extends State<TradingScreen> {
       _quantityController.clear();
       _rateController.clear();
       _amountController.clear();
+      _paymentReferenceController.clear();
       _allowAdvance = false;
       await _load();
     } on ApiException catch (error) {
@@ -311,6 +318,25 @@ class _TradingScreenState extends State<TradingScreen> {
                   ),
                 ),
                 if (_mode == 1) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _paymentMethod,
+                    items: const [
+                      DropdownMenuItem(value: 'CASH', child: Text('CASH')),
+                      DropdownMenuItem(value: 'BANK', child: Text('BANK')),
+                      DropdownMenuItem(value: 'CHECK', child: Text('CHEQUE')),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _paymentMethod = value ?? 'CASH'),
+                    decoration:
+                        const InputDecoration(labelText: 'Payment Method'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _paymentReferenceController,
+                    decoration:
+                        const InputDecoration(labelText: 'Payment Reference'),
+                  ),
                   const SizedBox(height: 12),
                   if (_inference != null)
                     _SettlementPreviewCard(inference: _inference!),

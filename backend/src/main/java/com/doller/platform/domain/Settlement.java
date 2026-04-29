@@ -2,6 +2,7 @@ package com.doller.platform.domain;
 
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
+import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,6 +31,11 @@ public class Settlement {
     private BigDecimal appliedAmount;
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal advanceAmount;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SettlementPaymentMethod paymentMethod;
+    @Column(length = 255)
+    private String paymentReference;
     @Column(nullable = false)
     private LocalDateTime settlementTime;
     private String notes;

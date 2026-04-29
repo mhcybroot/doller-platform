@@ -102,6 +102,8 @@ class DollerRepository {
     required int partyId,
     int? tradeDealId,
     required double amount,
+    required String paymentMethod,
+    String? paymentReference,
     required bool allowAdvance,
     required String notes,
   }) async {
@@ -112,6 +114,8 @@ class DollerRepository {
         'tradeDealId': tradeDealId,
         'bdtAmount': amount,
         'settlementTime': DateTime.now().toIso8601String(),
+        'paymentMethod': paymentMethod,
+        'paymentReference': paymentReference,
         'notes': notes,
         'allowAdvance': allowAdvance,
       },

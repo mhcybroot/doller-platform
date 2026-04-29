@@ -176,8 +176,9 @@ public class ExportController {
                     if (y < 60) break;
                     cs.beginText();
                     cs.newLineAtOffset(50, y);
-                    cs.showText(String.format("%s | %s | %s | %s | instrument=%s qty=%s amount=%s",
-                            row.occurredAt(), row.entryType(), row.partyName(), row.directionLabel(), row.instrumentCode(), row.quantity(), row.amountBdt()));
+                    cs.showText(String.format("%s | %s | %s | %s | instrument=%s qty=%s amount=%s | payment=%s ref=%s",
+                            row.occurredAt(), row.entryType(), row.partyName(), row.directionLabel(), row.instrumentCode(), row.quantity(), row.amountBdt(),
+                            row.paymentMethod(), row.paymentReference()));
                     cs.endText();
                     y -= 14;
                 }

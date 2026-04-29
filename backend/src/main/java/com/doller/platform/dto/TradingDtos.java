@@ -5,6 +5,7 @@ import com.doller.platform.domain.enums.ExpenseType;
 import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
+import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +21,8 @@ public class TradingDtos {
     public record DealSummary(Long id, String partyName, DealType dealType, InstrumentCode instrumentCode, BigDecimal quantity, BigDecimal bdtGross,
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
     public record SettlementCreateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
-                                          @NotNull LocalDateTime settlementTime, String notes, boolean allowAdvance) {}
+                                          @NotNull LocalDateTime settlementTime, @NotNull SettlementPaymentMethod paymentMethod,
+                                          String paymentReference, String notes, boolean allowAdvance) {}
     public record PartyBalanceSummary(BigDecimal receivableBdt, BigDecimal payableBdt, BigDecimal advanceFromPartyBdt,
                                       BigDecimal advanceToPartyBdt, BigDecimal netBalanceBdt, BigDecimal agingDueBdt) {}
     public record SettlementInferenceResponse(
@@ -108,6 +110,8 @@ public class TradingDtos {
             BigDecimal bdtRate,
             String directionLabel,
             String referenceLabel,
+            String paymentMethod,
+            String paymentReference,
             String notes,
             String category
     ) {}

@@ -369,6 +369,8 @@ class TransactionDetailRowModel {
   final double? bdtRate;
   final String? directionLabel;
   final String? referenceLabel;
+  final String? paymentMethod;
+  final String? paymentReference;
   final String? notes;
   final String? category;
 
@@ -384,6 +386,8 @@ class TransactionDetailRowModel {
     required this.bdtRate,
     required this.directionLabel,
     required this.referenceLabel,
+    required this.paymentMethod,
+    required this.paymentReference,
     required this.notes,
     required this.category,
   });
@@ -401,6 +405,8 @@ class TransactionDetailRowModel {
       bdtRate: (json["bdtRate"] as num?)?.toDouble(),
       directionLabel: json["directionLabel"] as String?,
       referenceLabel: json["referenceLabel"] as String?,
+      paymentMethod: json["paymentMethod"] as String?,
+      paymentReference: json["paymentReference"] as String?,
       notes: json["notes"] as String?,
       category: json["category"] as String?,
     );

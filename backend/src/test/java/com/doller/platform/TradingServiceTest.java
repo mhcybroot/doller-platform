@@ -4,6 +4,7 @@ import com.doller.platform.domain.Party;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.InstrumentCode;
+import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import com.doller.platform.domain.enums.Role;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.AuditLogRepository;
@@ -126,7 +127,7 @@ class TradingServiceTest {
         assertEquals(new BigDecimal("3000.00"), inference.advanceAmount());
 
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
-                p.getId(), null, new BigDecimal("15000"), LocalDateTime.now(), "paid", true
+                p.getId(), null, new BigDecimal("15000"), LocalDateTime.now(), SettlementPaymentMethod.CASH, null, "paid", true
         ));
 
         var ledger = tradingService.partyLedger(p.getId());
@@ -150,7 +151,7 @@ class TradingServiceTest {
         assertEquals("PAYABLE", inference.basis().name());
 
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
-                p.getId(), null, new BigDecimal("2000"), LocalDateTime.now(), "partial pay", false
+                p.getId(), null, new BigDecimal("2000"), LocalDateTime.now(), SettlementPaymentMethod.BANK, "Bank transfer", "partial pay", false
         ));
 
         var ledger = tradingService.partyLedger(p.getId());
@@ -177,7 +178,7 @@ class TradingServiceTest {
                 t2, "buy payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
-                customer.getId(), null, new BigDecimal("2000"), t3, "incoming", false
+                customer.getId(), null, new BigDecimal("2000"), t3, SettlementPaymentMethod.CHECK, "CHK-001", "incoming", false
         ));
 
         TradingDtos.DuesSnapshotResponse snapshot = tradingService.duesSnapshot();
