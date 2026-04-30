@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app/app_theme.dart';
 import 'features/auth/login_screen.dart';
@@ -8,7 +9,9 @@ import 'shared/services/api_client.dart';
 import 'shared/services/auth_store.dart';
 import 'shared/services/doller_repository.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   runApp(const DollerApp());
 }
 

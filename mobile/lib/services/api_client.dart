@@ -2,12 +2,13 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../shared/config/app_env.dart';
 import 'auth_store.dart';
 import 'outbox_store.dart';
 
 class ApiClient {
   final Dio _dio = Dio(
-    BaseOptions(baseUrl: 'http://76.13.221.43:8088'),
+    BaseOptions(baseUrl: AppEnv.baseUrl),
   );
   final AuthStore _store;
   final OutboxStore _outbox = OutboxStore();

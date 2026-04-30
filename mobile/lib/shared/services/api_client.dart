@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../models/auth_models.dart';
+import '../config/app_env.dart';
 import 'auth_store.dart';
 import 'outbox_store.dart';
 
@@ -21,7 +22,7 @@ class ApiClient {
   ApiClient(this._store)
       : _dio = Dio(
           BaseOptions(
-            baseUrl: 'http://76.13.221.43:8088',
+            baseUrl: AppEnv.baseUrl,
             connectTimeout: const Duration(seconds: 20),
             receiveTimeout: const Duration(seconds: 20),
           ),

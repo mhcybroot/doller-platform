@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class MasterDataServiceTest {
@@ -82,5 +83,23 @@ class MasterDataServiceTest {
         assertEquals(0, receivable.compareTo(new BigDecimal("1500.00")));
         assertEquals(0, payable.compareTo(new BigDecimal("-700.00")));
         assertEquals(0, cash.compareTo(new BigDecimal("-800.00")));
+    }
+
+    @Test
+    void deletePartyRemovesOpeningBalanceLedgerEntries() {
+        var created = masterDataService.createParty(new MasterDataDtos.PartyCreateRequest(
+                "Delete Opening Party",
+                "017",
+                "Dhaka",
+                "seed",
+                new BigDecimal("1200.00"),
+                new BigDecimal("300.00")
+        ));
+
+        assertTrue(ledgerEntryRepository.findByReferenceTypeAndReferenceId("OPENING_BALANCE", created.getId()).size() > 0);
+
+        masterDataService.deleteParty(created.getId());
+
+        assertEquals(0, ledgerEntryRepository.findByReferenceTypeAndReferenceId("OPENING_BALANCE", created.getId()).size());
     }
 }

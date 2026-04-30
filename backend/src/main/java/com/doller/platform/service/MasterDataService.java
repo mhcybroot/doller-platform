@@ -8,6 +8,7 @@ import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.RefreshTokenRepository;
 import com.doller.platform.repo.UserAccountRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -92,9 +93,11 @@ public class MasterDataService {
         return saved;
     }
 
+    @Transactional
     public void deleteParty(Long id) {
         Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
         String before = "party:" + party.getId() + ":" + party.getName() + "|" + party.getPhone() + "|" + party.getAddress() + "|" + party.getNotes();
+        ledgerService.deleteOpeningBalanceEntries(party.getId());
         party.setDeleted(true);
         party.setDeletedAt(LocalDateTime.now());
         party.setDeletedBy(currentActor());

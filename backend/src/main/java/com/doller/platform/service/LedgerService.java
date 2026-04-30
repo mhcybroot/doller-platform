@@ -26,4 +26,8 @@ public class LedgerService {
                 .narration(narration)
                 .build());
     }
+
+    public void deleteOpeningBalanceEntries(Long partyId) {
+        ledgerRepo.deleteByReferenceTypeAndReferenceId("OPENING_BALANCE", partyId);
+    }
 }
