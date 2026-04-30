@@ -377,7 +377,7 @@ class TradingServiceTest {
     }
 
     @Test
-    void dailyOpeningUsesPreviousSnapshotBaselineWhenLedgerHistoryMissing() {
+    void dailyOpeningIgnoresSnapshotBaselineWhenLedgerHistoryMissing() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         LocalDate yesterday = LocalDate.now().minusDays(1);
         LocalDate today = LocalDate.now();
@@ -402,7 +402,7 @@ class TradingServiceTest {
                 .build());
 
         var report = tradingService.balanceSheetReport("DAILY", today, null, null, null, null);
-        assertEquals(0, report.openingCash().compareTo(new BigDecimal("5000.00")));
-        assertEquals(0, report.openingUsd().compareTo(new BigDecimal("120.000000")));
+        assertEquals(0, report.openingCash().compareTo(BigDecimal.ZERO.setScale(2)));
+        assertEquals(0, report.openingUsd().compareTo(BigDecimal.ZERO));
     }
 }

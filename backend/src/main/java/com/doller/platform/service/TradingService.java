@@ -949,34 +949,12 @@ public class TradingService {
 
     private BigDecimal cashAt(LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        Optional<StatementSnapshot> baseline = snapshotRepo
-                .findTopByBusinessDateLessThanEqualOrderByBusinessDateDesc(asOfDate);
-        if (baseline.isEmpty()) {
-            return netForAccountUntilActive("CASH", cutoff);
-        }
-        StatementSnapshot snapshot = baseline.get();
-        LocalDateTime deltaFrom = snapshot.getBusinessDate().plusDays(1).atStartOfDay();
-        if (deltaFrom.isAfter(cutoff)) {
-            return snapshot.getClosingCashBdt();
-        }
-        BigDecimal delta = netForAccountBetweenActive("CASH", deltaFrom, cutoff);
-        return snapshot.getClosingCashBdt().add(delta);
+        return netForAccountUntilActive("CASH", cutoff);
     }
 
     private BigDecimal usdAt(LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        Optional<StatementSnapshot> baseline = snapshotRepo
-                .findTopByBusinessDateLessThanEqualOrderByBusinessDateDesc(asOfDate);
-        if (baseline.isEmpty()) {
-            return netForPrefixUntilActive("FX_INVENTORY_", cutoff);
-        }
-        StatementSnapshot snapshot = baseline.get();
-        LocalDateTime deltaFrom = snapshot.getBusinessDate().plusDays(1).atStartOfDay();
-        if (deltaFrom.isAfter(cutoff)) {
-            return snapshot.getClosingUsd();
-        }
-        BigDecimal delta = netForPrefixBetweenActive("FX_INVENTORY_", deltaFrom, cutoff);
-        return snapshot.getClosingUsd().add(delta);
+        return netForPrefixUntilActive("FX_INVENTORY_", cutoff);
     }
 
     private BalancePosition closingPositionFromSnapshot(StatementSnapshot snapshot) {
