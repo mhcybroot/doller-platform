@@ -50,7 +50,6 @@ public class TradingService {
 
     @Transactional
     public TradeDeal createDeal(TradingDtos.DealCreateRequest req) {
-        requireOpenDay(req.dealTime().toLocalDate());
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         UserAccount by = getCurrentUser();
         BigDecimal gross = req.quantity().multiply(req.bdtRate());
@@ -92,7 +91,6 @@ public class TradingService {
 
     @Transactional
     public Settlement createSettlement(TradingDtos.SettlementCreateRequest req) {
-        requireOpenDay(req.settlementTime().toLocalDate());
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         TradeDeal deal = resolveDeal(req.tradeDealId(), party.getId());
         SettlementPlan plan = inferSettlementPlan(party, deal, req.bdtAmount());
@@ -129,7 +127,6 @@ public class TradingService {
 
     @Transactional
     public Expense createExpense(TradingDtos.ExpenseCreateRequest req) {
-        requireOpenDay(req.expenseTime().toLocalDate());
         if (req.expenseType() == ExpenseType.TRANSACTION || req.expenseType() == ExpenseType.DAILY_OVERHEAD) {
             throw new ApiException("Unsupported expenseType for new entries");
         }
@@ -150,11 +147,6 @@ public class TradingService {
     @Transactional
     public TradeDeal updateDeal(Long id, TradingDtos.DealUpdateRequest req) {
         TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
-        requireOpenDay(deal.getDealTime().toLocalDate());
-        requireOpenDay(req.dealTime().toLocalDate());
-        if (deal.isLockedByDayClose()) {
-            throw new ApiException("Deal is locked by day close");
-        }
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         String before = serializeDeal(deal);
         reverseDealLedger(deal, LocalDateTime.now());
@@ -176,10 +168,6 @@ public class TradingService {
     @Transactional
     public void deleteDeal(Long id) {
         TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
-        requireOpenDay(deal.getDealTime().toLocalDate());
-        if (deal.isLockedByDayClose()) {
-            throw new ApiException("Deal is locked by day close");
-        }
         String before = serializeDeal(deal);
         reverseDealLedger(deal, LocalDateTime.now());
         deal.setDeleted(true);
@@ -192,8 +180,6 @@ public class TradingService {
     @Transactional
     public Settlement updateSettlement(Long id, TradingDtos.SettlementUpdateRequest req) {
         Settlement settlement = settlementRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Settlement not found"));
-        requireOpenDay(settlement.getSettlementTime().toLocalDate());
-        requireOpenDay(req.settlementTime().toLocalDate());
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         TradeDeal deal = resolveDeal(req.tradeDealId(), party.getId());
         SettlementPlan plan = inferSettlementPlan(party, deal, req.bdtAmount());
@@ -222,7 +208,6 @@ public class TradingService {
     @Transactional
     public void deleteSettlement(Long id) {
         Settlement settlement = settlementRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Settlement not found"));
-        requireOpenDay(settlement.getSettlementTime().toLocalDate());
         String before = serializeSettlement(settlement);
         reverseSettlementLedger(settlement, LocalDateTime.now());
         settlement.setDeleted(true);
@@ -235,8 +220,6 @@ public class TradingService {
     @Transactional
     public Expense updateExpense(Long id, TradingDtos.ExpenseUpdateRequest req) {
         Expense expense = expenseRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Expense not found"));
-        requireOpenDay(expense.getExpenseTime().toLocalDate());
-        requireOpenDay(req.expenseTime().toLocalDate());
         if (req.expenseType() == ExpenseType.TRANSACTION || req.expenseType() == ExpenseType.DAILY_OVERHEAD) {
             throw new ApiException("Unsupported expenseType for new entries");
         }
@@ -256,7 +239,6 @@ public class TradingService {
     @Transactional
     public void deleteExpense(Long id) {
         Expense expense = expenseRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Expense not found"));
-        requireOpenDay(expense.getExpenseTime().toLocalDate());
         String before = serializeExpense(expense);
         reverseExpenseLedger(expense, LocalDateTime.now());
         expense.setDeleted(true);
@@ -285,9 +267,6 @@ public class TradingService {
     @Transactional
     public TradingDtos.DayCloseResponse confirmDayClose(LocalDate date) {
         DailyClose existingClose = dailyCloseRepo.findByBusinessDate(date).orElse(null);
-        if (existingClose != null && !existingClose.isReopened()) {
-            throw new ApiException("Day already closed");
-        }
         TradingDtos.DayClosePreview p = previewDayClose(date);
         StatementSnapshot prev = snapshotRepo.findByBusinessDate(date.minusDays(1)).orElse(null);
         BigDecimal openingCash = prev == null ? BigDecimal.ZERO : prev.getClosingCashBdt();
@@ -320,7 +299,6 @@ public class TradingService {
                 .realizedProfitLossBdt(p.realizedProfitLossBdt())
                 .build());
 
-        dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(true); dealRepo.save(d); });
         DailyClose closeRecord = existingClose == null
                 ? DailyClose.builder().businessDate(date).build()
                 : existingClose;
@@ -339,8 +317,6 @@ public class TradingService {
         close.setReopened(true);
         close.setReopenReason(reason);
         snapshotRepo.findByBusinessDate(date).ifPresent(snapshotRepo::delete);
-        var range = dayRange(date);
-        dealRepo.findByDealTimeBetweenAndDeletedFalse(range[0], range[1]).forEach(d -> { d.setLockedByDayClose(false); dealRepo.save(d); });
         dailyCloseRepo.save(close);
         String auditRef = auditService.log("DAY_REOPEN", "/day-close/" + date + "/reopen", null, reason, "closed", "reopened");
         return new TradingDtos.DayCloseResponse(date, false, auditRef, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -1662,9 +1638,4 @@ public class TradingService {
                 + ",notes=" + expense.getNotes();
     }
 
-    private void requireOpenDay(LocalDate date) {
-        dailyCloseRepo.findByBusinessDate(date).ifPresent(c -> {
-            if (!c.isReopened()) throw new ApiException("Date is closed. Reopen required.");
-        });
-    }
 }
