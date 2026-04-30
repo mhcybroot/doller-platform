@@ -141,31 +141,41 @@ class _DuesScreenState extends State<DuesScreen>
   }
 
   Widget _summarySection(DuesSnapshotModel snapshot) {
+    final effectiveReceivable = snapshot.rows.fold<double>(
+      0,
+      (sum, row) => sum + _effectiveReceivable(row),
+    );
+    final effectivePayable = snapshot.rows.fold<double>(
+      0,
+      (sum, row) => sum + _effectivePayable(row),
+    );
+    final netUsingEffective = effectiveReceivable - effectivePayable;
+    final grossUsingEffective = effectiveReceivable + effectivePayable;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: [
         BalancePill(
           label: 'Total Receivable',
-          value: '+${formatBdt(snapshot.totalReceivableBdt)}',
+          value: '+${formatBdt(effectiveReceivable)}',
           tone: BalancePillTone.receivable,
         ),
         BalancePill(
           label: 'Total Payable',
-          value: '-${formatBdt(snapshot.totalPayableBdt)}',
+          value: '-${formatBdt(effectivePayable)}',
           tone: BalancePillTone.payable,
         ),
         BalancePill(
           label: 'Gross (R+P)',
-          value: formatBdt(snapshot.grossBdt),
+          value: formatBdt(grossUsingEffective),
           tone: BalancePillTone.neutral,
         ),
         BalancePill(
           label: 'Net (R-P)',
-          value: snapshot.netBdt >= 0
-              ? '+${formatBdt(snapshot.netBdt)}'
-              : '-${formatBdt(snapshot.netBdt.abs())}',
-          tone: snapshot.netBdt >= 0
+          value: netUsingEffective >= 0
+              ? '+${formatBdt(netUsingEffective)}'
+              : '-${formatBdt(netUsingEffective.abs())}',
+          tone: netUsingEffective >= 0
               ? BalancePillTone.netPositive
               : BalancePillTone.netNegative,
         ),
@@ -237,8 +247,9 @@ class _DuesScreenState extends State<DuesScreen>
 
   List<PartyDueRowModel> _rowsForTab({required bool isReceivable}) {
     final rows = (_snapshot?.rows ?? const <PartyDueRowModel>[])
-        .where(
-            (row) => isReceivable ? row.receivableBdt > 0 : row.payableBdt > 0)
+        .where((row) => isReceivable
+            ? _effectiveReceivable(row) > 0
+            : _effectivePayable(row) > 0)
         .toList();
 
     AppLogger.log('screen:dues', 'rows:filtered', fields: {
@@ -255,8 +266,10 @@ class _DuesScreenState extends State<DuesScreen>
               a.partyName.toLowerCase().compareTo(b.partyName.toLowerCase());
           break;
         case DuesSortField.dueAmount:
-          final ad = isReceivable ? a.receivableBdt : a.payableBdt;
-          final bd = isReceivable ? b.receivableBdt : b.payableBdt;
+          final ad =
+              isReceivable ? _effectiveReceivable(a) : _effectivePayable(a);
+          final bd =
+              isReceivable ? _effectiveReceivable(b) : _effectivePayable(b);
           result = ad.compareTo(bd);
           break;
         case DuesSortField.lastActivity:
@@ -291,24 +304,22 @@ class _DuesScreenState extends State<DuesScreen>
 
     return Column(
       children: rows.map((row) {
-        final amount = isReceivable ? row.receivableBdt : row.payableBdt;
+        final netAbs = row.netBdt.abs();
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Card(
             child: ListTile(
               title: Text(row.partyName),
               subtitle: Text(
-                '${row.phone ?? 'No phone'}\n'
-                'Net: ${formatBdt(row.netBdt.abs())} | '
                 'Last: ${row.lastActivityAt == null ? 'No activity' : formatDateTime(row.lastActivityAt!)}',
               ),
-              isThreeLine: true,
+              isThreeLine: false,
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatBdt(amount),
+                    formatBdt(netAbs),
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: isReceivable
@@ -333,5 +344,15 @@ class _DuesScreenState extends State<DuesScreen>
         );
       }).toList(),
     );
+  }
+
+  double _effectivePayable(PartyDueRowModel row) {
+    final effective = row.payableBdt - row.advanceToPartyBdt;
+    return effective > 0 ? effective : 0;
+  }
+
+  double _effectiveReceivable(PartyDueRowModel row) {
+    final effective = row.receivableBdt - row.advanceFromPartyBdt;
+    return effective > 0 ? effective : 0;
   }
 }

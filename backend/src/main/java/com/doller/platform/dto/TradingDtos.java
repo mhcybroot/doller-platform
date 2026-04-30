@@ -138,6 +138,8 @@ public class TradingDtos {
             String notes,
             BigDecimal receivableBdt,
             BigDecimal payableBdt,
+            BigDecimal advanceFromPartyBdt,
+            BigDecimal advanceToPartyBdt,
             BigDecimal netBdt,
             LocalDateTime lastActivityAt
     ) {}

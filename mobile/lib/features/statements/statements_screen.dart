@@ -1414,10 +1414,10 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
     final isOutgoingSettlement =
         row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
-    final isBuyDeal = row.entryType == 'DEAL' && direction.contains('BUY');
+    final isSellDeal = row.entryType == 'DEAL' && direction.contains('SELL');
     return row.entryType == 'EXPENSE' ||
         isOutgoingSettlement ||
         isOpeningPayable ||
-        isBuyDeal;
+        isSellDeal;
   }
 }

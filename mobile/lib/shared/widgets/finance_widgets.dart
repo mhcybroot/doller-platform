@@ -224,9 +224,9 @@ class BalancePill extends StatelessWidget {
           const Color(0xFF166534),
         ),
       BalancePillTone.payable => (
-          const Color(0xFFFFEDEE),
-          const Color(0xFFF6C7CB),
-          const Color(0xFFB42318),
+          const Color(0xFFFFF3F4),
+          const Color(0xFFF8D7DA),
+          const Color(0xFFC65252),
         ),
       BalancePillTone.advanceIn => (
           const Color(0xFFE6F4FF),

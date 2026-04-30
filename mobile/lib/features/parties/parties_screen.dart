@@ -378,7 +378,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
                             tone: BalancePillTone.advanceOut,
                           ),
                           BalancePill(
-                            label: 'Net Position',
+                            label: 'NET POSITION ✅',
                             value: _formatSignedAmount(
                                 ledger!.balances.netBalanceBdt),
                             tone: ledger!.balances.netBalanceBdt >= 0
@@ -991,11 +991,11 @@ class _PartiesScreenState extends State<PartiesScreen> {
         row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
     final isOutgoingSettlement =
         row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
-    final isBuyDeal = row.entryType == 'DEAL' && direction.contains('BUY');
+    final isSellDeal = row.entryType == 'DEAL' && direction.contains('SELL');
     return row.entryType == 'EXPENSE' ||
         isOutgoingSettlement ||
         isOpeningPayable ||
-        isBuyDeal;
+        isSellDeal;
   }
 
   @override

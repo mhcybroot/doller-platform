@@ -402,6 +402,8 @@ class PartyDueRowModel {
   final String? notes;
   final double receivableBdt;
   final double payableBdt;
+  final double advanceFromPartyBdt;
+  final double advanceToPartyBdt;
   final double netBdt;
   final DateTime? lastActivityAt;
 
@@ -412,6 +414,8 @@ class PartyDueRowModel {
     required this.notes,
     required this.receivableBdt,
     required this.payableBdt,
+    required this.advanceFromPartyBdt,
+    required this.advanceToPartyBdt,
     required this.netBdt,
     required this.lastActivityAt,
   });
@@ -424,6 +428,9 @@ class PartyDueRowModel {
       notes: json["notes"] as String?,
       receivableBdt: (json["receivableBdt"] as num).toDouble(),
       payableBdt: (json["payableBdt"] as num).toDouble(),
+      advanceFromPartyBdt:
+          (json["advanceFromPartyBdt"] as num?)?.toDouble() ?? 0,
+      advanceToPartyBdt: (json["advanceToPartyBdt"] as num?)?.toDouble() ?? 0,
       netBdt: (json["netBdt"] as num).toDouble(),
       lastActivityAt: (json["lastActivityAt"] as String?) == null
           ? null

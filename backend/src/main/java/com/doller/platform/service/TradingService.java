@@ -431,6 +431,8 @@ public class TradingService {
                     party.getNotes(),
                     bdt(balances.receivableBdt()),
                     bdt(balances.payableBdt()),
+                    bdt(balances.advanceFromPartyBdt()),
+                    bdt(balances.advanceToPartyBdt()),
                     bdt(balances.netBalanceBdt()),
                     latestActivityAtForParty(party.getId())
             ));
