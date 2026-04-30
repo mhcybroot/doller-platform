@@ -98,13 +98,13 @@ public class ExportController {
             PDPage page = new PDPage(PDRectangle.A4);
             doc.addPage(page);
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 14);
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD), 14);
                 cs.beginText();
                 cs.newLineAtOffset(50, 790);
                 cs.showText("Doller Platform - Balance Sheet");
                 cs.endText();
 
-                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER), 10);
                 cs.beginText();
                 cs.newLineAtOffset(50, 772);
                 cs.showText("Mode: " + response.mode() + " | Range: " + response.from() + " to " + response.to());
@@ -171,8 +171,8 @@ public class ExportController {
     private static final class TransactionPdfWriter {
         private final PDDocument doc;
         private final TradingDtos.TransactionExportReport report;
-        private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-        private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+        private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.COURIER);
+        private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD);
         private final DecimalFormat bdt = new DecimalFormat("#,##0.00");
         private final float margin = 34f;
         private final float top = 806f;
@@ -238,7 +238,7 @@ public class ExportController {
                     // fallback to text-only header
                 }
             }
-            text("NexPay", margin + logoSize + 8, brandY, bold, 22, new Color(17, 48, 87));
+            text("NexPay", margin + logoSize + 8, brandY, bold, 21, new Color(17, 48, 87));
             if (continued) {
                 text("Continued", page.getMediaBox().getWidth() - margin - 40, brandY, regular, 8, Color.GRAY);
             }
@@ -253,11 +253,11 @@ public class ExportController {
             fill(margin, y - cardHeight, cardWidth, cardHeight, new Color(245, 248, 252));
             float innerX = margin + cardPadding;
             float phoneX = innerX;
-            float addressX = margin + cardWidth * 0.40f;
+            float addressX = margin + cardWidth * 0.38f;
             text("Customer: " + safe(section.party().partyName()), innerX, y - 22, bold, 11, Color.BLACK);
             text("Phone: " + safe(section.party().phone()), phoneX, y - 42, regular, 9, Color.DARK_GRAY);
             String address = "Address: " + safe(section.party().address());
-            text(truncate(address, cardWidth * 0.58f, 9), addressX, y - 42, regular, 9, Color.DARK_GRAY);
+            text(truncate(address, cardWidth * 0.60f, 9), addressX, y - 42, regular, 9, Color.DARK_GRAY);
             y -= (cardHeight + customerToDealsGap);
 
             drawDealTable(section.deals(), section.dealSummary());
@@ -272,7 +272,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Deals");
             String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Quantity", "Rate", "Amount"};
-            float[] cols = {44, 60, 54, 58, 126, 60, 58, 74};
+            float[] cols = {44, 58, 56, 66, 118, 60, 58, 74};
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionDealExportRow r : rows) {
@@ -296,7 +296,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Settlements");
             String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID"};
-            float[] cols = {72, 66, 56, 122, 82, 92};
+            float[] cols = {72, 64, 56, 132, 72, 92};
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
@@ -366,7 +366,7 @@ public class ExportController {
 
         private void sectionTitleCard(String title) throws IOException {
             ensure(sectionTitleCardHeight + sectionTitleGap + 4);
-            float cardWidth = 88f;
+            float cardWidth = 104f;
             float cardX = margin;
             fill(cardX, y - sectionTitleCardHeight, cardWidth, sectionTitleCardHeight, new Color(234, 241, 251));
             float titleWidth = bold.getStringWidth(title) / 1000f * 11f;

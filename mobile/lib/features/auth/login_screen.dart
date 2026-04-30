@@ -18,22 +18,16 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _initMode = false;
   bool _loading = false;
 
   Future<void> _submit() async {
     setState(() => _loading = true);
     final repository = DollerRepository(ApiClient(AuthStore()), AuthStore());
     try {
-      final AuthSession session = _initMode
-          ? await repository.initOwner(
-              _userController.text.trim(),
-              _passwordController.text,
-            )
-          : await repository.login(
-              _userController.text.trim(),
-              _passwordController.text,
-            );
+      final AuthSession session = await repository.login(
+        _userController.text.trim(),
+        _passwordController.text,
+      );
       if (!mounted) {
         return;
       }
@@ -108,30 +102,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 22),
               FinanceSection(
-                title: _initMode ? 'Initialize Owner' : 'Sign In',
+                title: 'Sign In',
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Login'),
-                            selected: !_initMode,
-                            onSelected: (_) =>
-                                setState(() => _initMode = false),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('First Owner Setup'),
-                            selected: _initMode,
-                            onSelected: (_) => setState(() => _initMode = true),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
                     TextField(
                       controller: _userController,
                       decoration: const InputDecoration(labelText: 'Username'),
@@ -140,26 +113,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: _initMode ? 'Create password' : 'Password',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Password'),
                     ),
                     const SizedBox(height: 18),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        _initMode
-                            ? 'Use this once on a fresh deployment. The created owner can then manage staff and security.'
-                            : 'Use your owner or staff credential. Owner users unlock the control center and audit tools.',
+                        'Use your owner or staff credential. Owner users unlock the control center and audit tools.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                     const SizedBox(height: 18),
                     ElevatedButton(
                       onPressed: _loading ? null : _submit,
-                      child: Text(_loading
-                          ? 'Working...'
-                          : (_initMode ? 'Create Owner' : 'Login')),
+                      child: Text(_loading ? 'Working...' : 'Login'),
                     ),
                   ],
                 ),
