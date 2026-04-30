@@ -401,6 +401,59 @@ class TradingServiceTest {
     }
 
     @Test
+    void balanceReadersShareSingleProjectionAcrossAllSurfaces() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party buyParty = partyRepository.save(Party.builder().name("Projection Buy").build());
+        Party sellParty = partyRepository.save(Party.builder().name("Projection Sell").build());
+        LocalDate day = LocalDate.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, buyParty.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                day.atTime(10, 0), "buy"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, sellParty.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("125"),
+                day.atTime(11, 0), "sell"
+        ));
+
+        var dues = tradingService.duesSnapshot();
+        assertEquals(0, dues.totalReceivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, dues.totalPayableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var buyLedger = tradingService.partyLedger(buyParty.getId());
+        var sellLedger = tradingService.partyLedger(sellParty.getId());
+        assertEquals(0, buyLedger.balances().payableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, sellLedger.balances().receivableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var buyInference = tradingService.settlementInference(buyParty.getId(), null, new BigDecimal("100"));
+        var sellInference = tradingService.settlementInference(sellParty.getId(), null, new BigDecimal("100"));
+        assertEquals(0, buyInference.current().payableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, sellInference.current().receivableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var report = tradingService.balanceSheetReport("DAILY", day, null, null, null, null);
+        assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, report.closingPayableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var dashboard = tradingService.dashboard(day, day);
+        assertEquals(0, dashboard.receivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, dashboard.payableBdt().compareTo(new BigDecimal("1000.00")));
+
+        TradingDtos.TransactionExportReport export = tradingService.transactionExportReport(day, day, null, null, null, "occurredAt", "asc");
+        TradingDtos.TransactionPartyExportSection buySection = export.partySections().stream()
+                .filter(section -> section.party().partyId().equals(buyParty.getId()))
+                .findFirst()
+                .orElseThrow();
+        TradingDtos.TransactionPartyExportSection sellSection = export.partySections().stream()
+                .filter(section -> section.party().partyId().equals(sellParty.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, buySection.exposureSummary().payableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, sellSection.exposureSummary().receivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, export.grandExposureSummary().receivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, export.grandExposureSummary().payableBdt().compareTo(new BigDecimal("1000.00")));
+    }
+
+    @Test
     void openingBalanceReflectsInPartyLedgerAndTransactionDetailsWithoutDeals() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         var created = masterDataService.createParty(new com.doller.platform.dto.MasterDataDtos.PartyCreateRequest(

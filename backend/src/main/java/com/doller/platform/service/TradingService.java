@@ -323,13 +323,7 @@ public class TradingService {
     }
 
     public TradingDtos.DashboardResponse dashboard(LocalDate from, LocalDate to) {
-        BigDecimal receivable = BigDecimal.ZERO;
-        BigDecimal payable = BigDecimal.ZERO;
-        for (Party party : partyRepo.findByDeletedFalse()) {
-            TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
-            receivable = receivable.add(balances.receivableBdt());
-            payable = payable.add(balances.payableBdt());
-        }
+        BalancePosition balances = projectBusinessBalance(null);
         var range = new LocalDateTime[]{from.atStartOfDay(), to.plusDays(1).atStartOfDay().minusNanos(1)};
         Map<String, BigDecimal> positionByInstrument = new HashMap<>();
         for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
@@ -354,8 +348,8 @@ public class TradingService {
         PnlMetrics periodMetrics = pnlMetrics(from, to);
 
         return new TradingDtos.DashboardResponse(
-                receivable,
-                payable,
+                bdt(balances.receivableBdt()),
+                bdt(balances.payableBdt()),
                 totalPositionValuation,
                 todayMetrics.netPnlBdt(),
                 periodMetrics.netPnlBdt(),
@@ -395,19 +389,19 @@ public class TradingService {
     }
 
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {
-        BalancePosition totals = businessPositionAt(null);
+        BalancePosition totals = projectBusinessBalance(null);
         List<TradingDtos.PartyDueRow> rows = new ArrayList<>();
 
         for (Party party : partyRepo.findByDeletedFalse()) {
-            TradingDtos.PartyBalanceSummary balances = partyBalanceSummary(party);
+            BalancePosition balances = projectPartyBalance(party, null);
             rows.add(new TradingDtos.PartyDueRow(
                     party.getId(),
                     party.getName(),
                     party.getPhone(),
                     party.getNotes(),
-                    balances.receivableBdt(),
-                    balances.payableBdt(),
-                    balances.netBalanceBdt(),
+                    bdt(balances.receivableBdt()),
+                    bdt(balances.payableBdt()),
+                    bdt(balances.netBalanceBdt()),
                     latestActivityAtForParty(party.getId())
             ));
         }
@@ -801,6 +795,21 @@ public class TradingService {
     }
 
     private TradingDtos.PartyBalanceSummary partyBalanceSummary(Party party, LocalDate asOfDate) {
+        return toPartyBalanceSummary(projectPartyBalance(party, asOfDate));
+    }
+
+    private TradingDtos.PartyBalanceSummary toPartyBalanceSummary(BalancePosition balance) {
+        return new TradingDtos.PartyBalanceSummary(
+                bdt(balance.receivableBdt()),
+                bdt(balance.payableBdt()),
+                bdt(balance.advanceFromPartyBdt()),
+                bdt(balance.advanceToPartyBdt()),
+                bdt(balance.netBalanceBdt()),
+                bdt(balance.agingDueBdt())
+        );
+    }
+
+    private BalancePosition projectPartyBalance(Party party, LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate == null
                 ? LocalDateTime.now()
                 : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
@@ -847,7 +856,7 @@ public class TradingService {
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging);
+        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, aging);
     }
 
     private BigDecimal openingBalanceForPartyAccount(Long partyId, String accountPrefix, LocalDateTime cutoff) {
@@ -859,14 +868,14 @@ public class TradingService {
     }
 
     private TradingDtos.SettlementInferenceResponse toInferenceResponse(Party party, TradeDeal deal, BigDecimal amount) {
-        TradingDtos.PartyBalanceSummary current = partyBalanceSummary(party);
+        BalancePosition current = projectPartyBalance(party, null);
         SettlementPlan plan = inferSettlementPlan(party, deal, amount);
-        TradingDtos.PartyBalanceSummary projected = applyPlan(current, plan);
+        BalancePosition projected = applyPlan(current, plan);
         return new TradingDtos.SettlementInferenceResponse(
                 party.getId(),
                 deal == null ? null : deal.getId(),
-                current,
-                projected,
+                toPartyBalanceSummary(current),
+                toPartyBalanceSummary(projected),
                 plan.direction(),
                 plan.basis(),
                 plan.appliedAmount(),
@@ -877,7 +886,7 @@ public class TradingService {
     }
 
     private SettlementPlan inferSettlementPlan(Party party, TradeDeal deal, BigDecimal amount) {
-        TradingDtos.PartyBalanceSummary current = partyBalanceSummary(party);
+        BalancePosition current = projectPartyBalance(party, null);
         BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount.max(BigDecimal.ZERO);
         SettlementDirection direction;
         SettlementBasis basis;
@@ -962,7 +971,7 @@ public class TradingService {
         return "You are " + action + " " + amount + " BDT to reduce " + target + " with " + partyName + ".";
     }
 
-    private TradingDtos.PartyBalanceSummary applyPlan(TradingDtos.PartyBalanceSummary current, SettlementPlan plan) {
+    private BalancePosition applyPlan(BalancePosition current, SettlementPlan plan) {
         BigDecimal receivable = current.receivableBdt();
         BigDecimal payable = current.payableBdt();
         BigDecimal advanceFromParty = current.advanceFromPartyBdt();
@@ -993,7 +1002,7 @@ public class TradingService {
             agingDue = agingDue.subtract(plan.appliedAmount()).max(BigDecimal.ZERO);
         }
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
+        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
     }
 
     private TradingDtos.StatementLine toStatementLine(StatementSnapshot snapshot) {
@@ -1018,10 +1027,14 @@ public class TradingService {
     }
 
     private BalancePosition aggregateBusinessPositionAt(LocalDate asOfDate) {
-        return businessPositionAt(asOfDate);
+        return projectBusinessBalance(asOfDate);
     }
 
     private BalancePosition businessPositionAt(LocalDate asOfDate) {
+        return projectBusinessBalance(asOfDate);
+    }
+
+    private BalancePosition projectBusinessBalance(LocalDate asOfDate) {
         BigDecimal receivable = BigDecimal.ZERO;
         BigDecimal payable = BigDecimal.ZERO;
         BigDecimal advanceFromParty = BigDecimal.ZERO;
@@ -1029,7 +1042,7 @@ public class TradingService {
         BigDecimal agingDue = BigDecimal.ZERO;
 
         for (Party party : partyRepo.findByDeletedFalse()) {
-            TradingDtos.PartyBalanceSummary summary = partyBalanceSummary(party, asOfDate);
+            BalancePosition summary = projectPartyBalance(party, asOfDate);
             receivable = receivable.add(summary.receivableBdt());
             payable = payable.add(summary.payableBdt());
             advanceFromParty = advanceFromParty.add(summary.advanceFromPartyBdt());
