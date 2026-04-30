@@ -2,6 +2,7 @@ package com.doller.platform;
 
 import com.doller.platform.domain.Party;
 import com.doller.platform.domain.StatementSnapshot;
+import com.doller.platform.domain.TradeDeal;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.InstrumentCode;
@@ -404,5 +405,66 @@ class TradingServiceTest {
         var report = tradingService.balanceSheetReport("DAILY", today, null, null, null, null);
         assertEquals(0, report.openingCash().compareTo(BigDecimal.ZERO.setScale(2)));
         assertEquals(0, report.openingUsd().compareTo(BigDecimal.ZERO));
+    }
+
+    @Test
+    void transactionExportReportGroupsRowsPerPartyAndBuildsSummaries() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Hasan").phone("01711").address("Dhaka").build());
+        LocalDate day = LocalDate.now();
+
+        TradeDeal buyDeal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("120"),
+                day.atTime(10, 0), "buy"
+        ));
+        TradeDeal sellDeal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("130"),
+                day.atTime(11, 0), "sell"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), sellDeal.getId(), new BigDecimal("50"), day.atTime(12, 0), SettlementPaymentMethod.CASH, null, "incoming", false
+        ));
+
+        TradingDtos.TransactionExportReport report = tradingService.transactionExportReport(day, day, null, null, null, "occurredAt", "asc");
+        assertEquals(1, report.partySections().size());
+        TradingDtos.TransactionPartyExportSection section = report.partySections().getFirst();
+        assertEquals("Hasan", section.party().partyName());
+        assertEquals("01711", section.party().phone());
+        assertEquals("Dhaka", section.party().address());
+        assertEquals(2, section.deals().size());
+        assertEquals(1, section.settlements().size());
+        assertEquals(0, section.dealSummary().totalBuyBdt().compareTo(new BigDecimal("240.00")));
+        assertEquals(0, section.dealSummary().totalSellBdt().compareTo(new BigDecimal("130.00")));
+        assertEquals(0, section.settlementSummary().totalIncomingBdt().compareTo(new BigDecimal("50.00")));
+    }
+
+    @Test
+    void transactionExportReportComputesGrandTotalsAcrossParties() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party p1 = partyRepository.save(Party.builder().name("P1").build());
+        Party p2 = partyRepository.save(Party.builder().name("P2").build());
+        LocalDate day = LocalDate.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, p1.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                day.atTime(9, 0), "sell"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, p2.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("80"),
+                day.atTime(10, 0), "buy"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                p1.getId(), null, new BigDecimal("40"), day.atTime(11, 0), SettlementPaymentMethod.BANK, "ref", "incoming", false
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                p2.getId(), null, new BigDecimal("20"), day.atTime(12, 0), SettlementPaymentMethod.CASH, null, "outgoing", false
+        ));
+
+        TradingDtos.TransactionExportReport report = tradingService.transactionExportReport(day, day, null, null, null, "occurredAt", "asc");
+        assertEquals(2, report.partySections().size());
+        assertEquals(0, report.grandDealSummary().totalBuyBdt().compareTo(new BigDecimal("80.00")));
+        assertEquals(0, report.grandDealSummary().totalSellBdt().compareTo(new BigDecimal("100.00")));
+        assertEquals(0, report.grandSettlementSummary().totalIncomingBdt().compareTo(new BigDecimal("40.00")));
+        assertEquals(0, report.grandSettlementSummary().totalOutgoingBdt().compareTo(new BigDecimal("20.00")));
     }
 }

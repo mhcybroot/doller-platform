@@ -228,6 +228,65 @@ public class TradingDtos {
             String sortDirection,
             List<TransactionDetailRow> rows
     ) {}
+    public record TransactionDealExportRow(
+            Long dealId,
+            LocalDate date,
+            String time,
+            String direction,
+            String instrumentCode,
+            BigDecimal quantity,
+            BigDecimal bdtRate,
+            BigDecimal amountBdt
+    ) {}
+    public record TransactionSettlementExportRow(
+            Long settlementId,
+            LocalDate date,
+            String time,
+            String direction,
+            String paymentMethod,
+            Long relatedDealId,
+            BigDecimal amountBdt
+    ) {}
+    public record TransactionDealSummary(
+            long count,
+            BigDecimal totalBuyBdt,
+            BigDecimal totalSellBdt,
+            BigDecimal netDealExposureBdt
+    ) {}
+    public record TransactionSettlementSummary(
+            long count,
+            BigDecimal totalIncomingBdt,
+            BigDecimal totalOutgoingBdt,
+            long linkedCount,
+            long unlinkedCount
+    ) {}
+    public record PartyIdentity(
+            Long partyId,
+            String partyName,
+            String phone,
+            String address
+    ) {}
+    public record TransactionPartyExportSection(
+            PartyIdentity party,
+            List<TransactionDealExportRow> deals,
+            List<TransactionSettlementExportRow> settlements,
+            TransactionDealSummary dealSummary,
+            TransactionSettlementSummary settlementSummary,
+            PartyBalanceSummary exposureSummary
+    ) {}
+    public record TransactionExportReport(
+            LocalDate from,
+            LocalDate to,
+            String typeFilter,
+            Long partyIdFilter,
+            String search,
+            String sortField,
+            String sortDirection,
+            List<TransactionPartyExportSection> partySections,
+            TransactionDealSummary grandDealSummary,
+            TransactionSettlementSummary grandSettlementSummary,
+            PartyBalanceSummary grandExposureSummary
+    ) {}
     public record PartyLedgerLine(String kind, LocalDateTime time, BigDecimal amount, String note) {}
     public record PartyLedgerResponse(Long partyId, String partyName, PartyBalanceSummary balances, List<PartyLedgerLine> lines) {}
     public record DayCloseResponse(LocalDate date, boolean locked, String auditRef, BigDecimal openingCash, BigDecimal closingCash, BigDecimal openingUsd, BigDecimal closingUsd, BigDecimal pnl) {}

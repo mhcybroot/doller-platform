@@ -614,6 +614,119 @@ public class TradingService {
         );
     }
 
+    public TradingDtos.TransactionExportReport transactionExportReport(
+            LocalDate from,
+            LocalDate to,
+            String type,
+            Long partyId,
+            String search,
+            String sortField,
+            String sortDirection
+    ) {
+        TradingDtos.TransactionDetailsResponse details = transactionDetails(from, to, type, partyId, search, sortField, sortDirection);
+        Map<Long, List<TradingDtos.TransactionDetailRow>> byParty = new LinkedHashMap<>();
+        for (TradingDtos.TransactionDetailRow row : details.rows()) {
+            if (!"DEAL".equals(row.entryType()) && !"SETTLEMENT".equals(row.entryType()) && !"OPENING_BALANCE".equals(row.entryType())) {
+                continue;
+            }
+            if (row.partyId() == null) {
+                continue;
+            }
+            byParty.computeIfAbsent(row.partyId(), ignored -> new ArrayList<>()).add(row);
+        }
+
+        List<TradingDtos.TransactionPartyExportSection> sections = new ArrayList<>();
+        for (Map.Entry<Long, List<TradingDtos.TransactionDetailRow>> entry : byParty.entrySet()) {
+            Long pid = entry.getKey();
+            List<TradingDtos.TransactionDetailRow> rows = entry.getValue();
+            Party party = partyRepo.findById(pid).orElse(null);
+            TradingDtos.PartyIdentity partyIdentity = new TradingDtos.PartyIdentity(
+                    pid,
+                    party == null ? rows.stream().map(TradingDtos.TransactionDetailRow::partyName).filter(Objects::nonNull).findFirst().orElse("Party #" + pid) : party.getName(),
+                    party == null ? null : party.getPhone(),
+                    party == null ? null : party.getAddress()
+            );
+
+            List<TradingDtos.TransactionDealExportRow> deals = rows.stream()
+                    .filter(r -> "DEAL".equals(r.entryType()))
+                    .map(r -> new TradingDtos.TransactionDealExportRow(
+                            r.entryId(),
+                            r.occurredAt().toLocalDate(),
+                            r.occurredAt().toLocalTime().withNano(0).toString(),
+                            r.directionLabel(),
+                            r.instrumentCode(),
+                            r.quantity() == null ? BigDecimal.ZERO : r.quantity(),
+                            r.bdtRate() == null ? BigDecimal.ZERO : r.bdtRate(),
+                            r.amountBdt() == null ? BigDecimal.ZERO : r.amountBdt()
+                    ))
+                    .toList();
+
+            List<TradingDtos.TransactionSettlementExportRow> settlements = rows.stream()
+                    .filter(r -> "SETTLEMENT".equals(r.entryType()))
+                    .map(r -> new TradingDtos.TransactionSettlementExportRow(
+                            r.entryId(),
+                            r.occurredAt().toLocalDate(),
+                            r.occurredAt().toLocalTime().withNano(0).toString(),
+                            r.directionLabel(),
+                            r.paymentMethod(),
+                            r.tradeDealId(),
+                            r.amountBdt() == null ? BigDecimal.ZERO : r.amountBdt()
+                    ))
+                    .toList();
+
+            TradingDtos.TransactionDealSummary dealSummary = summarizeDeals(deals);
+            TradingDtos.TransactionSettlementSummary settlementSummary = summarizeSettlements(settlements);
+            TradingDtos.PartyBalanceSummary exposure = party == null
+                    ? new TradingDtos.PartyBalanceSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)
+                    : partyBalanceSummary(party, details.to());
+
+            sections.add(new TradingDtos.TransactionPartyExportSection(
+                    partyIdentity,
+                    deals,
+                    settlements,
+                    dealSummary,
+                    settlementSummary,
+                    new TradingDtos.PartyBalanceSummary(
+                            bdt(exposure.receivableBdt()),
+                            bdt(exposure.payableBdt()),
+                            bdt(exposure.advanceFromPartyBdt()),
+                            bdt(exposure.advanceToPartyBdt()),
+                            bdt(exposure.netBalanceBdt()),
+                            bdt(exposure.agingDueBdt())
+                    )
+            ));
+        }
+
+        TradingDtos.TransactionDealSummary grandDeals = summarizeDeals(
+                sections.stream().flatMap(s -> s.deals().stream()).toList()
+        );
+        TradingDtos.TransactionSettlementSummary grandSettlements = summarizeSettlements(
+                sections.stream().flatMap(s -> s.settlements().stream()).toList()
+        );
+        TradingDtos.PartyBalanceSummary grandExposure = new TradingDtos.PartyBalanceSummary(
+                bdt(sections.stream().map(s -> s.exposureSummary().receivableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().payableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().advanceFromPartyBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().advanceToPartyBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().netBalanceBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().agingDueBdt()).reduce(BigDecimal.ZERO, BigDecimal::add))
+        );
+
+        return new TradingDtos.TransactionExportReport(
+                details.from(),
+                details.to(),
+                details.typeFilter(),
+                details.partyId(),
+                details.search(),
+                details.sortField(),
+                details.sortDirection(),
+                sections,
+                grandDeals,
+                grandSettlements,
+                grandExposure
+        );
+    }
+
     public TradingDtos.PartyLedgerResponse partyLedger(Long partyId) {
         Party p = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
         List<TradingDtos.PartyLedgerLine> lines = new ArrayList<>();
@@ -1187,6 +1300,42 @@ public class TradingService {
             case "amountBdt", "entryType", "partyName" -> sortField;
             default -> "occurredAt";
         };
+    }
+
+    private TradingDtos.TransactionDealSummary summarizeDeals(List<TradingDtos.TransactionDealExportRow> rows) {
+        BigDecimal buy = rows.stream()
+                .filter(r -> r.direction() != null && r.direction().toUpperCase(Locale.ROOT).contains("BUY"))
+                .map(TradingDtos.TransactionDealExportRow::amountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sell = rows.stream()
+                .filter(r -> r.direction() != null && r.direction().toUpperCase(Locale.ROOT).contains("SELL"))
+                .map(TradingDtos.TransactionDealExportRow::amountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new TradingDtos.TransactionDealSummary(
+                rows.size(),
+                bdt(buy),
+                bdt(sell),
+                bdt(sell.subtract(buy))
+        );
+    }
+
+    private TradingDtos.TransactionSettlementSummary summarizeSettlements(List<TradingDtos.TransactionSettlementExportRow> rows) {
+        BigDecimal incoming = rows.stream()
+                .filter(r -> r.direction() != null && r.direction().toUpperCase(Locale.ROOT).contains("INCOMING"))
+                .map(TradingDtos.TransactionSettlementExportRow::amountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal outgoing = rows.stream()
+                .filter(r -> r.direction() != null && r.direction().toUpperCase(Locale.ROOT).contains("OUTGOING"))
+                .map(TradingDtos.TransactionSettlementExportRow::amountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long linked = rows.stream().filter(r -> r.relatedDealId() != null).count();
+        return new TradingDtos.TransactionSettlementSummary(
+                rows.size(),
+                bdt(incoming),
+                bdt(outgoing),
+                linked,
+                rows.size() - linked
+        );
     }
 
     private Long expensePartyId(Expense expense) {
