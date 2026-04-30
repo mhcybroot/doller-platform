@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -37,12 +38,14 @@ public class TradingService {
     private final LedgerService ledgerService;
     private final AuditService auditService;
     private final boolean tradingDebug;
+    private final ZoneId businessZone;
 
     public TradingService(TradeDealRepository dealRepo, PartyRepository partyRepo, UserAccountRepository userRepo,
                           SettlementRepository settlementRepo, ExpenseRepository expenseRepo,
                           DailyCloseRepository dailyCloseRepo, StatementSnapshotRepository snapshotRepo,
                           LedgerEntryRepository ledgerRepo, LedgerService ledgerService, AuditService auditService,
-                          @Value("${app.logging.trading-debug:false}") boolean tradingDebug) {
+                          @Value("${app.logging.trading-debug:false}") boolean tradingDebug,
+                          @Value("${app.timezone:Asia/Dhaka}") String appTimeZone) {
         this.dealRepo = dealRepo;
         this.partyRepo = partyRepo;
         this.userRepo = userRepo;
@@ -54,6 +57,7 @@ public class TradingService {
         this.ledgerService = ledgerService;
         this.auditService = auditService;
         this.tradingDebug = tradingDebug;
+        this.businessZone = ZoneId.of(appTimeZone);
     }
 
     @Transactional
@@ -169,7 +173,7 @@ public class TradingService {
         TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         String before = serializeDeal(deal);
-        reverseDealLedger(deal, LocalDateTime.now());
+        reverseDealLedger(deal, businessNow());
         BigDecimal gross = req.quantity().multiply(req.bdtRate());
         deal.setDealType(req.dealType());
         deal.setParty(party);
@@ -189,9 +193,9 @@ public class TradingService {
     public void deleteDeal(Long id) {
         TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
         String before = serializeDeal(deal);
-        reverseDealLedger(deal, LocalDateTime.now());
+        reverseDealLedger(deal, businessNow());
         deal.setDeleted(true);
-        deal.setDeletedAt(LocalDateTime.now());
+        deal.setDeletedAt(businessNow());
         deal.setDeletedBy(currentActor());
         dealRepo.save(deal);
         auditService.log("DELETE_DEAL", "/deals/" + id, null, null, before, null);
@@ -207,7 +211,7 @@ public class TradingService {
             throw new ApiException("Over settlement requires allowAdvance=true");
         }
         String before = serializeSettlement(settlement);
-        reverseSettlementLedger(settlement, LocalDateTime.now());
+        reverseSettlementLedger(settlement, businessNow());
         settlement.setParty(party);
         settlement.setTradeDeal(deal);
         settlement.setDirection(plan.direction());
@@ -229,9 +233,9 @@ public class TradingService {
     public void deleteSettlement(Long id) {
         Settlement settlement = settlementRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Settlement not found"));
         String before = serializeSettlement(settlement);
-        reverseSettlementLedger(settlement, LocalDateTime.now());
+        reverseSettlementLedger(settlement, businessNow());
         settlement.setDeleted(true);
-        settlement.setDeletedAt(LocalDateTime.now());
+        settlement.setDeletedAt(businessNow());
         settlement.setDeletedBy(currentActor());
         settlementRepo.save(settlement);
         auditService.log("DELETE_SETTLEMENT", "/settlements/" + id, null, null, before, null);
@@ -244,7 +248,7 @@ public class TradingService {
             throw new ApiException("Unsupported expenseType for new entries");
         }
         String before = serializeExpense(expense);
-        reverseExpenseLedger(expense, LocalDateTime.now());
+        reverseExpenseLedger(expense, businessNow());
         expense.setExpenseType(req.expenseType());
         expense.setAmountBdt(req.amountBdt());
         expense.setExpenseTime(req.expenseTime());
@@ -260,9 +264,9 @@ public class TradingService {
     public void deleteExpense(Long id) {
         Expense expense = expenseRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Expense not found"));
         String before = serializeExpense(expense);
-        reverseExpenseLedger(expense, LocalDateTime.now());
+        reverseExpenseLedger(expense, businessNow());
         expense.setDeleted(true);
-        expense.setDeletedAt(LocalDateTime.now());
+        expense.setDeletedAt(businessNow());
         expense.setDeletedBy(currentActor());
         expenseRepo.save(expense);
         auditService.log("DELETE_EXPENSE", "/expenses/" + id, null, null, before, null);
@@ -323,7 +327,7 @@ public class TradingService {
                 ? DailyClose.builder().businessDate(date).build()
                 : existingClose;
         closeRecord.setClosedBy(getCurrentUser());
-        closeRecord.setClosedAt(LocalDateTime.now());
+        closeRecord.setClosedAt(businessNow());
         closeRecord.setReopened(false);
         closeRecord.setReopenReason(null);
         dailyCloseRepo.save(closeRecord);
@@ -363,7 +367,7 @@ public class TradingService {
                 .map(TradingDtos.InstrumentPosition::valuationBdt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessToday();
         PnlMetrics todayMetrics = pnlMetrics(today, today);
         PnlMetrics periodMetrics = pnlMetrics(from, to);
 
@@ -404,7 +408,7 @@ public class TradingService {
         LocalDate[] resolved = resolveReportRange(mode, date, month, year, from, to);
         LocalDate safeFrom = resolved[0];
         LocalDate safeTo = resolved[1];
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessToday();
         return new TradingDtos.DashboardPnlExplainResponse(
                 normalizeMode(mode),
                 safeFrom,
@@ -513,7 +517,7 @@ public class TradingService {
             String sortField,
             String sortDirection
     ) {
-        LocalDate safeFrom = from == null ? LocalDate.now() : from;
+        LocalDate safeFrom = from == null ? businessToday() : from;
         LocalDate safeTo = to == null ? safeFrom : to;
         LocalDateTime[] range = dayRange(safeFrom, safeTo);
         String normalizedType = normalizeFilter(type);
@@ -803,7 +807,7 @@ public class TradingService {
 
     public BigDecimal computeAgingDue(Long partyId, int olderThanDays) {
         Party party = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
-        return computeAgingDue(party, LocalDate.now());
+        return computeAgingDue(party, businessToday());
     }
 
     private BigDecimal computeAgingDue(Party party, LocalDate asOfDate) {
@@ -855,7 +859,7 @@ public class TradingService {
 
     private BalancePosition projectPartyBalance(Party party, LocalDate asOfDate) {
         LocalDateTime cutoff = asOfDate == null
-                ? LocalDateTime.now()
+                ? businessNow()
                 : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
         BigDecimal openingReceivable = openingBalanceForPartyAccount(party.getId(), "RECEIVABLE_", cutoff);
         BigDecimal openingPayable = openingBalanceForPartyAccount(party.getId(), "PAYABLE_", cutoff).negate();
@@ -914,7 +918,7 @@ public class TradingService {
 
         receivable = receivable.max(BigDecimal.ZERO);
         payable = payable.max(BigDecimal.ZERO);
-        BigDecimal aging = computeAgingDue(party, asOfDate == null ? LocalDate.now() : asOfDate);
+        BigDecimal aging = computeAgingDue(party, asOfDate == null ? businessToday() : asOfDate);
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
@@ -1425,25 +1429,33 @@ public class TradingService {
     private LocalDate[] resolveReportRange(String mode, LocalDate date, Integer month, Integer year, LocalDate from, LocalDate to) {
         return switch (normalizeMode(mode)) {
             case "MONTHLY" -> {
-                int safeYear = year == null ? LocalDate.now().getYear() : year;
-                int safeMonth = month == null ? LocalDate.now().getMonthValue() : month;
+                int safeYear = year == null ? businessToday().getYear() : year;
+                int safeMonth = month == null ? businessToday().getMonthValue() : month;
                 LocalDate start = LocalDate.of(safeYear, safeMonth, 1);
                 yield new LocalDate[]{start, start.withDayOfMonth(start.lengthOfMonth())};
             }
             case "YEARLY" -> {
-                int safeYear = year == null ? LocalDate.now().getYear() : year;
+                int safeYear = year == null ? businessToday().getYear() : year;
                 yield new LocalDate[]{LocalDate.of(safeYear, 1, 1), LocalDate.of(safeYear, 12, 31)};
             }
             case "CUSTOM" -> {
-                LocalDate safeFrom = from == null ? LocalDate.now() : from;
+                LocalDate safeFrom = from == null ? businessToday() : from;
                 LocalDate safeTo = to == null ? safeFrom : to;
                 yield new LocalDate[]{safeFrom, safeTo};
             }
             default -> {
-                LocalDate safeDate = date == null ? LocalDate.now() : date;
+                LocalDate safeDate = date == null ? businessToday() : date;
                 yield new LocalDate[]{safeDate, safeDate};
             }
         };
+    }
+
+    private LocalDate businessToday() {
+        return LocalDate.now(businessZone);
+    }
+
+    private LocalDateTime businessNow() {
+        return LocalDateTime.now(businessZone);
     }
 
     private String normalizeMode(String mode) {

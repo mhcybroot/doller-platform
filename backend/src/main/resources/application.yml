@@ -19,6 +19,7 @@ spring:
     time-zone: ${APP_TIMEZONE:Asia/Dhaka}
 
 app:
+  timezone: ${APP_TIMEZONE:Asia/Dhaka}
   init:
     enabled: ${APP_INIT_ENABLED:true}
   logging:
