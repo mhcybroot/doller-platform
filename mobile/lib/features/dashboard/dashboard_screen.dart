@@ -272,7 +272,7 @@ class _PnlExplainSection extends StatelessWidget {
       'Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}',
       ...section.openInstruments.map(
         (row) =>
-            '${row.instrumentCode}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            '${instrumentDisplayName(row.instrumentCode)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
             ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
       ),
       'Expense: ${formatBdt(section.expenseBdt)}',
@@ -318,7 +318,8 @@ class _PnlExplainSection extends StatelessWidget {
                       tilePadding: EdgeInsets.zero,
                       childrenPadding: EdgeInsets.zero,
                       title: Text(group.expenseType),
-                      subtitle: Text('Total ${formatBdt(group.totalAmountBdt)}'),
+                      subtitle:
+                          Text('Total ${formatBdt(group.totalAmountBdt)}'),
                       children: group.rows
                           .map(
                             (row) => ListTile(
@@ -366,7 +367,8 @@ class _PnlExplainSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(
                   value,
@@ -381,7 +383,8 @@ class _PnlExplainSection extends StatelessWidget {
     );
   }
 
-  void _showMetricExplanation(BuildContext context, String title, String value) {
+  void _showMetricExplanation(
+      BuildContext context, String title, String value) {
     final (what, why, howNow, changeWhen) = _metricExplain(title, value);
     showDialog<void>(
       context: context,

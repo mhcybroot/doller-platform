@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
@@ -239,7 +240,7 @@ class _ExplainSection extends StatelessWidget {
       'Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}',
       ...section.openInstruments.map(
         (row) =>
-            '${row.instrumentCode}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            '${instrumentDisplayName(row.instrumentCode)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
             ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
       ),
       'Expense: ${formatBdt(section.expenseBdt)}',
@@ -318,7 +319,7 @@ class _ExplainSection extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(row.referenceLabel ?? 'Deal #${row.dealId}'),
                     subtitle: Text(
-                        '${formatDateTime(row.time)} • ${row.instrumentCode} ${row.quantity} @ ${row.bdtRate}'),
+                        '${formatDateTime(row.time)} • ${instrumentDisplayName(row.instrumentCode)} ${row.quantity} @ ${row.bdtRate}'),
                     trailing: Text(formatBdt(row.bdtAmount)),
                   ),
                 ),
@@ -340,7 +341,7 @@ class _ExplainSection extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(row.referenceLabel ?? 'Deal #${row.dealId}'),
                     subtitle: Text(
-                        '${formatDateTime(row.time)} • ${row.instrumentCode} ${row.quantity} @ ${row.bdtRate}'),
+                        '${formatDateTime(row.time)} • ${instrumentDisplayName(row.instrumentCode)} ${row.quantity} @ ${row.bdtRate}'),
                     trailing: Text(formatBdt(row.bdtAmount)),
                   ),
                 ),
@@ -378,7 +379,8 @@ class _ExplainSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(
                   value,
@@ -393,7 +395,8 @@ class _ExplainSection extends StatelessWidget {
     );
   }
 
-  void _showMetricExplanation(BuildContext context, String title, String value) {
+  void _showMetricExplanation(
+      BuildContext context, String title, String value) {
     final (what, why, howNow, changeWhen) = _metricExplain(title, value);
     showDialog<void>(
       context: context,

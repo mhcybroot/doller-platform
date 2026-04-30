@@ -14,8 +14,10 @@ class _StatementsTabState extends State<StatementsTab> {
 
   Future<void> load() async {
     final now = DateTime.now();
-    final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final res = await widget.api.get('/statements/daily', query: {'date': date});
+    final date =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final res =
+        await widget.api.get('/statements/daily', query: {'date': date});
     setState(() => lines = List<dynamic>.from(res.data));
   }
 
@@ -25,29 +27,8 @@ class _StatementsTabState extends State<StatementsTab> {
       padding: const EdgeInsets.all(16),
       child: Column(children: [
         Row(children: [
-          ElevatedButton(onPressed: load, child: const Text('Load Today Statement')),
-          const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () async {
-              final now = DateTime.now();
-              final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-              await widget.api.post('/day-close/$date', {});
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Day closed')));
-            },
-            child: const Text('Close Day'),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () async {
-              final now = DateTime.now();
-              final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-              await widget.api.post('/day-close/$date/reopen', {'reason': 'Correction required'});
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Day reopened')));
-            },
-            child: const Text('Reopen Day'),
-          )
+              onPressed: load, child: const Text('Load Today Statement')),
         ]),
         const SizedBox(height: 12),
         Expanded(
@@ -55,7 +36,8 @@ class _StatementsTabState extends State<StatementsTab> {
             itemCount: lines.length,
             itemBuilder: (_, i) => ListTile(
               title: Text('Date: ${lines[i]['date']}'),
-              subtitle: Text('P/L: ${lines[i]['pnl']} | Cash: ${lines[i]['closingCash']}'),
+              subtitle: Text(
+                  'P/L: ${lines[i]['pnl']} | Cash: ${lines[i]['closingCash']}'),
             ),
           ),
         )

@@ -39,8 +39,7 @@ class _StatementsScreenState extends State<StatementsScreen> {
       padding: const EdgeInsets.all(20),
       children: [
         if (_tab == 0)
-          _BalanceSheetTab(
-              repository: widget.repository, session: widget.session)
+          _BalanceSheetTab(repository: widget.repository)
         else
           _TransactionDetailsTab(
               repository: widget.repository, session: widget.session),
@@ -52,11 +51,9 @@ class _StatementsScreenState extends State<StatementsScreen> {
 class _BalanceSheetTab extends StatefulWidget {
   const _BalanceSheetTab({
     required this.repository,
-    required this.session,
   });
 
   final DollerRepository repository;
-  final AuthSession session;
 
   @override
   State<_BalanceSheetTab> createState() => _BalanceSheetTabState();
@@ -70,7 +67,6 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
   late int _selectedMonth;
   late int _selectedYear;
   BalanceSheetModel? _report;
-  DayClosePreviewModel? _preview;
   bool _loading = true;
 
   @override
@@ -96,20 +92,11 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         from: _mode == 'CUSTOM' ? _from : null,
         to: _mode == 'CUSTOM' ? _to : null,
       );
-      DayClosePreviewModel? preview;
-      if (_mode == 'DAILY') {
-        try {
-          preview = await widget.repository.previewDayClose(_selectedDate);
-        } on ApiException {
-          preview = null;
-        }
-      }
       if (!mounted) {
         return;
       }
       setState(() {
         _report = report;
-        _preview = preview;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -186,8 +173,6 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         message: 'Try another reporting period.',
       );
     }
-    final isDailyClosed = _mode == 'DAILY' && (_preview?.closed ?? false);
-
     return Column(
       children: [
         FinanceSection(
@@ -316,7 +301,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                   children: report.instrumentBalances
                       .map(
                         (row) => _summaryPill(
-                          row.instrumentCode,
+                          instrumentDisplayName(row.instrumentCode),
                           _formatFxFlow(row.openingQty, row.closingQty),
                           BalancePillTone.neutral,
                         ),
@@ -396,95 +381,11 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
             ],
           ),
         ),
-        if (_mode == 'DAILY' && _preview != null) ...[
-          const SizedBox(height: 16),
-          FinanceSection(
-            title: isDailyClosed ? 'Day Close Status' : 'Day Close Controls',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Buy ${formatBdt(_preview!.totalBuyBdt)}'),
-                Text('Sell ${formatBdt(_preview!.totalSellBdt)}'),
-                Text(
-                    'Owner/Company Expense ${formatBdt(_preview!.totalExpenseBdt)}'),
-                const SizedBox(height: 8),
-                Text(
-                  'Projected P/L ${formatBdt(_preview!.realizedProfitLossBdt)}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  isDailyClosed
-                      ? 'This day is already closed. Reopen it only if you need to correct entries.'
-                      : 'This day is still open. Confirm close to create the daily balance-sheet snapshot.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 14),
-                if (!isDailyClosed || widget.session.isOwner)
-                  Row(
-                    children: [
-                      if (!isDailyClosed && widget.session.isOwner)
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              try {
-                                final result = await widget.repository
-                                    .confirmDayClose(_selectedDate);
-                                if (!mounted) return;
-                                showAppMessage(
-                                    context, 'Day closed: ${result.auditRef}');
-                                await _load();
-                              } on ApiException catch (error) {
-                                if (!mounted) return;
-                                if (error.message == 'Day already closed') {
-                                  showAppMessage(context,
-                                      'This day is already closed. Reloading status.');
-                                  await _load();
-                                  return;
-                                }
-                                showAppMessage(context, error.message,
-                                    isError: true);
-                              }
-                            },
-                            child: const Text('Confirm Close'),
-                          ),
-                        ),
-                      if (widget.session.isOwner) ...[
-                        if (!isDailyClosed) const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: isDailyClosed
-                                ? () async {
-                                    try {
-                                      await widget.repository.reopenDay(
-                                          _selectedDate, 'Owner correction');
-                                      if (!mounted) return;
-                                      showAppMessage(context, 'Day reopened');
-                                      await _load();
-                                    } on ApiException catch (error) {
-                                      if (!mounted) return;
-                                      showAppMessage(context, error.message,
-                                          isError: true);
-                                    }
-                                  }
-                                : null,
-                            child:
-                                Text(isDailyClosed ? 'Reopen Day' : 'Closed'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ],
         const SizedBox(height: 16),
         if (report.lines.isEmpty)
           const EmptyStateCard(
             title: 'No balance sheet lines',
-            message:
-                'Close operational days first to build balance-sheet history.',
+            message: 'No transactions found for the selected period.',
           )
         else
           FinanceSection(
@@ -574,12 +475,6 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
           ),
       ],
     );
-  }
-
-  String _formatSignedBdt(double value) {
-    final sign = value >= 0 ? '+' : '-';
-    final abs = value.abs();
-    return '$sign${formatBdt(abs)}';
   }
 
   String _formatQty(double value) => value.toStringAsFixed(2);

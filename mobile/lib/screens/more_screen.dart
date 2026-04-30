@@ -48,14 +48,16 @@ class MoreScreen extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.query_stats_outlined),
             title: const Text('Profit/Loss Explanation'),
-            subtitle: const Text('Owner-friendly gross/net breakdown by period'),
+            subtitle:
+                const Text('Owner-friendly gross/net breakdown by period'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => Scaffold(
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                    appBar: AppBar(title: const Text('Profit/Loss Explanation')),
+                    appBar:
+                        AppBar(title: const Text('Profit/Loss Explanation')),
                     body: SafeArea(
                       child: PnlExplainScreen(repository: repository),
                     ),
@@ -69,7 +71,8 @@ class MoreScreen extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.balance_outlined),
             title: const Text('Balance Sheet'),
-            subtitle: const Text('Opening/closing balances and day-close view'),
+            subtitle:
+                const Text('Opening/closing balances from live transactions'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.of(context).push(
@@ -94,7 +97,8 @@ class MoreScreen extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
             title: const Text('Transaction Details'),
-            subtitle: const Text('Filterable deal, settlement, and expense rows'),
+            subtitle:
+                const Text('Filterable deal, settlement, and expense rows'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.of(context).push(
