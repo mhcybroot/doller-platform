@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
+import '../../shared/services/app_logger.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
@@ -34,12 +35,25 @@ class _DuesScreenState extends State<DuesScreen>
   }
 
   Future<void> _load() async {
+    AppLogger.log('screen:dues', 'load:start');
     setState(() => _loading = true);
     try {
       final data = await widget.repository.fetchDuesSnapshot();
       if (!mounted) {
         return;
       }
+      final receivableRows =
+          data.rows.where((row) => row.receivableBdt > 0).length;
+      final payableRows = data.rows.where((row) => row.payableBdt > 0).length;
+      AppLogger.log('screen:dues', 'load:success', fields: {
+        'totalReceivableBdt': data.totalReceivableBdt,
+        'totalPayableBdt': data.totalPayableBdt,
+        'grossBdt': data.grossBdt,
+        'netBdt': data.netBdt,
+        'rowCount': data.rows.length,
+        'receivableRowCount': receivableRows,
+        'payableRowCount': payableRows,
+      });
       setState(() {
         _snapshot = data;
         _networkError = false;
@@ -49,6 +63,10 @@ class _DuesScreenState extends State<DuesScreen>
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:dues', 'load:error', fields: {
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _snapshot = null;
@@ -220,6 +238,12 @@ class _DuesScreenState extends State<DuesScreen>
         .where(
             (row) => isReceivable ? row.receivableBdt > 0 : row.payableBdt > 0)
         .toList();
+
+    AppLogger.log('screen:dues', 'rows:filtered', fields: {
+      'tab': isReceivable ? 'receivable' : 'payable',
+      'sourceRowCount': _snapshot?.rows.length ?? 0,
+      'filteredRowCount': rows.length,
+    });
 
     rows.sort((a, b) {
       int result;

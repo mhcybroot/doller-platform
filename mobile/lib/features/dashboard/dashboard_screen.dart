@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
+import '../../shared/services/app_logger.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
@@ -28,6 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _load() async {
+    AppLogger.log('screen:dashboard', 'load:start');
     setState(() => _loading = true);
     final now = DateTime.now();
     final from = DateTime(now.year, now.month, 1);
@@ -37,6 +39,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:dashboard', 'load:success', fields: {
+        'receivableBdt': metrics.receivableBdt,
+        'payableBdt': metrics.payableBdt,
+        'totalPositionValuationBdt': metrics.totalPositionValuationBdt,
+        'positionsCount': metrics.positions.length,
+        'todayNetPnlBdt': metrics.todayNetPnlBdt,
+        'periodNetPnlBdt': metrics.periodNetPnlBdt,
+      });
       setState(() {
         _metrics = metrics;
         _pnlExplain = explain;
@@ -47,6 +57,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:dashboard', 'load:error', fields: {
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _metrics = null;

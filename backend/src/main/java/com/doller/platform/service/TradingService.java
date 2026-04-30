@@ -10,8 +10,11 @@ import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import com.doller.platform.dto.TradingDtos;
 import com.doller.platform.repo.*;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,6 +24,8 @@ import java.util.stream.Stream;
 
 @Service
 public class TradingService {
+    private static final Logger log = LoggerFactory.getLogger(TradingService.class);
+
     private final TradeDealRepository dealRepo;
     private final PartyRepository partyRepo;
     private final UserAccountRepository userRepo;
@@ -31,11 +36,13 @@ public class TradingService {
     private final LedgerEntryRepository ledgerRepo;
     private final LedgerService ledgerService;
     private final AuditService auditService;
+    private final boolean tradingDebug;
 
     public TradingService(TradeDealRepository dealRepo, PartyRepository partyRepo, UserAccountRepository userRepo,
                           SettlementRepository settlementRepo, ExpenseRepository expenseRepo,
                           DailyCloseRepository dailyCloseRepo, StatementSnapshotRepository snapshotRepo,
-                          LedgerEntryRepository ledgerRepo, LedgerService ledgerService, AuditService auditService) {
+                          LedgerEntryRepository ledgerRepo, LedgerService ledgerService, AuditService auditService,
+                          @Value("${app.logging.trading-debug:false}") boolean tradingDebug) {
         this.dealRepo = dealRepo;
         this.partyRepo = partyRepo;
         this.userRepo = userRepo;
@@ -46,6 +53,7 @@ public class TradingService {
         this.ledgerRepo = ledgerRepo;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
+        this.tradingDebug = tradingDebug;
     }
 
     @Transactional
@@ -68,6 +76,18 @@ public class TradingService {
                 .build());
 
         postDealLedger(deal, req.dealTime());
+        if (tradingDebug) {
+            log.info("deal_created dealId={} partyId={} type={} instrument={} quantity={} rate={} gross={} dealTime={} notes={}",
+                    deal.getId(),
+                    party.getId(),
+                    req.dealType(),
+                    req.instrumentCode(),
+                    req.quantity(),
+                    req.bdtRate(),
+                    gross,
+                    req.dealTime(),
+                    maskFreeText(req.notes()));
+        }
         auditService.log("CREATE_DEAL", "/deals", "partyId=" + party.getId(), null, null, "deal:" + deal.getId());
         return deal;
     }
@@ -347,7 +367,7 @@ public class TradingService {
         PnlMetrics todayMetrics = pnlMetrics(today, today);
         PnlMetrics periodMetrics = pnlMetrics(from, to);
 
-        return new TradingDtos.DashboardResponse(
+        TradingDtos.DashboardResponse response = new TradingDtos.DashboardResponse(
                 bdt(balances.receivableBdt()),
                 bdt(balances.payableBdt()),
                 totalPositionValuation,
@@ -365,6 +385,12 @@ public class TradingService {
                 periodMetrics.netPnlBdt(),
                 positions
         );
+        if (tradingDebug) {
+            log.info("dashboard_response from={} to={} receivable={} payable={} totalPosition={} positions={}",
+                    from, to, response.receivableBdt(), response.payableBdt(),
+                    response.totalPositionValuationBdt(), response.positions().size());
+        }
+        return response;
     }
 
     public TradingDtos.DashboardPnlExplainResponse dashboardPnlExplain(
@@ -410,7 +436,13 @@ public class TradingService {
         BigDecimal totalPayable = bdt(totals.payableBdt());
         BigDecimal gross = bdt(totalReceivable.add(totalPayable));
         BigDecimal net = bdt(totalReceivable.subtract(totalPayable));
-        return new TradingDtos.DuesSnapshotResponse(totalReceivable, totalPayable, gross, net, rows);
+        TradingDtos.DuesSnapshotResponse response =
+                new TradingDtos.DuesSnapshotResponse(totalReceivable, totalPayable, gross, net, rows);
+        if (tradingDebug) {
+            log.info("dues_snapshot_response rows={} totalReceivable={} totalPayable={} gross={} net={}",
+                    rows.size(), totalReceivable, totalPayable, gross, net);
+        }
+        return response;
     }
 
     public List<TradingDtos.StatementLine> statementRange(LocalDate from, LocalDate to) {
@@ -747,7 +779,19 @@ public class TradingService {
                         entry.getNarration()
                 )));
         lines.sort(Comparator.comparing(TradingDtos.PartyLedgerLine::time));
-        return new TradingDtos.PartyLedgerResponse(p.getId(), p.getName(), partyBalanceSummary(p), lines);
+        TradingDtos.PartyLedgerResponse response =
+                new TradingDtos.PartyLedgerResponse(p.getId(), p.getName(), partyBalanceSummary(p), lines);
+        if (tradingDebug) {
+            log.info("party_ledger_response partyId={} receivable={} payable={} advanceIn={} advanceOut={} net={} lineCount={}",
+                    partyId,
+                    response.balances().receivableBdt(),
+                    response.balances().payableBdt(),
+                    response.balances().advanceFromPartyBdt(),
+                    response.balances().advanceToPartyBdt(),
+                    response.balances().netBalanceBdt(),
+                    response.lines().size());
+        }
+        return response;
     }
 
     public BigDecimal partyOutstanding(Long partyId) {
@@ -813,10 +857,20 @@ public class TradingService {
         LocalDateTime cutoff = asOfDate == null
                 ? LocalDateTime.now()
                 : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        BigDecimal receivable = openingBalanceForPartyAccount(party.getId(), "RECEIVABLE_", cutoff);
-        BigDecimal payable = openingBalanceForPartyAccount(party.getId(), "PAYABLE_", cutoff).negate();
+        BigDecimal openingReceivable = openingBalanceForPartyAccount(party.getId(), "RECEIVABLE_", cutoff);
+        BigDecimal openingPayable = openingBalanceForPartyAccount(party.getId(), "PAYABLE_", cutoff).negate();
+        BigDecimal receivable = openingReceivable;
+        BigDecimal payable = openingPayable;
         BigDecimal advanceFromParty = BigDecimal.ZERO;
         BigDecimal advanceToParty = BigDecimal.ZERO;
+        BigDecimal buyDealPayable = BigDecimal.ZERO;
+        BigDecimal sellDealReceivable = BigDecimal.ZERO;
+        BigDecimal incomingReceivableApplied = BigDecimal.ZERO;
+        BigDecimal outgoingPayableApplied = BigDecimal.ZERO;
+        BigDecimal advanceFromPartyAdded = BigDecimal.ZERO;
+        BigDecimal advanceToPartyAdded = BigDecimal.ZERO;
+        BigDecimal advanceFromPartyCleared = BigDecimal.ZERO;
+        BigDecimal advanceToPartyCleared = BigDecimal.ZERO;
 
         for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
             if (!deal.getParty().getId().equals(party.getId()) || deal.getDealTime().isAfter(cutoff)) {
@@ -824,8 +878,10 @@ public class TradingService {
             }
             if (deal.getDealType() == DealType.BUY) {
                 payable = payable.add(deal.getBdtGross());
+                buyDealPayable = buyDealPayable.add(deal.getBdtGross());
             } else {
                 receivable = receivable.add(deal.getBdtGross());
+                sellDealReceivable = sellDealReceivable.add(deal.getBdtGross());
             }
         }
 
@@ -836,17 +892,23 @@ public class TradingService {
             if (settlement.getDirection() == SettlementDirection.INCOMING) {
                 if (settlement.getBasis() == SettlementBasis.RECEIVABLE) {
                     receivable = receivable.subtract(settlement.getAppliedAmount());
+                    incomingReceivableApplied = incomingReceivableApplied.add(settlement.getAppliedAmount());
                 } else if (settlement.getBasis() == SettlementBasis.ADVANCE_TO_PARTY) {
                     advanceToParty = advanceToParty.subtract(settlement.getAppliedAmount());
+                    advanceToPartyCleared = advanceToPartyCleared.add(settlement.getAppliedAmount());
                 }
                 advanceFromParty = advanceFromParty.add(settlement.getAdvanceAmount());
+                advanceFromPartyAdded = advanceFromPartyAdded.add(settlement.getAdvanceAmount());
             } else {
                 if (settlement.getBasis() == SettlementBasis.PAYABLE) {
                     payable = payable.subtract(settlement.getAppliedAmount());
+                    outgoingPayableApplied = outgoingPayableApplied.add(settlement.getAppliedAmount());
                 } else if (settlement.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY) {
                     advanceFromParty = advanceFromParty.subtract(settlement.getAppliedAmount());
+                    advanceFromPartyCleared = advanceFromPartyCleared.add(settlement.getAppliedAmount());
                 }
                 advanceToParty = advanceToParty.add(settlement.getAdvanceAmount());
+                advanceToPartyAdded = advanceToPartyAdded.add(settlement.getAdvanceAmount());
             }
         }
 
@@ -856,7 +918,29 @@ public class TradingService {
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, aging);
+        BalancePosition position = new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, aging);
+        if (tradingDebug) {
+            log.info("party_balance_projection partyId={} asOfDate={} openingReceivable={} openingPayable={} buyDealAddedPayable={} sellDealAddedReceivable={} incomingSettlementApplied={} outgoingSettlementApplied={} advanceInAdded={} advanceOutAdded={} advanceInCleared={} advanceOutCleared={} finalReceivable={} finalPayable={} finalAdvanceIn={} finalAdvanceOut={} finalNet={} finalAging={}",
+                    party.getId(),
+                    asOfDate,
+                    openingReceivable,
+                    openingPayable,
+                    buyDealPayable,
+                    sellDealReceivable,
+                    incomingReceivableApplied,
+                    outgoingPayableApplied,
+                    advanceFromPartyAdded,
+                    advanceToPartyAdded,
+                    advanceFromPartyCleared,
+                    advanceToPartyCleared,
+                    position.receivableBdt(),
+                    position.payableBdt(),
+                    position.advanceFromPartyBdt(),
+                    position.advanceToPartyBdt(),
+                    position.netBalanceBdt(),
+                    position.agingDueBdt());
+        }
+        return position;
     }
 
     private BigDecimal openingBalanceForPartyAccount(Long partyId, String accountPrefix, LocalDateTime cutoff) {
@@ -871,7 +955,7 @@ public class TradingService {
         BalancePosition current = projectPartyBalance(party, null);
         SettlementPlan plan = inferSettlementPlan(party, deal, amount);
         BalancePosition projected = applyPlan(current, plan);
-        return new TradingDtos.SettlementInferenceResponse(
+        TradingDtos.SettlementInferenceResponse response = new TradingDtos.SettlementInferenceResponse(
                 party.getId(),
                 deal == null ? null : deal.getId(),
                 toPartyBalanceSummary(current),
@@ -883,6 +967,22 @@ public class TradingService {
                 plan.amountLabel(),
                 plan.summary()
         );
+        if (tradingDebug) {
+            log.info("settlement_inference_response partyId={} dealId={} amount={} direction={} basis={} applied={} advance={} currentReceivable={} currentPayable={} projectedReceivable={} projectedPayable={} projectedNet={}",
+                    party.getId(),
+                    deal == null ? null : deal.getId(),
+                    amount,
+                    response.direction(),
+                    response.basis(),
+                    response.appliedAmount(),
+                    response.advanceAmount(),
+                    response.current().receivableBdt(),
+                    response.current().payableBdt(),
+                    response.projected().receivableBdt(),
+                    response.projected().payableBdt(),
+                    response.projected().netBalanceBdt());
+        }
+        return response;
     }
 
     private SettlementPlan inferSettlementPlan(Party party, TradeDeal deal, BigDecimal amount) {
@@ -1051,7 +1151,26 @@ public class TradingService {
         }
 
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
+        BalancePosition position = new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
+        if (tradingDebug) {
+            log.info("business_balance_projection asOfDate={} receivable={} payable={} advanceIn={} advanceOut={} net={} aging={}",
+                    asOfDate,
+                    position.receivableBdt(),
+                    position.payableBdt(),
+                    position.advanceFromPartyBdt(),
+                    position.advanceToPartyBdt(),
+                    position.netBalanceBdt(),
+                    position.agingDueBdt());
+        }
+        return position;
+    }
+
+    private String maskFreeText(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        return normalized.length() <= 48 ? normalized : normalized.substring(0, 48) + "...";
     }
 
     private List<TradingDtos.StatementLine> liveStatementRange(LocalDate from, LocalDate to) {

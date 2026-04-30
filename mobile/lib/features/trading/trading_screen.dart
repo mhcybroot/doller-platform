@@ -4,11 +4,13 @@ import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
+import '../../shared/services/app_logger.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
 class TradingScreen extends StatefulWidget {
-  const TradingScreen({super.key, required this.repository, required this.session});
+  const TradingScreen(
+      {super.key, required this.repository, required this.session});
 
   final DollerRepository repository;
   final AuthSession session;
@@ -47,6 +49,7 @@ class _TradingScreenState extends State<TradingScreen> {
   }
 
   Future<void> _load() async {
+    AppLogger.log('screen:trading', 'load:start');
     setState(() => _loading = true);
     try {
       final parties = await widget.repository.listParties();
@@ -54,6 +57,12 @@ class _TradingScreenState extends State<TradingScreen> {
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:trading', 'load:success', fields: {
+        'partyCount': parties.length,
+        'dealCount': deals.length,
+        'selectedPartyId': _selectedPartyId,
+        'selectedDealId': _selectedDealId,
+      });
       setState(() {
         _parties = parties;
         _deals = deals;
@@ -82,6 +91,10 @@ class _TradingScreenState extends State<TradingScreen> {
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:trading', 'load:error', fields: {
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _parties = const [];
@@ -108,6 +121,12 @@ class _TradingScreenState extends State<TradingScreen> {
 
     final requestId = ++_inferenceVersion;
     final amount = double.tryParse(_amountController.text) ?? 0;
+    AppLogger.log('screen:trading', 'inference:start', fields: {
+      'requestId': requestId,
+      'partyId': _selectedParty?.id,
+      'tradeDealId': _selectedDealId,
+      'amount': amount,
+    });
     try {
       final inference = await widget.repository.settlementInference(
         partyId: _selectedParty!.id,
@@ -117,6 +136,13 @@ class _TradingScreenState extends State<TradingScreen> {
       if (!mounted || requestId != _inferenceVersion) {
         return;
       }
+      AppLogger.log('screen:trading', 'inference:success', fields: {
+        'requestId': requestId,
+        'direction': inference.direction,
+        'basis': inference.basis,
+        'appliedAmount': inference.appliedAmount,
+        'advanceAmount': inference.advanceAmount,
+      });
       setState(() {
         _inference = inference;
         _inferenceError = null;
@@ -125,6 +151,11 @@ class _TradingScreenState extends State<TradingScreen> {
       if (!mounted || requestId != _inferenceVersion) {
         return;
       }
+      AppLogger.log('screen:trading', 'inference:error', fields: {
+        'requestId': requestId,
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       setState(() {
         _inference = null;
         _inferenceError = error.message;
@@ -138,6 +169,13 @@ class _TradingScreenState extends State<TradingScreen> {
         if (_selectedParty == null) {
           throw const ApiException('Select a party first');
         }
+        AppLogger.log('screen:trading', 'submit:deal:start', fields: {
+          'partyId': _selectedParty!.id,
+          'dealType': _dealType,
+          'instrumentCode': _instrumentCode,
+          'quantity': _quantityController.text,
+          'bdtRate': _rateController.text,
+        });
         await widget.repository.createDeal(
           dealType: _dealType,
           partyId: _selectedParty!.id,
@@ -146,6 +184,11 @@ class _TradingScreenState extends State<TradingScreen> {
           bdtRate: double.parse(_rateController.text),
           notes: _noteController.text.trim(),
         );
+        AppLogger.log('screen:trading', 'submit:deal:success', fields: {
+          'partyId': _selectedParty!.id,
+          'dealType': _dealType,
+          'instrumentCode': _instrumentCode,
+        });
         showAppMessage(context, 'Deal saved');
       } else if (_mode == 1) {
         if (_selectedParty == null) {
@@ -185,6 +228,11 @@ class _TradingScreenState extends State<TradingScreen> {
       _allowAdvance = false;
       await _load();
     } on ApiException catch (error) {
+      AppLogger.log('screen:trading', 'submit:error', fields: {
+        'mode': _mode,
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       showAppMessage(context, error.message, isError: true);
     } on FormatException {
       showAppMessage(context, 'Please enter valid numeric values',
@@ -324,7 +372,8 @@ class _TradingScreenState extends State<TradingScreen> {
                       setState(() => _selectedDealId = value);
                       _refreshInference();
                     },
-                    decoration: const InputDecoration(labelText: 'Related Deal'),
+                    decoration:
+                        const InputDecoration(labelText: 'Related Deal'),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -397,7 +446,8 @@ class _TradingScreenState extends State<TradingScreen> {
                       DropdownMenuItem(
                           value: 'EMPLOYEE_SALARY',
                           child: Text('EMPLOYEE_SALARY')),
-                      DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+                      DropdownMenuItem(
+                          value: 'UTILITY', child: Text('UTILITY')),
                       DropdownMenuItem(value: 'RENT', child: Text('RENT')),
                       DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
                     ],
@@ -408,8 +458,8 @@ class _TradingScreenState extends State<TradingScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _categoryController,
-                    decoration:
-                        const InputDecoration(labelText: 'Category Detail (optional)'),
+                    decoration: const InputDecoration(
+                        labelText: 'Category Detail (optional)'),
                   ),
                 ],
               ],

@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
+import '../../shared/services/app_logger.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
 class PartiesScreen extends StatefulWidget {
-  const PartiesScreen({super.key, required this.repository, required this.session});
+  const PartiesScreen(
+      {super.key, required this.repository, required this.session});
 
   final DollerRepository repository;
   final AuthSession session;
@@ -102,18 +104,18 @@ class _PartiesScreenState extends State<PartiesScreen> {
               TextField(
                   controller: openingPayable,
                   keyboardType: TextInputType.number,
-                  decoration:
-                      const InputDecoration(labelText: 'Opening Payable (BDT)')),
+                  decoration: const InputDecoration(
+                      labelText: 'Opening Payable (BDT)')),
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: () async {
                   try {
-                    final openingReceivableValue =
-                        double.tryParse(openingReceivable.text.trim().isEmpty
+                    final openingReceivableValue = double.tryParse(
+                        openingReceivable.text.trim().isEmpty
                             ? '0'
                             : openingReceivable.text.trim());
-                    final openingPayableValue =
-                        double.tryParse(openingPayable.text.trim().isEmpty
+                    final openingPayableValue = double.tryParse(
+                        openingPayable.text.trim().isEmpty
                             ? '0'
                             : openingPayable.text.trim());
                     if (openingReceivableValue == null ||
@@ -170,13 +172,21 @@ class _PartiesScreenState extends State<PartiesScreen> {
             children: [
               Text('Edit Party', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+              TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Name')),
               const SizedBox(height: 12),
-              TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+              TextField(
+                  controller: phone,
+                  decoration: const InputDecoration(labelText: 'Phone')),
               const SizedBox(height: 12),
-              TextField(controller: address, decoration: const InputDecoration(labelText: 'Address')),
+              TextField(
+                  controller: address,
+                  decoration: const InputDecoration(labelText: 'Address')),
               const SizedBox(height: 12),
-              TextField(controller: notes, decoration: const InputDecoration(labelText: 'Notes')),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
               const SizedBox(height: 18),
               ElevatedButton(
                 onPressed: () async {
@@ -213,8 +223,12 @@ class _PartiesScreenState extends State<PartiesScreen> {
         title: const Text('Delete Party'),
         content: Text('Delete ${party.name}? This is an owner-only action.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -237,11 +251,23 @@ class _PartiesScreenState extends State<PartiesScreen> {
   }
 
   Future<void> _openLedger(PartyModel party) async {
+    AppLogger.log('screen:party-ledger', 'open:start', fields: {
+      'partyId': party.id,
+      'partyName': party.name,
+    });
     try {
       final ledger = await widget.repository.partyLedger(party.id);
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:party-ledger', 'open:success', fields: {
+        'partyId': party.id,
+        'partyName': party.name,
+        'receivableBdt': ledger.balances.receivableBdt,
+        'payableBdt': ledger.balances.payableBdt,
+        'netBalanceBdt': ledger.balances.netBalanceBdt,
+        'lineCount': ledger.lines.length,
+      });
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -290,7 +316,8 @@ class _PartiesScreenState extends State<PartiesScreen> {
                         ),
                         BalancePill(
                           label: 'Net Position',
-                          value: _formatSignedAmount(ledger.balances.netBalanceBdt),
+                          value: _formatSignedAmount(
+                              ledger.balances.netBalanceBdt),
                           tone: ledger.balances.netBalanceBdt >= 0
                               ? BalancePillTone.netPositive
                               : BalancePillTone.netNegative,
@@ -333,6 +360,11 @@ class _PartiesScreenState extends State<PartiesScreen> {
       if (!mounted) {
         return;
       }
+      AppLogger.log('screen:party-ledger', 'open:error', fields: {
+        'partyId': party.id,
+        'message': error.message,
+        'isNetworkError': error.isNetworkError,
+      });
       showAppMessage(context, error.message, isError: true);
     }
   }

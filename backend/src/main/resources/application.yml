@@ -1,5 +1,8 @@
 server:
   port: 8089
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{traceId}] %logger - %msg%n"
 spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/doller}
@@ -18,6 +21,8 @@ spring:
 app:
   init:
     enabled: ${APP_INIT_ENABLED:true}
+  logging:
+    trading-debug: ${APP_LOGGING_TRADING_DEBUG:false}
   jwt:
     issuer: ${JWT_ISSUER:doller-platform}
     active-secret: ${JWT_ACTIVE_SECRET:change-this-very-long-active-secret-please-change-in-prod}

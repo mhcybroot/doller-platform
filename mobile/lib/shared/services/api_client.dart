@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../models/auth_models.dart';
 import '../config/app_env.dart';
+import 'app_logger.dart';
 import 'auth_store.dart';
 import 'outbox_store.dart';
 
@@ -13,7 +14,8 @@ class ApiException implements Exception {
   final int? statusCode;
   final bool isNetworkError;
 
-  const ApiException(this.message, {this.statusCode, this.isNetworkError = false});
+  const ApiException(this.message,
+      {this.statusCode, this.isNetworkError = false});
 
   @override
   String toString() => message;
@@ -31,7 +33,24 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          final traceId = AppLogger.newTraceId();
+          final startedAt = DateTime.now().microsecondsSinceEpoch;
+          options.extra['traceId'] = traceId;
+          options.extra['startedAtUs'] = startedAt;
+          options.headers[TraceHeader.name] = traceId;
           if (options.extra['skipAuth'] == true) {
+            AppLogger.log(
+              'api',
+              'request',
+              traceId: traceId,
+              fields: {
+                'method': options.method,
+                'url': options.uri.toString(),
+                'query': options.queryParameters,
+                'body': AppLogger.sanitizeValue(options.data),
+                'skipAuth': true,
+              },
+            );
             handler.next(options);
             return;
           }
@@ -39,7 +58,76 @@ class ApiClient {
           if (session != null && session.accessToken.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer ${session.accessToken}';
           }
+          AppLogger.log(
+            'api',
+            'request',
+            traceId: traceId,
+            fields: {
+              'method': options.method,
+              'url': options.uri.toString(),
+              'query': options.queryParameters,
+              'body': AppLogger.sanitizeValue(options.data),
+            },
+          );
           handler.next(options);
+        },
+        onResponse: (response, handler) {
+          final traceId = response.requestOptions.extra['traceId'] as String?;
+          final startedAtUs =
+              response.requestOptions.extra['startedAtUs'] as int? ?? 0;
+          final durationMs = startedAtUs == 0
+              ? null
+              : ((DateTime.now().microsecondsSinceEpoch - startedAtUs) / 1000)
+                  .round();
+          AppLogger.log(
+            'api',
+            'response',
+            traceId: traceId,
+            fields: {
+              'method': response.requestOptions.method,
+              'url': response.requestOptions.uri.toString(),
+              'status': response.statusCode,
+              'durationMs': durationMs,
+              'responseTraceId':
+                  response.headers.value(TraceHeader.name) ?? traceId,
+              'summary': AppLogger.summarizeForPath(
+                response.requestOptions.path,
+                response.data,
+              ),
+            },
+          );
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          final traceId = error.requestOptions.extra['traceId'] as String?;
+          final startedAtUs =
+              error.requestOptions.extra['startedAtUs'] as int? ?? 0;
+          final durationMs = startedAtUs == 0
+              ? null
+              : ((DateTime.now().microsecondsSinceEpoch - startedAtUs) / 1000)
+                  .round();
+          AppLogger.log(
+            'api',
+            'error',
+            traceId: traceId,
+            fields: {
+              'method': error.requestOptions.method,
+              'url': error.requestOptions.uri.toString(),
+              'status': error.response?.statusCode,
+              'durationMs': durationMs,
+              'type': error.type.name,
+              'responseTraceId':
+                  error.response?.headers.value(TraceHeader.name) ?? traceId,
+              'message': error.message,
+              'responseSummary': error.response == null
+                  ? null
+                  : AppLogger.summarizeForPath(
+                      error.requestOptions.path,
+                      error.response?.data,
+                    ),
+            },
+          );
+          handler.next(error);
         },
       ),
     );
@@ -154,7 +242,7 @@ class ApiClient {
           return sender();
         }
       }
-      throw error;
+      rethrow;
     }
   }
 
@@ -194,7 +282,18 @@ class ApiClient {
   }
 
   ApiException _mapError(DioException error) {
+    final traceId = error.requestOptions.extra['traceId'] as String?;
     if (_shouldQueue(error)) {
+      AppLogger.log(
+        'api',
+        'mapped_error',
+        traceId: traceId,
+        fields: {
+          'type': error.type.name,
+          'mappedMessage':
+              'No internet connection. Please check your network and try again.',
+        },
+      );
       return const ApiException(
         'No internet connection. Please check your network and try again.',
         isNetworkError: true,
@@ -203,11 +302,35 @@ class ApiClient {
     final data = error.response?.data;
     if (data is Map<String, dynamic>) {
       final message = data['message'] as String? ?? 'Request failed';
+      AppLogger.log(
+        'api',
+        'mapped_error',
+        traceId: traceId,
+        fields: {
+          'type': error.type.name,
+          'statusCode': error.response?.statusCode,
+          'mappedMessage': message,
+        },
+      );
       return ApiException(message, statusCode: error.response?.statusCode);
     }
+    AppLogger.log(
+      'api',
+      'mapped_error',
+      traceId: traceId,
+      fields: {
+        'type': error.type.name,
+        'statusCode': error.response?.statusCode,
+        'mappedMessage': error.message ?? 'Network request failed',
+      },
+    );
     return ApiException(
       error.message ?? 'Network request failed',
       statusCode: error.response?.statusCode,
     );
   }
+}
+
+class TraceHeader {
+  static const String name = 'X-Trace-Id';
 }

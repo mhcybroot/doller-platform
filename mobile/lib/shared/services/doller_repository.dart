@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/auth_models.dart';
 import '../models/domain_models.dart';
 import 'api_client.dart';
+import 'app_logger.dart';
 import 'auth_store.dart';
 
 class DollerRepository {
@@ -57,13 +58,13 @@ class DollerRepository {
   }
 
   Future<PartyModel> createParty(
-      String name,
-      String phone,
-      String address,
-      String notes, {
-      double openingReceivableBdt = 0,
-      double openingPayableBdt = 0,
-      }) async {
+    String name,
+    String phone,
+    String address,
+    String notes, {
+    double openingReceivableBdt = 0,
+    double openingPayableBdt = 0,
+  }) async {
     return _api.post<PartyModel>(
       '/parties',
       data: {
@@ -122,6 +123,14 @@ class DollerRepository {
     required double bdtRate,
     required String notes,
   }) async {
+    AppLogger.log('repo', 'createDeal:start', fields: {
+      'dealType': dealType,
+      'partyId': partyId,
+      'instrumentCode': instrumentCode,
+      'quantity': quantity,
+      'bdtRate': bdtRate,
+      'notes': notes,
+    });
     await _api.post<void>(
       '/deals',
       data: {
@@ -135,6 +144,13 @@ class DollerRepository {
       },
       parser: (_) {},
     );
+    AppLogger.log('repo', 'createDeal:success', fields: {
+      'dealType': dealType,
+      'partyId': partyId,
+      'instrumentCode': instrumentCode,
+      'quantity': quantity,
+      'bdtRate': bdtRate,
+    });
   }
 
   Future<void> updateDeal({
@@ -233,7 +249,12 @@ class DollerRepository {
     int? tradeDealId,
     required double amount,
   }) async {
-    return _api.get<SettlementInferenceModel>(
+    AppLogger.log('repo', 'settlementInference:start', fields: {
+      'partyId': partyId,
+      'tradeDealId': tradeDealId,
+      'amount': amount,
+    });
+    final result = await _api.get<SettlementInferenceModel>(
       '/settlements/inference',
       query: {
         'partyId': partyId,
@@ -243,6 +264,18 @@ class DollerRepository {
       parser: (json) =>
           SettlementInferenceModel.fromJson(json as Map<String, dynamic>),
     );
+    AppLogger.log('repo', 'settlementInference:success', fields: {
+      'partyId': partyId,
+      'tradeDealId': tradeDealId,
+      'amount': amount,
+      'direction': result.direction,
+      'basis': result.basis,
+      'currentReceivableBdt': result.current.receivableBdt,
+      'currentPayableBdt': result.current.payableBdt,
+      'projectedReceivableBdt': result.projected.receivableBdt,
+      'projectedPayableBdt': result.projected.payableBdt,
+    });
+    return result;
   }
 
   Future<void> createExpense({
@@ -293,11 +326,24 @@ class DollerRepository {
   }
 
   Future<DashboardMetrics> dashboard(DateTime from, DateTime to) async {
-    return _api.get<DashboardMetrics>(
+    AppLogger.log('repo', 'dashboard:start', fields: {
+      'from': _date(from),
+      'to': _date(to),
+    });
+    final result = await _api.get<DashboardMetrics>(
       '/dashboard',
       query: {'from': _date(from), 'to': _date(to)},
       parser: (json) => DashboardMetrics.fromJson(json as Map<String, dynamic>),
     );
+    AppLogger.log('repo', 'dashboard:success', fields: {
+      'from': _date(from),
+      'to': _date(to),
+      'receivableBdt': result.receivableBdt,
+      'payableBdt': result.payableBdt,
+      'totalPositionValuationBdt': result.totalPositionValuationBdt,
+      'positionsCount': result.positions.length,
+    });
+    return result;
   }
 
   Future<DashboardPnlExplainModel> dashboardPnlExplain(
@@ -334,11 +380,20 @@ class DollerRepository {
   }
 
   Future<DuesSnapshotModel> fetchDuesSnapshot() async {
-    return _api.get<DuesSnapshotModel>(
+    AppLogger.log('repo', 'fetchDuesSnapshot:start');
+    final result = await _api.get<DuesSnapshotModel>(
       '/dues/snapshot',
       parser: (json) =>
           DuesSnapshotModel.fromJson(json as Map<String, dynamic>),
     );
+    AppLogger.log('repo', 'fetchDuesSnapshot:success', fields: {
+      'totalReceivableBdt': result.totalReceivableBdt,
+      'totalPayableBdt': result.totalPayableBdt,
+      'grossBdt': result.grossBdt,
+      'netBdt': result.netBdt,
+      'rowCount': result.rows.length,
+    });
+    return result;
   }
 
   Future<List<StatementLineModel>> statements(
@@ -431,10 +486,19 @@ class DollerRepository {
   }
 
   Future<PartyLedgerModel> partyLedger(int partyId) async {
-    return _api.get<PartyLedgerModel>(
+    AppLogger.log('repo', 'partyLedger:start', fields: {'partyId': partyId});
+    final result = await _api.get<PartyLedgerModel>(
       '/ledgers/party/$partyId',
       parser: (json) => PartyLedgerModel.fromJson(json as Map<String, dynamic>),
     );
+    AppLogger.log('repo', 'partyLedger:success', fields: {
+      'partyId': partyId,
+      'receivableBdt': result.balances.receivableBdt,
+      'payableBdt': result.balances.payableBdt,
+      'netBalanceBdt': result.balances.netBalanceBdt,
+      'lineCount': result.lines.length,
+    });
+    return result;
   }
 
   Future<List<UserModel>> users() async {
