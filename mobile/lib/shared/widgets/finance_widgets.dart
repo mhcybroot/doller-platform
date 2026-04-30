@@ -219,14 +219,14 @@ class BalancePill extends StatelessWidget {
   (Color, Color, Color) _toneScheme(BalancePillTone tone) {
     return switch (tone) {
       BalancePillTone.receivable => (
-          const Color(0xFFFFEDEE),
-          const Color(0xFFF6C7CB),
-          const Color(0xFFB42318),
-        ),
-      BalancePillTone.payable => (
           const Color(0xFFEAF8F0),
           const Color(0xFFBFE4CC),
           const Color(0xFF166534),
+        ),
+      BalancePillTone.payable => (
+          const Color(0xFFFFEDEE),
+          const Color(0xFFF6C7CB),
+          const Color(0xFFB42318),
         ),
       BalancePillTone.advanceIn => (
           const Color(0xFFE6F4FF),
@@ -269,14 +269,14 @@ class BalancePill extends StatelessWidget {
           const Color(0xFFB91C1C),
         ),
       BalancePillTone.netPositive => (
-          const Color(0xFFFFEDEE),
-          const Color(0xFFF6C7CB),
-          const Color(0xFFB42318),
-        ),
-      BalancePillTone.netNegative => (
           const Color(0xFFEAF8F0),
           const Color(0xFFBFE4CC),
           const Color(0xFF166534),
+        ),
+      BalancePillTone.netNegative => (
+          const Color(0xFFFFEDEE),
+          const Color(0xFFF6C7CB),
+          const Color(0xFFB42318),
         ),
       BalancePillTone.neutral => (
           const Color(0xFFF8FAFC),

@@ -147,12 +147,12 @@ class _DuesScreenState extends State<DuesScreen>
       children: [
         BalancePill(
           label: 'Total Receivable',
-          value: formatBdt(snapshot.totalReceivableBdt),
+          value: '+${formatBdt(snapshot.totalReceivableBdt)}',
           tone: BalancePillTone.receivable,
         ),
         BalancePill(
           label: 'Total Payable',
-          value: formatBdt(snapshot.totalPayableBdt),
+          value: '-${formatBdt(snapshot.totalPayableBdt)}',
           tone: BalancePillTone.payable,
         ),
         BalancePill(
@@ -162,7 +162,9 @@ class _DuesScreenState extends State<DuesScreen>
         ),
         BalancePill(
           label: 'Net (R-P)',
-          value: formatBdt(snapshot.netBdt.abs()),
+          value: snapshot.netBdt >= 0
+              ? '+${formatBdt(snapshot.netBdt)}'
+              : '-${formatBdt(snapshot.netBdt.abs())}',
           tone: snapshot.netBdt >= 0
               ? BalancePillTone.netPositive
               : BalancePillTone.netNegative,

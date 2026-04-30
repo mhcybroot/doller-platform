@@ -1399,25 +1399,25 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     if (amount == 0) {
       return formatBdt(0);
     }
+    final sign = _isNegativeRow(row) ? '-' : '+';
+    return '$sign${formatBdt(amount.abs())}';
+  }
+
+  Color _amountColor(TransactionDetailRowModel row) {
+    final isNegative = _isNegativeRow(row);
+    return isNegative ? Colors.red.shade700 : Colors.green.shade700;
+  }
+
+  bool _isNegativeRow(TransactionDetailRowModel row) {
     final direction = (row.directionLabel ?? '').toUpperCase();
     final isOpeningPayable =
         row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
     final isOutgoingSettlement =
         row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
-    final sign =
-        row.entryType == 'EXPENSE' || isOutgoingSettlement || isOpeningPayable
-            ? '-'
-            : '+';
-    return '$sign${formatBdt(amount.abs())}';
-  }
-
-  Color _amountColor(TransactionDetailRowModel row) {
-    final direction = (row.directionLabel ?? '').toUpperCase();
-    final isOpeningPayable =
-        row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
-    final isNegative = row.entryType == 'EXPENSE' ||
-        (row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING')) ||
-        isOpeningPayable;
-    return isNegative ? Colors.red.shade700 : Colors.green.shade700;
+    final isBuyDeal = row.entryType == 'DEAL' && direction.contains('BUY');
+    return row.entryType == 'EXPENSE' ||
+        isOutgoingSettlement ||
+        isOpeningPayable ||
+        isBuyDeal;
   }
 }
