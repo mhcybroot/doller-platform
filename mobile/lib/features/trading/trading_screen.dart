@@ -284,7 +284,7 @@ class _TradingScreenState extends State<TradingScreen> {
                 TextField(
                   controller: _quantityController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Quantity'),
+                  decoration: const InputDecoration(labelText: 'Amount'),
                 ),
                 const SizedBox(height: 12),
                 TextField(

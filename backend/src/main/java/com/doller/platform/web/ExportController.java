@@ -112,7 +112,7 @@ public class ExportController {
 
                 cs.beginText();
                 cs.newLineAtOffset(50, 756);
-                cs.showText(String.format("Open Cash=%s | Close Cash=%s | Open FX Qty=%s | Close FX Qty=%s | Total P/L=%s",
+                cs.showText(String.format("Open Cash=%s | Close Cash=%s | Open FX Amt=%s | Close FX Amt=%s | Total P/L=%s",
                         response.openingCash(), response.closingCash(), response.openingUsd(), response.closingUsd(), response.totalPnl()));
                 cs.endText();
 
@@ -271,7 +271,7 @@ public class ExportController {
         private void drawDealTable(List<TradingDtos.TransactionDealExportRow> rows, TradingDtos.TransactionDealSummary summary) throws IOException {
             ensure(80);
             sectionTitleCard("Deals");
-            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Quantity", "Rate", "Amount"};
+            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amt", "Rate", "Amount"};
             float[] cols = {44, 58, 56, 66, 118, 60, 58, 74};
             tableHeader(headers, cols);
             y -= firstRowTopGap;

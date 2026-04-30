@@ -270,7 +270,7 @@ class _ExplainSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'P/L is inventory-cost based (FIFO). Sell-first profit is realized when later buy covers short qty.',
+          'P/L is inventory-cost based (FIFO). Sell-first profit is realized when later buy covers short amt.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 10),
@@ -490,7 +490,7 @@ class _ExplainSection extends StatelessWidget {
     if (title == 'Open long total value') {
       return (
         'এখনো বিক্রি হয়নি এমন স্টকের মোট ক্রয়মূল্য (BDT)।',
-        'যেগুলো এখনো হাতে আছে, সেগুলোর qty × buy rate ধরে মোট মূল্য দেখায়।',
+        'যেগুলো এখনো হাতে আছে, সেগুলোর amt × buy rate ধরে মোট মূল্য দেখায়।',
         'ফর্মুলা: Open long value = Σ(openLongQty × lotBuyRate)।',
         'আরও BUY করলে বাড়ে, SELL করলে কমে।'
       );
@@ -522,7 +522,7 @@ class _ExplainSection extends StatelessWidget {
     return (
       'এটি নির্দিষ্ট কারেন্সি/ইন্সট্রুমেন্টের ওপেন অবস্থা।',
       'Long মানে হাতে থাকা স্টক, Short মানে আগে SELL করা কিন্তু এখনো BUY করে কভার হয়নি।',
-      'এখনের মানটি ঐ instrument-এর open lots থেকে qty ও BDT basis ধরে দেখানো হচ্ছে।',
+      'এখনের মানটি ঐ instrument-এর open lots থেকে amt ও BDT basis ধরে দেখানো হচ্ছে।',
       'ওই instrument-এ BUY/SELL/cover হলে এই মান বদলাবে।'
     );
   }

@@ -480,7 +480,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
   String _formatQty(double value) => value.toStringAsFixed(2);
 
   String _formatFxFlow(double opening, double closing) {
-    return 'Open: ${_formatQty(opening)} qty\nClose: ${_formatQty(closing)} qty';
+    return 'Open: ${_formatQty(opening)} amt\nClose: ${_formatQty(closing)} amt';
   }
 
   Widget _summaryPill(String label, String value, BalancePillTone tone) {
@@ -845,7 +845,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                 TextField(
                     controller: qty,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Quantity')),
+                    decoration: const InputDecoration(labelText: 'Amount')),
                 const SizedBox(height: 12),
                 TextField(
                     controller: rate,
@@ -1341,7 +1341,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                               Text(
                                   'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),
                             if (row.quantity != null)
-                              Text('Quantity: ${row.quantity}'),
+                              Text('Amount: ${row.quantity}'),
                             if (row.bdtRate != null)
                               Text('Rate: ${row.bdtRate}'),
                             if ((row.category ?? '').isNotEmpty)

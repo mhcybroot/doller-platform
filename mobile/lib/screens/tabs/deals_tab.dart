@@ -46,7 +46,7 @@ class _DealsTabState extends State<DealsTab> {
         ),
         TextField(
             controller: usd,
-            decoration: const InputDecoration(labelText: 'Quantity')),
+            decoration: const InputDecoration(labelText: 'Amount')),
         TextField(
             controller: rate,
             decoration: const InputDecoration(labelText: 'BDT Rate')),

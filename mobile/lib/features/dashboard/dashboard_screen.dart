@@ -175,7 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                             instrumentDisplayName(position.instrumentCode)),
-                        subtitle: Text('Qty ${position.quantity}'),
+                        subtitle: Text('Amt ${position.quantity}'),
                         trailing: Text(
                           formatBdt(position.valuationBdt),
                           style: Theme.of(context).textTheme.titleMedium,
@@ -478,7 +478,7 @@ class _PnlExplainSection extends StatelessWidget {
     if (title == 'Open long total value') {
       return (
         'এখনো বিক্রি হয়নি এমন স্টকের মোট ক্রয়মূল্য (BDT)।',
-        'যেগুলো এখনো হাতে আছে, সেগুলোর qty × buy rate ধরে মোট মূল্য দেখায়।',
+        'যেগুলো এখনো হাতে আছে, সেগুলোর amt × buy rate ধরে মোট মূল্য দেখায়।',
         'ফর্মুলা: Open long value = Σ(openLongQty × lotBuyRate)।',
         'আরও BUY করলে বাড়ে, SELL করলে কমে।'
       );
@@ -510,7 +510,7 @@ class _PnlExplainSection extends StatelessWidget {
     return (
       'এটি নির্দিষ্ট কারেন্সি/ইন্সট্রুমেন্টের ওপেন অবস্থা।',
       'Long মানে হাতে থাকা স্টক, Short মানে আগে SELL করা কিন্তু এখনো BUY করে কভার হয়নি।',
-      'এখনের মানটি ঐ instrument-এর open lots থেকে qty ও BDT basis ধরে দেখানো হচ্ছে।',
+      'এখনের মানটি ঐ instrument-এর open lots থেকে amt ও BDT basis ধরে দেখানো হচ্ছে।',
       'ওই instrument-এ BUY/SELL/cover হলে এই মান বদলাবে।'
     );
   }
