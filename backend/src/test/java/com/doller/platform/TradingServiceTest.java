@@ -273,6 +273,134 @@ class TradingServiceTest {
     }
 
     @Test
+    void buyDealImmediatelyAppearsAsPayableInDuesAndLedger() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Immediate Payable").build());
+        LocalDateTime stamp = LocalDateTime.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                stamp, "buy only"
+        ));
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow row = dues.rows().stream()
+                .filter(r -> r.partyId().equals(party.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, row.receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, row.payableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, dues.totalPayableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("1000.00")));
+    }
+
+    @Test
+    void sellDealImmediatelyAppearsAsReceivableInDuesAndLedger() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Immediate Receivable").build());
+        LocalDateTime stamp = LocalDateTime.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                stamp, "sell only"
+        ));
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow row = dues.rows().stream()
+                .filter(r -> r.partyId().equals(party.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, row.receivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, row.payableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, dues.totalReceivableBdt().compareTo(new BigDecimal("1000.00")));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("1000.00")));
+    }
+
+    @Test
+    void deletingDealRemovesDueImmediately() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Delete Due").build());
+        LocalDateTime stamp = LocalDateTime.now();
+
+        TradeDeal deal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                stamp, "buy then delete"
+        ));
+        tradingService.deleteDeal(deal.getId());
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow row = dues.rows().stream()
+                .filter(r -> r.partyId().equals(party.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, row.receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, row.payableBdt().compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void partialSettlementReducesDueImmediately() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Partial Settlement").build());
+        LocalDateTime stamp = LocalDateTime.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                stamp, "buy first"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("400"), stamp, SettlementPaymentMethod.CASH, null, "partial pay", false
+        ));
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow row = dues.rows().stream()
+                .filter(r -> r.partyId().equals(party.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, row.payableBdt().compareTo(new BigDecimal("600.00")));
+        assertEquals(0, row.receivableBdt().compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void duesProjectionStaysConsistentWithLedgerForSimpleDealFlows() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party buyParty = partyRepository.save(Party.builder().name("Ledger Buy").build());
+        Party sellParty = partyRepository.save(Party.builder().name("Ledger Sell").build());
+        LocalDateTime stamp = LocalDateTime.now();
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, buyParty.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                stamp, "buy"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, sellParty.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("125"),
+                stamp, "sell"
+        ));
+
+        var dues = tradingService.duesSnapshot();
+        TradingDtos.PartyDueRow buyRow = dues.rows().stream()
+                .filter(r -> r.partyId().equals(buyParty.getId()))
+                .findFirst()
+                .orElseThrow();
+        TradingDtos.PartyDueRow sellRow = dues.rows().stream()
+                .filter(r -> r.partyId().equals(sellParty.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        LocalDateTime cutoff = stamp.plusMinutes(2);
+        assertEquals(0, buyRow.payableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + buyParty.getId(), cutoff)
+                .negate()
+                .compareTo(buyRow.payableBdt()));
+        assertEquals(0, sellRow.receivableBdt().compareTo(new BigDecimal("1000.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + sellParty.getId(), cutoff)
+                .compareTo(sellRow.receivableBdt()));
+    }
+
+    @Test
     void openingBalanceReflectsInPartyLedgerAndTransactionDetailsWithoutDeals() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         var created = masterDataService.createParty(new com.doller.platform.dto.MasterDataDtos.PartyCreateRequest(

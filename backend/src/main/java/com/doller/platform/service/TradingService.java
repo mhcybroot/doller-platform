@@ -804,13 +804,58 @@ public class TradingService {
         LocalDateTime cutoff = asOfDate == null
                 ? LocalDateTime.now()
                 : asOfDate.plusDays(1).atStartOfDay().minusNanos(1);
-        BigDecimal receivable = netForAccountUntilActive("RECEIVABLE_" + party.getId(), cutoff).max(BigDecimal.ZERO);
-        BigDecimal payable = netForAccountUntilActive("PAYABLE_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
-        BigDecimal advanceFromParty = netForAccountUntilActive("ADVANCE_FROM_" + party.getId(), cutoff).negate().max(BigDecimal.ZERO);
-        BigDecimal advanceToParty = netForAccountUntilActive("ADVANCE_TO_" + party.getId(), cutoff).max(BigDecimal.ZERO);
+        BigDecimal receivable = openingBalanceForPartyAccount(party.getId(), "RECEIVABLE_", cutoff);
+        BigDecimal payable = openingBalanceForPartyAccount(party.getId(), "PAYABLE_", cutoff).negate();
+        BigDecimal advanceFromParty = BigDecimal.ZERO;
+        BigDecimal advanceToParty = BigDecimal.ZERO;
+
+        for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
+            if (!deal.getParty().getId().equals(party.getId()) || deal.getDealTime().isAfter(cutoff)) {
+                continue;
+            }
+            if (deal.getDealType() == DealType.BUY) {
+                payable = payable.add(deal.getBdtGross());
+            } else {
+                receivable = receivable.add(deal.getBdtGross());
+            }
+        }
+
+        for (Settlement settlement : settlementRepo.findByPartyAndDeletedFalseOrderBySettlementTimeAsc(party)) {
+            if (settlement.getSettlementTime().isAfter(cutoff)) {
+                continue;
+            }
+            if (settlement.getDirection() == SettlementDirection.INCOMING) {
+                if (settlement.getBasis() == SettlementBasis.RECEIVABLE) {
+                    receivable = receivable.subtract(settlement.getAppliedAmount());
+                } else if (settlement.getBasis() == SettlementBasis.ADVANCE_TO_PARTY) {
+                    advanceToParty = advanceToParty.subtract(settlement.getAppliedAmount());
+                }
+                advanceFromParty = advanceFromParty.add(settlement.getAdvanceAmount());
+            } else {
+                if (settlement.getBasis() == SettlementBasis.PAYABLE) {
+                    payable = payable.subtract(settlement.getAppliedAmount());
+                } else if (settlement.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY) {
+                    advanceFromParty = advanceFromParty.subtract(settlement.getAppliedAmount());
+                }
+                advanceToParty = advanceToParty.add(settlement.getAdvanceAmount());
+            }
+        }
+
+        receivable = receivable.max(BigDecimal.ZERO);
+        payable = payable.max(BigDecimal.ZERO);
         BigDecimal aging = computeAgingDue(party, asOfDate == null ? LocalDate.now() : asOfDate);
+        advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
+        advanceToParty = advanceToParty.max(BigDecimal.ZERO);
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         return new TradingDtos.PartyBalanceSummary(receivable, payable, advanceFromParty, advanceToParty, net, aging);
+    }
+
+    private BigDecimal openingBalanceForPartyAccount(Long partyId, String accountPrefix, LocalDateTime cutoff) {
+        return ledgerRepo.findByReferenceTypeAndReferenceId("OPENING_BALANCE", partyId).stream()
+                .filter(entry -> entry.getAccountCode().startsWith(accountPrefix))
+                .filter(entry -> !entry.getEntryTime().isAfter(cutoff))
+                .map(entry -> entry.getDebit().subtract(entry.getCredit()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private TradingDtos.SettlementInferenceResponse toInferenceResponse(Party party, TradeDeal deal, BigDecimal amount) {
