@@ -177,6 +177,8 @@ public class ExportController {
         private final float margin = 34f;
         private final float top = 806f;
         private final float bottom = 48f;
+        private final float tableHeaderHeight = 16f;
+        private final float tableRowHeight = 14f;
 
         private PDPage page;
         private PDPageContentStream cs;
@@ -215,34 +217,36 @@ public class ExportController {
         }
 
         private void drawHeader(boolean continued) throws IOException {
+            float logoSize = 34f;
+            float brandY = y - 16;
             if (logo != null) {
                 try {
                     PDImageXObject img = PDImageXObject.createFromByteArray(doc, logo, "logo");
-                    cs.drawImage(img, margin, y - 24, 24, 24);
+                    cs.drawImage(img, margin, y - logoSize, logoSize, logoSize);
                 } catch (IOException ignored) {
                     // fallback to text-only header
                 }
             }
-            text("NexPay", margin + 30, y - 5, bold, 16, new Color(17, 48, 87));
-            text("Transaction Details Report | Range: " + report.from() + " to " + report.to(), margin, y - 26, regular, 9, Color.DARK_GRAY);
-            text(String.format("Type=%s | Search=%s | Sort=%s %s",
-                    isBlank(report.typeFilter()) ? "ALL" : report.typeFilter(),
-                    isBlank(report.search()) ? "-" : report.search(),
-                    report.sortField(),
-                    report.sortDirection()), margin, y - 38, regular, 9, Color.DARK_GRAY);
+            text("NexPay", margin + logoSize + 8, brandY, bold, 22, new Color(17, 48, 87));
             if (continued) {
-                text("Continued", page.getMediaBox().getWidth() - margin - 40, y - 5, regular, 8, Color.GRAY);
+                text("Continued", page.getMediaBox().getWidth() - margin - 40, brandY, regular, 8, Color.GRAY);
             }
-            line(y - 44);
-            y -= 52;
+            line(y - 42);
+            y -= 56;
         }
 
         private void drawPartySection(TradingDtos.TransactionPartyExportSection section) throws IOException {
-            ensure(180);
-            fill(margin, y - 50, page.getMediaBox().getWidth() - margin * 2, 44, new Color(245, 248, 252));
-            text("Customer: " + safe(section.party().partyName()), margin + 8, y - 18, bold, 11, Color.BLACK);
-            text("Phone: " + safe(section.party().phone()) + "   Address: " + safe(section.party().address()), margin + 8, y - 34, regular, 9, Color.DARK_GRAY);
-            y -= 58;
+            ensure(190);
+            float cardWidth = page.getMediaBox().getWidth() - margin * 2;
+            fill(margin, y - 58, cardWidth, 52, new Color(245, 248, 252));
+            float innerX = margin + 8;
+            float phoneX = innerX;
+            float addressX = margin + cardWidth * 0.40f;
+            text("Customer: " + safe(section.party().partyName()), innerX, y - 19, bold, 11, Color.BLACK);
+            text("Phone: " + safe(section.party().phone()), phoneX, y - 36, regular, 9, Color.DARK_GRAY);
+            String address = "Address: " + safe(section.party().address());
+            text(truncate(address, cardWidth * 0.58f, 9), addressX, y - 36, regular, 9, Color.DARK_GRAY);
+            y -= 66;
 
             drawDealTable(section.deals(), section.dealSummary());
             y -= 6;
@@ -255,12 +259,12 @@ public class ExportController {
         private void drawDealTable(List<TradingDtos.TransactionDealExportRow> rows, TradingDtos.TransactionDealSummary summary) throws IOException {
             ensure(80);
             text("Deals", margin, y, bold, 11, new Color(17, 48, 87));
-            y -= 8;
+            y -= 10;
             String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Quantity", "Rate", "Amount"};
             float[] cols = {44, 60, 54, 58, 126, 60, 58, 74};
             tableHeader(headers, cols);
             for (TradingDtos.TransactionDealExportRow r : rows) {
-                ensure(16);
+                ensure(tableRowHeight + 2);
                 String[] cells = {
                         safe(r.dealId()),
                         safe(r.date()),
@@ -279,12 +283,12 @@ public class ExportController {
         private void drawSettlementTable(List<TradingDtos.TransactionSettlementExportRow> rows, TradingDtos.TransactionSettlementSummary summary) throws IOException {
             ensure(80);
             text("Settlements", margin, y, bold, 11, new Color(17, 48, 87));
-            y -= 8;
+            y -= 10;
             String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID"};
-            float[] cols = {72, 68, 58, 80, 116, 96};
+            float[] cols = {72, 66, 56, 122, 82, 92};
             tableHeader(headers, cols);
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
-                ensure(16);
+                ensure(tableRowHeight + 2);
                 String[] cells = {
                         safe(r.settlementId()),
                         safe(r.date()),
@@ -337,14 +341,14 @@ public class ExportController {
         }
 
         private void tableHeader(String[] headers, float[] cols) throws IOException {
-            ensure(18);
-            fill(margin, y - 15, sum(cols), 14, new Color(225, 233, 246));
+            ensure(tableHeaderHeight + 2);
+            fill(margin, y - tableHeaderHeight + 1, sum(cols), tableHeaderHeight, new Color(225, 233, 246));
             float x = margin + 2;
             for (int i = 0; i < headers.length; i++) {
-                text(headers[i], x, y - 5, bold, 8, new Color(32, 47, 82));
+                text(headers[i], x, y - 6, bold, 8, new Color(32, 47, 82));
                 x += cols[i];
             }
-            y -= 16;
+            y -= tableHeaderHeight;
             line(y + 3);
         }
 
@@ -359,7 +363,7 @@ public class ExportController {
                 }
                 x += cols[i];
             }
-            y -= 14;
+            y -= tableRowHeight;
         }
 
         private void text(String value, float x, float yAt, PDType1Font font, float size, Color color) throws IOException {
@@ -413,10 +417,6 @@ public class ExportController {
 
         private String safe(Object value) {
             return value == null ? "-" : String.valueOf(value);
-        }
-
-        private static boolean isBlank(String v) {
-            return v == null || v.isBlank();
         }
     }
 }
