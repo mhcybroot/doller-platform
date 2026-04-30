@@ -17,14 +17,18 @@ class DollerRepository {
 
   Future<AuthSession?> currentSession() => _store.readSession();
 
-  Future<AuthSession> login(String username, String password) async {
+  Future<AuthSession> login(
+    String username,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     final session = await _api.post<AuthSession>(
       '/auth/login',
       data: {'username': username, 'password': password},
       parser: (json) => AuthSession.fromJson(json as Map<String, dynamic>),
       queueOnNetworkFailure: false,
     );
-    await _store.saveSession(session);
+    await _store.saveSession(session, rememberMe: rememberMe);
     return session;
   }
 
@@ -35,7 +39,7 @@ class DollerRepository {
       parser: (json) => AuthSession.fromJson(json as Map<String, dynamic>),
       queueOnNetworkFailure: false,
     );
-    await _store.saveSession(session);
+    await _store.saveSession(session, rememberMe: true);
     return session;
   }
 

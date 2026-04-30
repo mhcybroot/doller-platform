@@ -238,7 +238,7 @@ class ApiClient {
     try {
       return await sender();
     } on DioException catch (error) {
-      if (error.response?.statusCode == 401) {
+      if (_isSessionExpiredResponse(error)) {
         final refreshed = await _refreshSession();
         if (refreshed != null) {
           return sender();
@@ -257,6 +257,32 @@ class ApiClient {
     await _store.clear();
     SessionNavigator.forceLogoutToLogin();
     _logoutInProgress = false;
+  }
+
+  bool _isSessionExpiredResponse(DioException error) {
+    final status = error.response?.statusCode;
+    if (status == 401) {
+      return true;
+    }
+    if (status != 403) {
+      return false;
+    }
+    final path = error.requestOptions.path;
+    if (path.startsWith('/auth/')) {
+      return false;
+    }
+    final data = error.response?.data;
+    if (data is Map<String, dynamic>) {
+      final message = (data['message'] as String? ?? '').toLowerCase();
+      if (message.contains('token') ||
+          message.contains('jwt') ||
+          message.contains('forbidden') ||
+          message.contains('access denied') ||
+          message.contains('expired')) {
+        return true;
+      }
+    }
+    return true;
   }
 
   Future<AuthSession?> _refreshSession() async {
@@ -296,6 +322,24 @@ class ApiClient {
 
   ApiException _mapError(DioException error) {
     final traceId = error.requestOptions.extra['traceId'] as String?;
+    final statusCode = error.response?.statusCode;
+    final path = error.requestOptions.path;
+    if ((statusCode == 401 || statusCode == 403) && !path.startsWith('/auth/')) {
+      AppLogger.log(
+        'api',
+        'mapped_error',
+        traceId: traceId,
+        fields: {
+          'type': error.type.name,
+          'statusCode': statusCode,
+          'mappedMessage': 'Session expired. Please login again.',
+        },
+      );
+      return const ApiException(
+        'Session expired. Please login again.',
+        statusCode: 401,
+      );
+    }
     if (_shouldQueue(error)) {
       AppLogger.log(
         'api',
@@ -325,7 +369,7 @@ class ApiClient {
           'mappedMessage': message,
         },
       );
-      return ApiException(message, statusCode: error.response?.statusCode);
+      return ApiException(message, statusCode: statusCode);
     }
     AppLogger.log(
       'api',
@@ -333,13 +377,13 @@ class ApiClient {
       traceId: traceId,
       fields: {
         'type': error.type.name,
-        'statusCode': error.response?.statusCode,
+        'statusCode': statusCode,
         'mappedMessage': error.message ?? 'Network request failed',
       },
     );
     return ApiException(
       error.message ?? 'Network request failed',
-      statusCode: error.response?.statusCode,
+      statusCode: statusCode,
     );
   }
 }

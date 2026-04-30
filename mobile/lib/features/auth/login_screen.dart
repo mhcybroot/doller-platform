@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
+  bool _rememberMe = true;
 
   Future<void> _submit() async {
     setState(() => _loading = true);
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final AuthSession session = await repository.login(
         _userController.text.trim(),
         _passwordController.text,
+        rememberMe: _rememberMe,
       );
       if (!mounted) {
         return;
@@ -116,6 +118,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: const InputDecoration(labelText: 'Password'),
                     ),
                     const SizedBox(height: 18),
+                    CheckboxListTile(
+                      value: _rememberMe,
+                      onChanged: _loading
+                          ? null
+                          : (value) {
+                              setState(() => _rememberMe = value ?? false);
+                            },
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Remember me (24 hours)'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
