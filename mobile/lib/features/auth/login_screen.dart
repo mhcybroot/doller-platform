@@ -81,15 +81,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Text(
                       'NexPay',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                              ),
                     ),
                     const SizedBox(height: 14),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.asset(
-                        'web/icons/Icon-512.png',
+                        'assets/logo.jpeg',
                         height: 56,
                         width: 56,
                         fit: BoxFit.cover,
@@ -116,7 +117,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ChoiceChip(
                             label: const Text('Login'),
                             selected: !_initMode,
-                            onSelected: (_) => setState(() => _initMode = false),
+                            onSelected: (_) =>
+                                setState(() => _initMode = false),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -155,7 +157,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 18),
                     ElevatedButton(
                       onPressed: _loading ? null : _submit,
-                      child: Text(_loading ? 'Working...' : (_initMode ? 'Create Owner' : 'Login')),
+                      child: Text(_loading
+                          ? 'Working...'
+                          : (_initMode ? 'Create Owner' : 'Login')),
                     ),
                   ],
                 ),
