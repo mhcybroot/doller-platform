@@ -6,6 +6,7 @@ const List<String> supportedInstrumentCodes = [
   'USD_HK',
   'USD_CN',
   'USD_MV',
+  'EXCHANGE_FEE',
   'RMB',
   'MYR',
   'AED',
@@ -16,6 +17,7 @@ const List<String> supportedInstrumentCodes = [
   'SAR',
   'HKD',
   'EUR',
+  'INR',
 ];
 
 const Map<String, String> _instrumentDisplayNames = {
@@ -26,6 +28,7 @@ const Map<String, String> _instrumentDisplayNames = {
   'USD_HK': 'US DOLLAR HONGKONG 🇺🇸🇭🇰',
   'USD_CN': 'US DOLLAR CHINA 🇺🇸🇨🇳',
   'USD_MV': 'US DOLLAR MALDIVES 🇺🇸🇲🇻',
+  'EXCHANGE_FEE': 'EXCHANGE FEE',
   'RMB': 'RMB 🇨🇳',
   'MYR': 'RINGGIT 🇲🇾',
   'AED': 'DIRHAM 🇦🇪',
@@ -36,6 +39,7 @@ const Map<String, String> _instrumentDisplayNames = {
   'SAR': 'SAUDI RIYAL 🇸🇦',
   'HKD': 'HONGKONG DOLLAR 🇭🇰',
   'EUR': 'EURO 🇪🇺',
+  'INR': 'INDIAN RUPEE 🇮🇳',
 };
 
 String instrumentDisplayName(String code) {

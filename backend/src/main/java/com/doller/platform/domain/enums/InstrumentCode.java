@@ -8,6 +8,7 @@ public enum InstrumentCode {
     USD_HK,
     USD_CN,
     USD_MV,
+    EXCHANGE_FEE,
     RMB,
     MYR,
     AED,
@@ -17,5 +18,6 @@ public enum InstrumentCode {
     CAD,
     SAR,
     HKD,
-    EUR
+    EUR,
+    INR
 }
