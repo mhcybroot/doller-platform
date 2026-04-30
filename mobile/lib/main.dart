@@ -8,6 +8,7 @@ import 'shared/models/auth_models.dart';
 import 'shared/services/api_client.dart';
 import 'shared/services/auth_store.dart';
 import 'shared/services/doller_repository.dart';
+import 'shared/services/session_navigator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,7 @@ class DollerApp extends StatelessWidget {
       title: 'NexPay',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
+      navigatorKey: SessionNavigator.navigatorKey,
       home: const AppBootstrap(),
     );
   }

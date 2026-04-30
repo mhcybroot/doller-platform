@@ -8,6 +8,7 @@ import '../config/app_env.dart';
 import 'app_logger.dart';
 import 'auth_store.dart';
 import 'outbox_store.dart';
+import 'session_navigator.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -137,6 +138,7 @@ class ApiClient {
   final AuthStore _store;
   final OutboxStore _outbox = OutboxStore();
   Future<AuthSession?>? _refreshing;
+  bool _logoutInProgress = false;
 
   Future<T> get<T>(
     String path, {
@@ -241,9 +243,20 @@ class ApiClient {
         if (refreshed != null) {
           return sender();
         }
+        await _forceLogoutOnUnauthorized();
       }
       rethrow;
     }
+  }
+
+  Future<void> _forceLogoutOnUnauthorized() async {
+    if (_logoutInProgress) {
+      return;
+    }
+    _logoutInProgress = true;
+    await _store.clear();
+    SessionNavigator.forceLogoutToLogin();
+    _logoutInProgress = false;
   }
 
   Future<AuthSession?> _refreshSession() async {
