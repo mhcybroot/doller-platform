@@ -287,7 +287,29 @@ public class TradingDtos {
             TransactionSettlementSummary grandSettlementSummary,
             PartyBalanceSummary grandExposureSummary
     ) {}
-    public record PartyLedgerLine(String kind, LocalDateTime time, BigDecimal amount, String note) {}
+    public record PartyLedgerLine(
+            String kind,
+            LocalDateTime time,
+            BigDecimal amount,
+            String note,
+            String entryType,
+            Long entryId,
+            LocalDateTime occurredAt,
+            Long partyId,
+            String partyName,
+            Long tradeDealId,
+            String instrumentCode,
+            BigDecimal quantity,
+            BigDecimal amountBdt,
+            BigDecimal bdtRate,
+            String directionLabel,
+            String referenceLabel,
+            String paymentMethod,
+            String paymentReference,
+            String notes,
+            String expenseType,
+            String category
+    ) {}
     public record PartyLedgerResponse(Long partyId, String partyName, PartyBalanceSummary balances, List<PartyLedgerLine> lines) {}
     public record DayCloseResponse(LocalDate date, boolean locked, String auditRef, BigDecimal openingCash, BigDecimal closingCash, BigDecimal openingUsd, BigDecimal closingUsd, BigDecimal pnl) {}
     public record ReopenDayRequest(@NotBlank String reason) {}

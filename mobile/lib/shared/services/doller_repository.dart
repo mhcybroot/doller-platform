@@ -489,10 +489,27 @@ class DollerRepository {
     );
   }
 
-  Future<PartyLedgerModel> partyLedger(int partyId) async {
+  Future<PartyLedgerModel> partyLedger(
+    int partyId, {
+    DateTime? from,
+    DateTime? to,
+    String? type,
+    String? search,
+    String? sortField,
+    String? sortDirection,
+  }) async {
     AppLogger.log('repo', 'partyLedger:start', fields: {'partyId': partyId});
     final result = await _api.get<PartyLedgerModel>(
       '/ledgers/party/$partyId',
+      query: {
+        if (from != null) 'from': _date(from),
+        if (to != null) 'to': _date(to),
+        if (type != null && type.isNotEmpty) 'type': type,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (sortField != null && sortField.isNotEmpty) 'sortField': sortField,
+        if (sortDirection != null && sortDirection.isNotEmpty)
+          'sortDirection': sortDirection,
+      },
       parser: (json) => PartyLedgerModel.fromJson(json as Map<String, dynamic>),
     );
     AppLogger.log('repo', 'partyLedger:success', fields: {

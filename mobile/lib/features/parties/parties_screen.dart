@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/instruments/instrument_labels.dart';
 import '../../shared/models/auth_models.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
@@ -256,103 +257,389 @@ class _PartiesScreenState extends State<PartiesScreen> {
       'partyName': party.name,
     });
     try {
-      final ledger = await widget.repository.partyLedger(party.id);
       if (!mounted) {
         return;
       }
-      AppLogger.log('screen:party-ledger', 'open:success', fields: {
-        'partyId': party.id,
-        'partyName': party.name,
-        'receivableBdt': ledger.balances.receivableBdt,
-        'payableBdt': ledger.balances.payableBdt,
-        'netBalanceBdt': ledger.balances.netBalanceBdt,
-        'lineCount': ledger.lines.length,
-      });
+      DateTime from = DateTime.now();
+      DateTime to = DateTime.now();
+      String type = '';
+      String sortField = 'occurredAt';
+      String sortDirection = 'desc';
+      final searchController = TextEditingController();
+      PartyLedgerModel? ledger;
+      bool loading = true;
+      bool networkError = false;
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         builder: (context) {
+          bool loaded = false;
           return DraggableScrollableSheet(
             expand: false,
-            initialChildSize: 0.84,
-            builder: (context, controller) {
-              return Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ledger.partyName,
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        BalancePill(
-                          label: 'Receivable',
-                          value: _formatSignedAmount(
-                            ledger.balances.receivableBdt,
-                            positiveSign: '+',
-                          ),
-                          tone: BalancePillTone.receivable,
-                        ),
-                        BalancePill(
-                          label: 'Payable',
-                          value: _formatSignedAmount(
-                            ledger.balances.payableBdt,
-                            positiveSign: '+',
-                          ),
-                          tone: BalancePillTone.payable,
-                        ),
-                        BalancePill(
-                          label: 'Advance In',
-                          value: formatBdt(ledger.balances.advanceFromPartyBdt),
-                          tone: BalancePillTone.advanceIn,
-                        ),
-                        BalancePill(
-                          label: 'Advance Out',
-                          value: formatBdt(ledger.balances.advanceToPartyBdt),
-                          tone: BalancePillTone.advanceOut,
-                        ),
-                        BalancePill(
-                          label: 'Net Position',
-                          value: _formatSignedAmount(
-                              ledger.balances.netBalanceBdt),
-                          tone: ledger.balances.netBalanceBdt >= 0
-                              ? BalancePillTone.netPositive
-                              : BalancePillTone.netNegative,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: controller,
-                        itemCount: ledger.lines.length,
-                        itemBuilder: (context, index) {
-                          final line = ledger.lines[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(line.kind),
-                            subtitle: Text(
-                                '${formatDateTime(line.time)}  ${line.note ?? ''}'),
-                            trailing: Text(
-                              _formatSignedAmount(line.amount),
-                              style: TextStyle(
-                                color: line.amount >= 0
-                                    ? Colors.green.shade700
-                                    : Colors.red.shade700,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          );
-                        },
+            initialChildSize: 0.92,
+            builder: (context, controller) => StatefulBuilder(
+              builder: (context, setModalState) {
+                Future<void> loadLedger() async {
+                  setModalState(() => loading = true);
+                  try {
+                    final result = await widget.repository.partyLedger(
+                      party.id,
+                      from: from,
+                      to: to,
+                      type: type,
+                      search: searchController.text,
+                      sortField: sortField,
+                      sortDirection: sortDirection,
+                    );
+                    AppLogger.log('screen:party-ledger', 'open:success', fields: {
+                      'partyId': party.id,
+                      'partyName': party.name,
+                      'receivableBdt': result.balances.receivableBdt,
+                      'payableBdt': result.balances.payableBdt,
+                      'netBalanceBdt': result.balances.netBalanceBdt,
+                      'lineCount': result.lines.length,
+                    });
+                    setModalState(() {
+                      ledger = result;
+                      networkError = false;
+                      loading = false;
+                    });
+                  } on ApiException catch (error) {
+                    setModalState(() {
+                      ledger = null;
+                      networkError = error.isNetworkError;
+                      loading = false;
+                    });
+                    if (context.mounted) {
+                      showAppMessage(context, error.message, isError: true);
+                    }
+                  }
+                }
+
+                if (!loaded) {
+                  loaded = true;
+                  Future.microtask(loadLedger);
+                }
+
+                if (loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (ledger == null) {
+                  return Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: EmptyStateCard(
+                      title: networkError
+                          ? 'No internet connection'
+                          : 'No party details',
+                      message: networkError
+                          ? 'Please check your network and try again.'
+                          : 'Could not load party transactions right now.',
+                      action: ElevatedButton(
+                        onPressed: loadLedger,
+                        child: const Text('Retry'),
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ledger!.partyName,
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          BalancePill(
+                            label: 'Receivable',
+                            value: _formatSignedAmount(
+                              ledger!.balances.receivableBdt,
+                              positiveSign: '+',
+                            ),
+                            tone: BalancePillTone.receivable,
+                          ),
+                          BalancePill(
+                            label: 'Payable',
+                            value: _formatSignedAmount(
+                              ledger!.balances.payableBdt,
+                              positiveSign: '+',
+                            ),
+                            tone: BalancePillTone.payable,
+                          ),
+                          BalancePill(
+                            label: 'Advance In',
+                            value: formatBdt(ledger!.balances.advanceFromPartyBdt),
+                            tone: BalancePillTone.advanceIn,
+                          ),
+                          BalancePill(
+                            label: 'Advance Out',
+                            value: formatBdt(ledger!.balances.advanceToPartyBdt),
+                            tone: BalancePillTone.advanceOut,
+                          ),
+                          BalancePill(
+                            label: 'Net Position',
+                            value: _formatSignedAmount(
+                                ledger!.balances.netBalanceBdt),
+                            tone: ledger!.balances.netBalanceBdt >= 0
+                                ? BalancePillTone.netPositive
+                                : BalancePillTone.netNegative,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      FinanceSection(
+                        title: 'Filters',
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: from,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked == null) return;
+                                      setModalState(() => from = picked);
+                                      await loadLedger();
+                                    },
+                                    child: Text('From ${formatDate(from)}'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: to,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked == null) return;
+                                      setModalState(() => to = picked);
+                                      await loadLedger();
+                                    },
+                                    child: Text('To ${formatDate(to)}'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: searchController,
+                              onSubmitted: (_) => loadLedger(),
+                              decoration: InputDecoration(
+                                labelText: 'Search',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: IconButton(
+                                  onPressed: loadLedger,
+                                  icon: const Icon(Icons.arrow_forward),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue: type.isEmpty ? 'ALL' : type,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'ALL', child: Text('All Types')),
+                                DropdownMenuItem(
+                                    value: 'DEAL', child: Text('Deals')),
+                                DropdownMenuItem(
+                                    value: 'SETTLEMENT',
+                                    child: Text('Settlements')),
+                                DropdownMenuItem(
+                                    value: 'EXPENSE', child: Text('Expenses')),
+                                DropdownMenuItem(
+                                    value: 'OPENING_BALANCE',
+                                    child: Text('Opening Balance')),
+                              ],
+                              onChanged: (value) async {
+                                setModalState(() => type =
+                                    value == null || value == 'ALL' ? '' : value);
+                                await loadLedger();
+                              },
+                              decoration: const InputDecoration(labelText: 'Type'),
+                            ),
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue: sortField,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'occurredAt',
+                                    child: Text('Sort by Date')),
+                                DropdownMenuItem(
+                                    value: 'amountBdt',
+                                    child: Text('Sort by Amount')),
+                                DropdownMenuItem(
+                                    value: 'entryType',
+                                    child: Text('Sort by Type')),
+                                DropdownMenuItem(
+                                    value: 'partyName',
+                                    child: Text('Sort by Party')),
+                              ],
+                              onChanged: (value) async {
+                                setModalState(
+                                    () => sortField = value ?? 'occurredAt');
+                                await loadLedger();
+                              },
+                              decoration:
+                                  const InputDecoration(labelText: 'Sort Field'),
+                            ),
+                            const SizedBox(height: 10),
+                            DropdownButtonFormField<String>(
+                              initialValue: sortDirection,
+                              isExpanded: true,
+                              items: const [
+                                DropdownMenuItem(
+                                    value: 'desc',
+                                    child: Text('Newest / Highest')),
+                                DropdownMenuItem(
+                                    value: 'asc', child: Text('Oldest / Lowest')),
+                              ],
+                              onChanged: (value) async {
+                                setModalState(
+                                    () => sortDirection = value ?? 'desc');
+                                await loadLedger();
+                              },
+                              decoration: const InputDecoration(
+                                  labelText: 'Sort Direction'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: ledger!.lines.isEmpty
+                            ? const EmptyStateCard(
+                                title: 'No transactions found',
+                                message:
+                                    'Try another date range, type, search term, or sort.',
+                              )
+                            : ListView(
+                                controller: controller,
+                                children: ledger!.lines
+                                    .map((row) => Card(
+                                          margin:
+                                              const EdgeInsets.only(bottom: 10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        row.referenceLabel ??
+                                                            '${row.entryType} #${row.entryId}',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .titleMedium,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      _formatSignedLedgerRowAmount(
+                                                          row),
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .titleMedium
+                                                          ?.copyWith(
+                                                            color:
+                                                                _ledgerRowAmountColor(
+                                                                    row),
+                                                          ),
+                                                    ),
+                                                    if (_canMutateLedgerRow(row))
+                                                      PopupMenuButton<String>(
+                                                        onSelected:
+                                                            (value) async {
+                                                          if (value == 'edit') {
+                                                            await _editLedgerRow(
+                                                                row,
+                                                                party,
+                                                                loadLedger);
+                                                            return;
+                                                          }
+                                                          if (value ==
+                                                              'delete') {
+                                                            await _deleteLedgerRow(
+                                                                row, loadLedger);
+                                                          }
+                                                        },
+                                                        itemBuilder: (context) =>
+                                                            const [
+                                                          PopupMenuItem(
+                                                              value: 'edit',
+                                                              child:
+                                                                  Text('Edit')),
+                                                          PopupMenuItem(
+                                                              value: 'delete',
+                                                              child:
+                                                                  Text('Delete')),
+                                                        ],
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                    '${_entryTypeLabel(row.entryType)} • ${formatDateTime(row.occurredAt)}'),
+                                                if ((row.partyName ?? '')
+                                                    .isNotEmpty)
+                                                  Text('Party: ${row.partyName}'),
+                                                if ((row.directionLabel ?? '')
+                                                    .isNotEmpty)
+                                                  Text(
+                                                      'Direction: ${row.directionLabel}'),
+                                                if ((row.paymentMethod ?? '')
+                                                    .isNotEmpty)
+                                                  Text(
+                                                      'Payment: ${row.paymentMethod == 'CHECK' ? 'CHEQUE' : row.paymentMethod}'),
+                                                if ((row.paymentReference ?? '')
+                                                    .isNotEmpty)
+                                                  Text(
+                                                      'Reference: ${row.paymentReference}'),
+                                                if ((row.instrumentCode ?? '')
+                                                    .isNotEmpty)
+                                                  Text(
+                                                      'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),
+                                                if (row.quantity != null)
+                                                  Text('Amount: ${row.quantity}'),
+                                                if (row.bdtRate != null)
+                                                  Text('Rate: ${row.bdtRate}'),
+                                                if ((row.category ?? '')
+                                                    .isNotEmpty)
+                                                  Text(
+                                                      'Category: ${row.category}'),
+                                                if ((row.notes ?? '')
+                                                    .isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(row.notes!),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           );
         },
       );
@@ -367,6 +654,480 @@ class _PartiesScreenState extends State<PartiesScreen> {
       });
       showAppMessage(context, error.message, isError: true);
     }
+  }
+
+  bool _canMutateLedgerRow(PartyLedgerLineModel row) {
+    return widget.session.isOwner &&
+        (row.entryType == 'DEAL' ||
+            row.entryType == 'SETTLEMENT' ||
+            row.entryType == 'EXPENSE');
+  }
+
+  Future<void> _deleteLedgerRow(
+    PartyLedgerLineModel row,
+    Future<void> Function() reload,
+  ) async {
+    if (row.entryType == 'OPENING_BALANCE') {
+      showAppMessage(context, 'Opening balance entries cannot be deleted.',
+          isError: true);
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Transaction'),
+        content: Text('Delete ${row.referenceLabel ?? row.entryType}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      if (row.entryType == 'DEAL') {
+        await widget.repository.deleteDeal(row.entryId);
+      } else if (row.entryType == 'SETTLEMENT') {
+        await widget.repository.deleteSettlement(row.entryId);
+      } else if (row.entryType == 'EXPENSE') {
+        await widget.repository.deleteExpense(row.entryId);
+      }
+      if (!mounted) return;
+      showAppMessage(context, 'Transaction deleted');
+      await reload();
+      await _load();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      showAppMessage(context, error.message, isError: true);
+    }
+  }
+
+  Future<void> _editLedgerRow(
+    PartyLedgerLineModel row,
+    PartyModel party,
+    Future<void> Function() reload,
+  ) async {
+    if (row.entryType == 'OPENING_BALANCE') {
+      showAppMessage(context, 'Opening balance entries are not editable.',
+          isError: true);
+      return;
+    }
+    if (row.entryType == 'DEAL') {
+      await _editLedgerDeal(row, reload);
+      return;
+    }
+    if (row.entryType == 'SETTLEMENT') {
+      await _editLedgerSettlement(row, reload);
+      return;
+    }
+    if (row.entryType == 'EXPENSE') {
+      await _editLedgerExpense(row, reload);
+      return;
+    }
+    showAppMessage(context, 'Unsupported entry type for edit.', isError: true);
+  }
+
+  Future<void> _editLedgerDeal(
+    PartyLedgerLineModel row,
+    Future<void> Function() reload,
+  ) async {
+    if (row.partyId == null ||
+        row.instrumentCode == null ||
+        row.quantity == null ||
+        row.bdtRate == null ||
+        row.directionLabel == null) {
+      showAppMessage(context, 'This deal row is missing required data.',
+          isError: true);
+      return;
+    }
+    final qty = TextEditingController(text: row.quantity!.toString());
+    final rate = TextEditingController(text: row.bdtRate!.toString());
+    final notes = TextEditingController(text: row.notes ?? '');
+    int selectedPartyId = row.partyId!;
+    String selectedInstrument = row.instrumentCode!;
+    String dealType =
+        row.directionLabel!.toUpperCase().contains('SELL') ? 'SELL' : 'BUY';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            24,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Deal', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: dealType,
+                items: const [
+                  DropdownMenuItem(value: 'BUY', child: Text('BUY')),
+                  DropdownMenuItem(value: 'SELL', child: Text('SELL')),
+                ],
+                onChanged: (value) =>
+                    setModalState(() => dealType = value ?? 'BUY'),
+                decoration: const InputDecoration(labelText: 'Deal Type'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                value: selectedPartyId,
+                isExpanded: true,
+                items: _parties
+                    .map((party) => DropdownMenuItem<int>(
+                          value: party.id,
+                          child: Text(party.name),
+                        ))
+                    .toList(),
+                onChanged: (value) => setModalState(
+                    () => selectedPartyId = value ?? selectedPartyId),
+                decoration: const InputDecoration(labelText: 'Party'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedInstrument,
+                items: supportedInstrumentCodes
+                    .map((code) => DropdownMenuItem<String>(
+                          value: code,
+                          child: Text(instrumentDisplayName(code)),
+                        ))
+                    .toList(),
+                onChanged: (value) => setModalState(
+                    () => selectedInstrument = value ?? selectedInstrument),
+                decoration: const InputDecoration(labelText: 'Instrument'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: qty,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: rate,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Rate')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await widget.repository.updateDeal(
+                      id: row.entryId,
+                      dealType: dealType,
+                      partyId: selectedPartyId,
+                      instrumentCode: selectedInstrument,
+                      quantity: double.parse(qty.text),
+                      bdtRate: double.parse(rate.text),
+                      dealTime: row.occurredAt,
+                      notes: notes.text.trim(),
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                  } on ApiException catch (error) {
+                    showAppMessage(context, error.message, isError: true);
+                  } on FormatException {
+                    showAppMessage(context, 'Enter valid numbers',
+                        isError: true);
+                  }
+                },
+                child: const Text('Update Deal'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await reload();
+    await _load();
+  }
+
+  Future<void> _editLedgerSettlement(
+    PartyLedgerLineModel row,
+    Future<void> Function() reload,
+  ) async {
+    if (row.partyId == null) {
+      showAppMessage(context, 'This settlement row is missing party data.',
+          isError: true);
+      return;
+    }
+    final amount = TextEditingController(text: row.amountBdt.toString());
+    final paymentRef = TextEditingController(text: row.paymentReference ?? '');
+    final notes = TextEditingController(text: row.notes ?? '');
+    bool allowAdvance = row.directionLabel?.contains(' / NONE') ?? false;
+    int selectedPartyId = row.partyId!;
+    int? selectedDealId = row.tradeDealId;
+    List<DealSummary> partyDeals = const [];
+    try {
+      partyDeals = await widget.repository.listDeals(partyId: selectedPartyId);
+    } on ApiException {}
+    String paymentMethod = (row.paymentMethod ?? 'CASH').toUpperCase();
+    if (paymentMethod != 'BANK' &&
+        paymentMethod != 'CHECK' &&
+        paymentMethod != 'CASH') {
+      paymentMethod = 'CASH';
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            24,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Settlement',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount (BDT)')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                value: selectedPartyId,
+                isExpanded: true,
+                items: _parties
+                    .map((party) => DropdownMenuItem<int>(
+                          value: party.id,
+                          child: Text(party.name),
+                        ))
+                    .toList(),
+                onChanged: (value) async {
+                  if (value == null) return;
+                  final deals = await widget.repository.listDeals(partyId: value);
+                  setModalState(() {
+                    selectedPartyId = value;
+                    partyDeals = deals;
+                    selectedDealId = null;
+                  });
+                },
+                decoration: const InputDecoration(labelText: 'Party'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
+                value: selectedDealId,
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem<int?>(
+                      value: null, child: Text('No Related Deal')),
+                  ...partyDeals.map(
+                    (deal) => DropdownMenuItem<int?>(
+                      value: deal.id,
+                      child: Text('Deal #${deal.id} • ${deal.dealType}'),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setModalState(() => selectedDealId = value),
+                decoration: const InputDecoration(labelText: 'Related Deal'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: paymentMethod,
+                items: const [
+                  DropdownMenuItem(value: 'CASH', child: Text('CASH')),
+                  DropdownMenuItem(value: 'BANK', child: Text('BANK')),
+                  DropdownMenuItem(value: 'CHECK', child: Text('CHEQUE')),
+                ],
+                onChanged: (value) =>
+                    setModalState(() => paymentMethod = value ?? 'CASH'),
+                decoration: const InputDecoration(labelText: 'Payment Method'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: paymentRef,
+                  decoration:
+                      const InputDecoration(labelText: 'Payment Reference')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                value: allowAdvance,
+                onChanged: (value) => setModalState(() => allowAdvance = value),
+                title: const Text('Allow Advance'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await widget.repository.updateSettlement(
+                      id: row.entryId,
+                      partyId: selectedPartyId,
+                      tradeDealId: selectedDealId,
+                      amount: double.parse(amount.text),
+                      paymentMethod: paymentMethod,
+                      paymentReference: paymentRef.text.trim().isEmpty
+                          ? null
+                          : paymentRef.text.trim(),
+                      allowAdvance: allowAdvance,
+                      notes: notes.text.trim(),
+                      settlementTime: row.occurredAt,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                  } on ApiException catch (error) {
+                    showAppMessage(context, error.message, isError: true);
+                  } on FormatException {
+                    showAppMessage(context, 'Enter valid numbers',
+                        isError: true);
+                  }
+                },
+                child: const Text('Update Settlement'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await reload();
+    await _load();
+  }
+
+  Future<void> _editLedgerExpense(
+    PartyLedgerLineModel row,
+    Future<void> Function() reload,
+  ) async {
+    final amount = TextEditingController(text: row.amountBdt.toString());
+    final category = TextEditingController(text: row.category ?? 'OTHER');
+    final notes = TextEditingController(text: row.notes ?? '');
+    String expenseType = row.expenseType ?? 'OTHER';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            24,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Expense',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: amount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Amount (BDT)')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: expenseType,
+                items: const [
+                  DropdownMenuItem(
+                      value: 'OFFICE_MANAGEMENT',
+                      child: Text('OFFICE MANAGEMENT')),
+                  DropdownMenuItem(value: 'TRANSPORT', child: Text('TRANSPORT')),
+                  DropdownMenuItem(value: 'UTILITY', child: Text('UTILITY')),
+                  DropdownMenuItem(value: 'RENT', child: Text('RENT')),
+                  DropdownMenuItem(
+                      value: 'EMPLOYEE_SALARY', child: Text('EMPLOYEE SALARY')),
+                  DropdownMenuItem(value: 'OTHER', child: Text('OTHER')),
+                ],
+                onChanged: (value) =>
+                    setModalState(() => expenseType = value ?? expenseType),
+                decoration: const InputDecoration(labelText: 'Expense Type'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: category,
+                  decoration: const InputDecoration(labelText: 'Category')),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await widget.repository.updateExpense(
+                      id: row.entryId,
+                      expenseType: expenseType,
+                      amount: double.parse(amount.text),
+                      category: category.text.trim(),
+                      notes: notes.text.trim(),
+                      expenseTime: row.occurredAt,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                  } on ApiException catch (error) {
+                    showAppMessage(context, error.message, isError: true);
+                  } on FormatException {
+                    showAppMessage(context, 'Enter valid numbers',
+                        isError: true);
+                  }
+                },
+                child: const Text('Update Expense'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await reload();
+    await _load();
+  }
+
+  String _entryTypeLabel(String entryType) {
+    switch (entryType) {
+      case 'OPENING_BALANCE':
+        return 'Opening Balance';
+      case 'SETTLEMENT':
+        return 'Settlement';
+      case 'EXPENSE':
+        return 'Expense';
+      case 'DEAL':
+        return 'Deal';
+      default:
+        return entryType;
+    }
+  }
+
+  String _formatSignedLedgerRowAmount(PartyLedgerLineModel row) {
+    final amount = row.amountBdt;
+    if (amount == 0) {
+      return formatBdt(0);
+    }
+    final direction = (row.directionLabel ?? '').toUpperCase();
+    final isOpeningPayable =
+        row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
+    final isOutgoingSettlement =
+        row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING');
+    final sign =
+        row.entryType == 'EXPENSE' || isOutgoingSettlement || isOpeningPayable
+            ? '-'
+            : '+';
+    return '$sign${formatBdt(amount.abs())}';
+  }
+
+  Color _ledgerRowAmountColor(PartyLedgerLineModel row) {
+    final direction = (row.directionLabel ?? '').toUpperCase();
+    final isOpeningPayable =
+        row.entryType == 'OPENING_BALANCE' && direction.contains('PAYABLE');
+    final isNegative = row.entryType == 'EXPENSE' ||
+        (row.entryType == 'SETTLEMENT' && direction.startsWith('OUTGOING')) ||
+        isOpeningPayable;
+    return isNegative ? Colors.red.shade700 : Colors.green.shade700;
   }
 
   @override

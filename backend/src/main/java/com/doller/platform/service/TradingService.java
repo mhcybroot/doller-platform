@@ -758,31 +758,46 @@ public class TradingService {
     }
 
     public TradingDtos.PartyLedgerResponse partyLedger(Long partyId) {
-        Party p = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
-        List<TradingDtos.PartyLedgerLine> lines = new ArrayList<>();
+        return partyLedger(partyId, null, null, null, null, null, null);
+    }
 
-        var deals = dealRepo.findByDeletedFalse().stream().filter(d -> d.getParty().getId().equals(partyId)).toList();
-        for (TradeDeal d : deals) {
-            BigDecimal signed = d.getDealType() == DealType.SELL ? d.getBdtGross() : d.getBdtGross().negate();
-            lines.add(new TradingDtos.PartyLedgerLine("DEAL-" + d.getDealType() + "-" + d.getInstrumentCode(), d.getDealTime(), signed, d.getNotes()));
-        }
-        for (Settlement s : settlementRepo.findByPartyAndDeletedFalseOrderBySettlementTimeAsc(p)) {
-            lines.add(new TradingDtos.PartyLedgerLine(
-                    "SETTLEMENT-" + s.getDirection() + "-" + s.getBasis(),
-                    s.getSettlementTime(),
-                    settlementNetEffect(s),
-                    s.getNotes()
-            ));
-        }
-        ledgerRepo.findByReferenceTypeAndReferenceId("OPENING_BALANCE", partyId).stream()
-                .filter(entry -> entry.getAccountCode().startsWith("RECEIVABLE_") || entry.getAccountCode().startsWith("PAYABLE_"))
-                .forEach(entry -> lines.add(new TradingDtos.PartyLedgerLine(
-                        "OPENING_BALANCE-" + (entry.getAccountCode().startsWith("RECEIVABLE_") ? "RECEIVABLE" : "PAYABLE"),
-                        entry.getEntryTime(),
-                        entry.getDebit().subtract(entry.getCredit()),
-                        entry.getNarration()
-                )));
-        lines.sort(Comparator.comparing(TradingDtos.PartyLedgerLine::time));
+    public TradingDtos.PartyLedgerResponse partyLedger(
+            Long partyId,
+            LocalDate from,
+            LocalDate to,
+            String type,
+            String search,
+            String sortField,
+            String sortDirection
+    ) {
+        Party p = partyRepo.findByIdAndDeletedFalse(partyId).orElseThrow(() -> new ApiException("Party not found"));
+        TradingDtos.TransactionDetailsResponse details =
+                transactionDetails(from, to, type, partyId, search, sortField, sortDirection);
+        List<TradingDtos.PartyLedgerLine> lines = details.rows().stream()
+                .map(row -> new TradingDtos.PartyLedgerLine(
+                        partyLedgerKind(row),
+                        row.occurredAt(),
+                        partyLedgerSignedAmount(row),
+                        row.notes(),
+                        row.entryType(),
+                        row.entryId(),
+                        row.occurredAt(),
+                        row.partyId(),
+                        row.partyName(),
+                        row.tradeDealId(),
+                        row.instrumentCode(),
+                        row.quantity(),
+                        row.amountBdt(),
+                        row.bdtRate(),
+                        row.directionLabel(),
+                        row.referenceLabel(),
+                        row.paymentMethod(),
+                        row.paymentReference(),
+                        row.notes(),
+                        row.expenseType(),
+                        row.category()
+                ))
+                .toList();
         TradingDtos.PartyLedgerResponse response =
                 new TradingDtos.PartyLedgerResponse(p.getId(), p.getName(), partyBalanceSummary(p), lines);
         if (tradingDebug) {
@@ -796,6 +811,37 @@ public class TradingService {
                     response.lines().size());
         }
         return response;
+    }
+
+    private String partyLedgerKind(TradingDtos.TransactionDetailRow row) {
+        if ("DEAL".equals(row.entryType())) {
+            return "DEAL-" + row.directionLabel() + "-" + row.instrumentCode();
+        }
+        if ("SETTLEMENT".equals(row.entryType())) {
+            return "SETTLEMENT-" + (row.directionLabel() == null ? "" : row.directionLabel().replace(" / ", "-"));
+        }
+        if ("OPENING_BALANCE".equals(row.entryType())) {
+            if (row.directionLabel() != null && row.directionLabel().contains("PAYABLE")) {
+                return "OPENING_BALANCE-PAYABLE";
+            }
+            return "OPENING_BALANCE-RECEIVABLE";
+        }
+        if ("EXPENSE".equals(row.entryType())) {
+            return "EXPENSE-" + (row.expenseType() == null ? "OTHER" : row.expenseType());
+        }
+        return row.entryType();
+    }
+
+    private BigDecimal partyLedgerSignedAmount(TradingDtos.TransactionDetailRow row) {
+        BigDecimal amount = row.amountBdt() == null ? BigDecimal.ZERO : row.amountBdt();
+        if (amount.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+        String direction = row.directionLabel() == null ? "" : row.directionLabel().toUpperCase(Locale.ROOT);
+        boolean isOpeningPayable = "OPENING_BALANCE".equals(row.entryType()) && direction.contains("PAYABLE");
+        boolean isOutgoingSettlement = "SETTLEMENT".equals(row.entryType()) && direction.startsWith("OUTGOING");
+        boolean isNegative = "EXPENSE".equals(row.entryType()) || isOutgoingSettlement || isOpeningPayable;
+        return isNegative ? amount.abs().negate() : amount.abs();
     }
 
     public BigDecimal partyOutstanding(Long partyId) {

@@ -823,12 +823,46 @@ class PartyLedgerLineModel {
   final DateTime time;
   final double amount;
   final String? note;
+  final String entryType;
+  final int entryId;
+  final DateTime occurredAt;
+  final int? partyId;
+  final String? partyName;
+  final int? tradeDealId;
+  final String? instrumentCode;
+  final double? quantity;
+  final double amountBdt;
+  final double? bdtRate;
+  final String? directionLabel;
+  final String? referenceLabel;
+  final String? paymentMethod;
+  final String? paymentReference;
+  final String? notes;
+  final String? expenseType;
+  final String? category;
 
   const PartyLedgerLineModel({
     required this.kind,
     required this.time,
     required this.amount,
     this.note,
+    required this.entryType,
+    required this.entryId,
+    required this.occurredAt,
+    required this.partyId,
+    required this.partyName,
+    required this.tradeDealId,
+    required this.instrumentCode,
+    required this.quantity,
+    required this.amountBdt,
+    required this.bdtRate,
+    required this.directionLabel,
+    required this.referenceLabel,
+    required this.paymentMethod,
+    required this.paymentReference,
+    required this.notes,
+    required this.expenseType,
+    required this.category,
   });
 
   factory PartyLedgerLineModel.fromJson(Map<String, dynamic> json) {
@@ -837,6 +871,25 @@ class PartyLedgerLineModel {
       time: DateTime.parse(json["time"] as String),
       amount: (json["amount"] as num).toDouble(),
       note: json["note"] as String?,
+      entryType: (json["entryType"] as String?) ?? 'UNKNOWN',
+      entryId: (json["entryId"] as num?)?.toInt() ?? 0,
+      occurredAt: DateTime.parse(
+          (json["occurredAt"] as String?) ?? (json["time"] as String)),
+      partyId: (json["partyId"] as num?)?.toInt(),
+      partyName: json["partyName"] as String?,
+      tradeDealId: (json["tradeDealId"] as num?)?.toInt(),
+      instrumentCode: json["instrumentCode"] as String?,
+      quantity: (json["quantity"] as num?)?.toDouble(),
+      amountBdt: (json["amountBdt"] as num?)?.toDouble() ??
+          ((json["amount"] as num?)?.toDouble().abs() ?? 0),
+      bdtRate: (json["bdtRate"] as num?)?.toDouble(),
+      directionLabel: json["directionLabel"] as String?,
+      referenceLabel: json["referenceLabel"] as String?,
+      paymentMethod: json["paymentMethod"] as String?,
+      paymentReference: json["paymentReference"] as String?,
+      notes: json["notes"] as String?,
+      expenseType: json["expenseType"] as String?,
+      category: json["category"] as String?,
     );
   }
 }

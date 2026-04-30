@@ -101,7 +101,17 @@ public class TradingController {
     }
 
     @GetMapping("/ledgers/party/{id}")
-    public TradingDtos.PartyLedgerResponse ledger(@PathVariable("id") Long id) { return service.partyLedger(id); }
+    public TradingDtos.PartyLedgerResponse ledger(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to,
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "sortField", required = false) String sortField,
+            @RequestParam(value = "sortDirection", required = false) String sortDirection
+    ) {
+        return service.partyLedger(id, from, to, type, search, sortField, sortDirection);
+    }
 
     @GetMapping("/dashboard")
     public TradingDtos.DashboardResponse dashboard(@RequestParam("from") LocalDate from, @RequestParam("to") LocalDate to) { return service.dashboard(from, to); }
