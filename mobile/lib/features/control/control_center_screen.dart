@@ -25,6 +25,7 @@ class _ControlCenterScreenState extends State<ControlCenterScreen> {
   List<AuditLogModel> _auditLogs = const [];
   String _filter = '';
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _ControlCenterScreenState extends State<ControlCenterScreen> {
       setState(() {
         _users = users;
         _auditLogs = logs;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -50,7 +52,12 @@ class _ControlCenterScreenState extends State<ControlCenterScreen> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _users = const [];
+        _auditLogs = const [];
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -172,6 +179,19 @@ class _ControlCenterScreenState extends State<ControlCenterScreen> {
           log.actor.toLowerCase().contains(q) ||
           log.requestPath.toLowerCase().contains(q);
     }).toList();
+
+    if (_networkError) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Control Center')),
+        body: const Padding(
+          padding: EdgeInsets.all(20),
+          child: EmptyStateCard(
+            title: 'No internet connection',
+            message: 'Please check your network and try again.',
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Control Center')),

@@ -11,8 +11,9 @@ import 'outbox_store.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
+  final bool isNetworkError;
 
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(this.message, {this.statusCode, this.isNetworkError = false});
 
   @override
   String toString() => message;
@@ -67,15 +68,13 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? data,
     required T Function(dynamic json) parser,
-    bool queueOnNetworkFailure = true,
+    bool queueOnNetworkFailure = false,
   }) async {
     try {
       final response = await _request(() => _dio.post(path, data: data));
       return parser(response.data);
     } on DioException catch (error) {
-      if (_shouldQueue(error) && queueOnNetworkFailure && data != null) {
-        await _outbox.enqueue('POST', path, data);
-      }
+      // Online-only mode: never queue writes on network failure.
       throw _mapError(error);
     }
   }
@@ -195,6 +194,12 @@ class ApiClient {
   }
 
   ApiException _mapError(DioException error) {
+    if (_shouldQueue(error)) {
+      return const ApiException(
+        'No internet connection. Please check your network and try again.',
+        isNetworkError: true,
+      );
+    }
     final data = error.response?.data;
     if (data is Map<String, dynamic>) {
       final message = data['message'] as String? ?? 'Request failed';

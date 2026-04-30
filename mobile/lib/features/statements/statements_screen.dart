@@ -68,6 +68,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
   late int _selectedYear;
   BalanceSheetModel? _report;
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -97,6 +98,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
       }
       setState(() {
         _report = report;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -104,7 +106,11 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _report = null;
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -168,9 +174,11 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
     }
     final report = _report;
     if (report == null) {
-      return const EmptyStateCard(
-        title: 'No report data',
-        message: 'Try another reporting period.',
+      return EmptyStateCard(
+        title: _networkError ? 'No internet connection' : 'No report data',
+        message: _networkError
+            ? 'Please check your network and try again.'
+            : 'Try another reporting period.',
       );
     }
     return Column(
@@ -629,6 +637,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
   List<PartyModel> _parties = const [];
   TransactionDetailsModel? _details;
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -658,6 +667,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       setState(() {
         _parties = parties;
         _details = details;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -665,7 +675,12 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _parties = const [];
+        _details = null;
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -1132,9 +1147,11 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     }
     final details = _details;
     if (details == null) {
-      return const EmptyStateCard(
-        title: 'No transaction details',
-        message: 'Adjust filters and try again.',
+      return EmptyStateCard(
+        title: _networkError ? 'No internet connection' : 'No transaction details',
+        message: _networkError
+            ? 'Please check your network and try again.'
+            : 'Adjust filters and try again.',
       );
     }
 

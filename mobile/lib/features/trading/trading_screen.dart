@@ -37,6 +37,7 @@ class _TradingScreenState extends State<TradingScreen> {
   List<PartyModel> _parties = const [];
   List<DealSummary> _deals = const [];
   bool _loading = true;
+  bool _networkError = false;
   int _inferenceVersion = 0;
 
   @override
@@ -56,6 +57,7 @@ class _TradingScreenState extends State<TradingScreen> {
       setState(() {
         _parties = parties;
         _deals = deals;
+        _networkError = false;
         if (parties.isEmpty) {
           _selectedPartyId = null;
           _selectedDealId = null;
@@ -81,7 +83,14 @@ class _TradingScreenState extends State<TradingScreen> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _parties = const [];
+        _deals = const [];
+        _inference = null;
+        _inferenceError = null;
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -190,10 +199,13 @@ class _TradingScreenState extends State<TradingScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (needsPartySelection && _parties.isEmpty) {
-      return const EmptyStateCard(
-        title: 'Trading needs parties first',
-        message:
-            'Create at least one party so deal and settlement forms can use proper selectors.',
+      return EmptyStateCard(
+        title: _networkError
+            ? 'No internet connection'
+            : 'Trading needs parties first',
+        message: _networkError
+            ? 'Please check your network and try again.'
+            : 'Create at least one party so deal and settlement forms can use proper selectors.',
       );
     }
 

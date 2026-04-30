@@ -22,6 +22,7 @@ class _DuesScreenState extends State<DuesScreen>
     with SingleTickerProviderStateMixin {
   DuesSnapshotModel? _snapshot;
   bool _loading = true;
+  bool _networkError = false;
   DuesSortField _sortField = DuesSortField.dueAmount;
   DuesSortDirection _sortDirection = DuesSortDirection.desc;
   bool _showReceivable = true;
@@ -41,6 +42,7 @@ class _DuesScreenState extends State<DuesScreen>
       }
       setState(() {
         _snapshot = data;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -48,7 +50,11 @@ class _DuesScreenState extends State<DuesScreen>
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _snapshot = null;
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -58,8 +64,12 @@ class _DuesScreenState extends State<DuesScreen>
       return const Center(child: CircularProgressIndicator());
     }
     if (_snapshot == null) {
-      return Center(
-        child: ElevatedButton.icon(
+      return EmptyStateCard(
+        title: _networkError ? 'No internet connection' : 'No dues data',
+        message: _networkError
+            ? 'Please check your network and try again.'
+            : 'Could not load dues right now.',
+        action: ElevatedButton.icon(
           onPressed: _load,
           icon: const Icon(Icons.refresh),
           label: const Text('Retry'),

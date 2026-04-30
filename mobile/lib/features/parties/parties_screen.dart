@@ -20,6 +20,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
   final _search = TextEditingController();
   List<PartyModel> _parties = const [];
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
       }
       setState(() {
         _parties = parties;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -43,7 +45,11 @@ class _PartiesScreenState extends State<PartiesScreen> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _parties = const [];
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -370,11 +376,14 @@ class _PartiesScreenState extends State<PartiesScreen> {
         const SizedBox(height: 18),
         if (filtered.isEmpty)
           EmptyStateCard(
-            title: 'No parties yet',
-            message:
-                'Create your counterparty list first so trading forms can use selectors instead of manual IDs.',
+            title: _networkError ? 'No internet connection' : 'No parties yet',
+            message: _networkError
+                ? 'Please check your network and try again.'
+                : 'Create your counterparty list first so trading forms can use selectors instead of manual IDs.',
             action: ElevatedButton(
-                onPressed: _createParty, child: const Text('Create Party')),
+              onPressed: _networkError ? _load : _createParty,
+              child: Text(_networkError ? 'Retry' : 'Create Party'),
+            ),
           )
         else
           ...filtered.map(

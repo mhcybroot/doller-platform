@@ -18,8 +18,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   DashboardMetrics? _metrics;
   DashboardPnlExplainModel? _pnlExplain;
-  Map<String, int> _stats = const {'pending': 0, 'failed': 0, 'poison': 0};
   bool _loading = true;
+  bool _networkError = false;
 
   @override
   void initState() {
@@ -34,14 +34,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final metrics = await widget.repository.dashboard(from, now);
       final explain = await widget.repository.dashboardPnlExplain(from, now);
-      final stats = await widget.repository.queueStats();
       if (!mounted) {
         return;
       }
       setState(() {
         _metrics = metrics;
         _pnlExplain = explain;
-        _stats = stats;
+        _networkError = false;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -49,7 +48,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       showAppMessage(context, error.message, isError: true);
-      setState(() => _loading = false);
+      setState(() {
+        _metrics = null;
+        _pnlExplain = null;
+        _networkError = error.isNetworkError;
+        _loading = false;
+      });
     }
   }
 
@@ -59,9 +63,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_metrics == null) {
-      return const EmptyStateCard(
-        title: 'No dashboard data',
-        message: 'We could not load your finance overview right now.',
+      return EmptyStateCard(
+        title: _networkError ? 'No internet connection' : 'No dashboard data',
+        message: _networkError
+            ? 'Please check your network and try again.'
+            : 'We could not load your finance overview right now.',
       );
     }
     return RefreshIndicator(
@@ -150,17 +156,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     caption: 'Total open position valued in BDT',
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: MetricCard(
-                    label: 'Sync Queue',
-                    value: '${_stats['pending']} pending',
-                    caption:
-                        '${_stats['failed']} failed / ${_stats['poison']} poison',
-                    positive: (_stats['failed'] ?? 0) == 0 &&
-                        (_stats['poison'] ?? 0) == 0,
-                  ),
-                ),
               ],
             ),
           ),
@@ -186,32 +181,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           if (_metrics!.positions.isNotEmpty) const SizedBox(height: 16),
-          FinanceSection(
-            title: 'Sync Controls',
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await widget.repository.flushRetries();
-                      await _load();
-                    },
-                    child: const Text('Retry Queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      await widget.repository.retryPoison();
-                      await _load();
-                    },
-                    child: const Text('Recover Poison'),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
