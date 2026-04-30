@@ -260,12 +260,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
       if (!mounted) {
         return;
       }
-      DateTime from = DateTime.now();
+      DateTime from = DateTime(2020, 1, 1);
       DateTime to = DateTime.now();
-      String type = '';
-      String sortField = 'occurredAt';
-      String sortDirection = 'desc';
-      final searchController = TextEditingController();
+      final String sortField = 'occurredAt';
+      final String sortDirection = 'desc';
       PartyLedgerModel? ledger;
       bool loading = true;
       bool networkError = false;
@@ -286,8 +284,6 @@ class _PartiesScreenState extends State<PartiesScreen> {
                       party.id,
                       from: from,
                       to: to,
-                      type: type,
-                      search: searchController.text,
                       sortField: sortField,
                       sortDirection: sortDirection,
                     );
@@ -390,134 +386,6 @@ class _PartiesScreenState extends State<PartiesScreen> {
                                 : BalancePillTone.netNegative,
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      FinanceSection(
-                        title: 'Filters',
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: from,
-                                        firstDate: DateTime(2020),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked == null) return;
-                                      setModalState(() => from = picked);
-                                      await loadLedger();
-                                    },
-                                    child: Text('From ${formatDate(from)}'),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: to,
-                                        firstDate: DateTime(2020),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked == null) return;
-                                      setModalState(() => to = picked);
-                                      await loadLedger();
-                                    },
-                                    child: Text('To ${formatDate(to)}'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: searchController,
-                              onSubmitted: (_) => loadLedger(),
-                              decoration: InputDecoration(
-                                labelText: 'Search',
-                                prefixIcon: const Icon(Icons.search),
-                                suffixIcon: IconButton(
-                                  onPressed: loadLedger,
-                                  icon: const Icon(Icons.arrow_forward),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            DropdownButtonFormField<String>(
-                              initialValue: type.isEmpty ? 'ALL' : type,
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'ALL', child: Text('All Types')),
-                                DropdownMenuItem(
-                                    value: 'DEAL', child: Text('Deals')),
-                                DropdownMenuItem(
-                                    value: 'SETTLEMENT',
-                                    child: Text('Settlements')),
-                                DropdownMenuItem(
-                                    value: 'EXPENSE', child: Text('Expenses')),
-                                DropdownMenuItem(
-                                    value: 'OPENING_BALANCE',
-                                    child: Text('Opening Balance')),
-                              ],
-                              onChanged: (value) async {
-                                setModalState(() => type =
-                                    value == null || value == 'ALL' ? '' : value);
-                                await loadLedger();
-                              },
-                              decoration: const InputDecoration(labelText: 'Type'),
-                            ),
-                            const SizedBox(height: 10),
-                            DropdownButtonFormField<String>(
-                              initialValue: sortField,
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'occurredAt',
-                                    child: Text('Sort by Date')),
-                                DropdownMenuItem(
-                                    value: 'amountBdt',
-                                    child: Text('Sort by Amount')),
-                                DropdownMenuItem(
-                                    value: 'entryType',
-                                    child: Text('Sort by Type')),
-                                DropdownMenuItem(
-                                    value: 'partyName',
-                                    child: Text('Sort by Party')),
-                              ],
-                              onChanged: (value) async {
-                                setModalState(
-                                    () => sortField = value ?? 'occurredAt');
-                                await loadLedger();
-                              },
-                              decoration:
-                                  const InputDecoration(labelText: 'Sort Field'),
-                            ),
-                            const SizedBox(height: 10),
-                            DropdownButtonFormField<String>(
-                              initialValue: sortDirection,
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'desc',
-                                    child: Text('Newest / Highest')),
-                                DropdownMenuItem(
-                                    value: 'asc', child: Text('Oldest / Lowest')),
-                              ],
-                              onChanged: (value) async {
-                                setModalState(
-                                    () => sortDirection = value ?? 'desc');
-                                await loadLedger();
-                              },
-                              decoration: const InputDecoration(
-                                  labelText: 'Sort Direction'),
-                            ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: 12),
                       Expanded(
