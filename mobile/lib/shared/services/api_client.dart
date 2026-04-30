@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -22,7 +21,7 @@ class ApiClient {
   ApiClient(this._store)
       : _dio = Dio(
           BaseOptions(
-            baseUrl: Platform.isAndroid ? 'http://10.0.2.2:8088' : 'http://localhost:8088',
+            baseUrl: 'http://76.13.221.43:8088',
             connectTimeout: const Duration(seconds: 20),
             receiveTimeout: const Duration(seconds: 20),
           ),
@@ -55,7 +54,8 @@ class ApiClient {
     required T Function(dynamic json) parser,
   }) async {
     try {
-      final response = await _request(() => _dio.get(path, queryParameters: query));
+      final response =
+          await _request(() => _dio.get(path, queryParameters: query));
       return parser(response.data);
     } on DioException catch (error) {
       throw _mapError(error);
@@ -127,10 +127,12 @@ class ApiClient {
     final items = await _outbox.dueItems();
     for (final item in items) {
       try {
-        await _request(() => _dio.post(item.path, data: jsonDecode(item.bodyJson)));
+        await _request(
+            () => _dio.post(item.path, data: jsonDecode(item.bodyJson)));
         await _outbox.markDone(item.id!);
       } catch (error) {
-        await _outbox.markFailed(item.id!, item.attemptCount + 1, error.toString());
+        await _outbox.markFailed(
+            item.id!, item.attemptCount + 1, error.toString());
       }
     }
   }
@@ -141,7 +143,8 @@ class ApiClient {
 
   Future<void> logout() => _store.clear();
 
-  Future<Response<dynamic>> _request(Future<Response<dynamic>> Function() sender) async {
+  Future<Response<dynamic>> _request(
+      Future<Response<dynamic>> Function() sender) async {
     try {
       return await sender();
     } on DioException catch (error) {
@@ -174,7 +177,8 @@ class ApiClient {
         data: {'refreshToken': existing.refreshToken},
         options: Options(extra: {'skipAuth': true}),
       );
-      final session = AuthSession.fromJson(response.data as Map<String, dynamic>);
+      final session =
+          AuthSession.fromJson(response.data as Map<String, dynamic>);
       await _store.saveSession(session);
       return session;
     } on DioException {
@@ -200,5 +204,4 @@ class ApiClient {
       statusCode: error.response?.statusCode,
     );
   }
-
 }

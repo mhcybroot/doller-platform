@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 
@@ -8,13 +7,14 @@ import 'outbox_store.dart';
 
 class ApiClient {
   final Dio _dio = Dio(
-    BaseOptions(baseUrl: Platform.isAndroid ? 'http://10.0.2.2:8088' : 'http://localhost:8088'),
+    BaseOptions(baseUrl: 'http://76.13.221.43:8088'),
   );
   final AuthStore _store;
   final OutboxStore _outbox = OutboxStore();
 
   ApiClient(this._store) {
-    _dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) async {
+    _dio.interceptors
+        .add(InterceptorsWrapper(onRequest: (options, handler) async {
       final token = await _store.getToken();
       if (token != null) {
         options.headers['Authorization'] = 'Bearer $token';
@@ -27,12 +27,14 @@ class ApiClient {
     try {
       return await _dio.post(path, data: data);
     } catch (e) {
-      await _outbox.enqueue('POST', path, Map<String, dynamic>.from(data as Map));
+      await _outbox.enqueue(
+          'POST', path, Map<String, dynamic>.from(data as Map));
       rethrow;
     }
   }
 
-  Future<Response<dynamic>> get(String path, {Map<String, dynamic>? query}) async {
+  Future<Response<dynamic>> get(String path,
+      {Map<String, dynamic>? query}) async {
     return _dio.get(path, queryParameters: query);
   }
 
