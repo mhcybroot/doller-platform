@@ -311,7 +311,7 @@ public class ExportController {
                         safe(r.date()),
                         safe(r.time()),
                         safe(r.direction()),
-                        safe(r.paymentMethod()),
+                        paymentMethodLabel(r.paymentMethod()),
                         safe(r.relatedDealId())
                 };
                 tableRow(cells, cols, List.of());
@@ -512,6 +512,13 @@ public class ExportController {
 
         private String safe(Object value) {
             return value == null ? "-" : String.valueOf(value);
+        }
+
+        private String paymentMethodLabel(String value) {
+            if (value == null || value.isBlank()) {
+                return "-";
+            }
+            return "CHECK".equalsIgnoreCase(value) ? "CHEQUE" : value;
         }
     }
 }
