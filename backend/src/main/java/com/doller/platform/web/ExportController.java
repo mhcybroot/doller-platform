@@ -186,6 +186,7 @@ public class ExportController {
         private final float tableHeaderTextOffset = 7f;
         private final float tableRowTextOffset = 6f;
         private final float firstRowTopGap = 4f;
+        private final float tableToSummaryGap = 10f;
         private final float summaryHeight = 32f;
         private final float summaryTextOffset = 20f;
         private final float exposureHeight = 48f;
@@ -292,6 +293,7 @@ public class ExportController {
                 };
                 tableRow(cells, cols, List.of(5, 6, 7));
             }
+            y -= tableToSummaryGap;
             dealSummary(summary);
         }
 
@@ -314,6 +316,7 @@ public class ExportController {
                 };
                 tableRow(cells, cols, List.of());
             }
+            y -= tableToSummaryGap;
             settlementSummary(summary);
         }
 
@@ -332,20 +335,49 @@ public class ExportController {
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
             ensure(summaryHeight + 10);
-            fill(margin, y - summaryHeight, page.getMediaBox().getWidth() - margin * 2, summaryHeight, new Color(240, 245, 252));
-            text(String.format("Deal Count: %d | Total Buy: %s | Total Sell: %s | Net Deal Exposure: %s",
-                    s.count(), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), fmt(s.netDealExposureBdt())),
-                    margin + 8, y - summaryTextOffset, bold, 9, new Color(20, 40, 90));
+            float cardWidth = page.getMediaBox().getWidth() - margin * 2;
+            fill(margin, y - summaryHeight, cardWidth, summaryHeight, new Color(236, 243, 252));
+            drawMetricRow(
+                    new String[]{"Deal Count", "Total Buy", "Total Sell", "Net Exposure"},
+                    new String[]{String.valueOf(s.count()), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), fmt(s.netDealExposureBdt())},
+                    new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86)},
+                    new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242)}
+            );
             y -= (summaryHeight + 8);
         }
 
         private void settlementSummary(TradingDtos.TransactionSettlementSummary s) throws IOException {
             ensure(summaryHeight + 10);
-            fill(margin, y - summaryHeight, page.getMediaBox().getWidth() - margin * 2, summaryHeight, new Color(240, 245, 252));
-            text(String.format("Settlement Count: %d | Incoming: %s | Outgoing: %s | Linked: %d | Unlinked: %d",
-                    s.count(), fmt(s.totalIncomingBdt()), fmt(s.totalOutgoingBdt()), s.linkedCount(), s.unlinkedCount()),
-                    margin + 8, y - summaryTextOffset, bold, 9, new Color(20, 40, 90));
+            float cardWidth = page.getMediaBox().getWidth() - margin * 2;
+            fill(margin, y - summaryHeight, cardWidth, summaryHeight, new Color(236, 243, 252));
+            drawMetricRow(
+                    new String[]{"Settle Count", "Incoming", "Outgoing", "Linked", "Unlinked"},
+                    new String[]{String.valueOf(s.count()), fmt(s.totalIncomingBdt()), fmt(s.totalOutgoingBdt()), String.valueOf(s.linkedCount()), String.valueOf(s.unlinkedCount())},
+                    new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86), new Color(90, 92, 102)},
+                    new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242), new Color(240, 241, 246)}
+            );
             y -= (summaryHeight + 8);
+        }
+
+        private void drawMetricRow(String[] labels, String[] values, Color[] textColors, Color[] bgColors) throws IOException {
+            float gutter = 6f;
+            float startX = margin + 8f;
+            float availableWidth = page.getMediaBox().getWidth() - (margin * 2) - 16f;
+            int count = labels.length;
+            float chipWidth = (availableWidth - (gutter * (count - 1))) / count;
+            float x = startX;
+            for (int i = 0; i < count; i++) {
+                drawMetricChip(labels[i], values[i], x, y - 7, chipWidth, 9f, textColors[i], bgColors[i]);
+                x += chipWidth + gutter;
+            }
+        }
+
+        private void drawMetricChip(String label, String value, float x, float topY, float width, float fontSize,
+                                    Color textColor, Color bgColor) throws IOException {
+            float chipHeight = 15f;
+            fill(x, topY - chipHeight, width, chipHeight, bgColor);
+            String chipText = label + ": " + value;
+            text(truncate(chipText, width - 4f, fontSize), x + 3, centeredTextY(topY, chipHeight, fontSize), bold, fontSize, textColor);
         }
 
         private void drawGrandSummary() throws IOException {
@@ -363,8 +395,9 @@ public class ExportController {
             float tableWidth = sum(cols);
             fill(margin, y - tableHeaderHeight + 1, tableWidth, tableHeaderHeight, new Color(225, 233, 246));
             float x = margin + 2;
+            float headerTextY = centeredTextY(y, tableHeaderHeight, 8f);
             for (int i = 0; i < headers.length; i++) {
-                text(headers[i], x, y - tableHeaderTextOffset, bold, 8, new Color(32, 47, 82));
+                text(headers[i], x, headerTextY, bold, 8, new Color(32, 47, 82));
                 x += cols[i];
             }
             drawRowBorder(y, tableHeaderHeight, cols, new Color(184, 196, 214));
@@ -385,17 +418,22 @@ public class ExportController {
         private void tableRow(String[] cells, float[] cols, List<Integer> rightAlignCols) throws IOException {
             float rowTop = y;
             float x = margin + 2;
+            float rowTextY = centeredTextY(y, tableRowHeight, 8f);
             for (int i = 0; i < cells.length; i++) {
                 String value = truncate(cells[i], cols[i], 8);
                 if (rightAlignCols.contains(i)) {
-                    textRight(value, x + cols[i] - 3, y - tableRowTextOffset, regular, 8, Color.BLACK);
+                    textRight(value, x + cols[i] - 3, rowTextY, regular, 8, Color.BLACK);
                 } else {
-                    text(value, x, y - tableRowTextOffset, regular, 8, Color.BLACK);
+                    text(value, x, rowTextY, regular, 8, Color.BLACK);
                 }
                 x += cols[i];
             }
             drawRowBorder(rowTop, tableRowHeight, cols, new Color(214, 220, 230));
             y -= tableRowHeight;
+        }
+
+        private float centeredTextY(float topY, float cellHeight, float fontSize) {
+            return topY - ((cellHeight - fontSize) / 2f) - 1f;
         }
 
         private void drawRowBorder(float topY, float height, float[] cols, Color strokeColor) throws IOException {
