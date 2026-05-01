@@ -178,8 +178,8 @@ class TradingServiceTest {
         var report = tradingService.balanceSheetReport("DAILY", businessDate, null, null, null, null);
         assertEquals(0, result.closingUsd().compareTo(new BigDecimal("5.000000")));
         assertEquals(0, report.closingUsd().compareTo(new BigDecimal("5.000000")));
-        assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("650.00")));
-        assertEquals(0, report.closingPayableBdt().compareTo(new BigDecimal("1200.00")));
+        assertEquals(0, report.closingReceivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, report.closingPayableBdt().compareTo(new BigDecimal("550.00")));
         assertEquals(0, report.closingAgingBdt().compareTo(new BigDecimal("650.00")));
     }
 
@@ -436,6 +436,108 @@ class TradingServiceTest {
         assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("0.00")));
         assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("300.00")));
         assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-300.00")));
+    }
+
+    @Test
+    void sellDealAutoNetsExistingPayableBeforeCreatingReceivable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Payable Net By Sell").build());
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                t1, "existing payable 2000"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("15"), new BigDecimal("100"),
+                t2, "sell 1500"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("500.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-500.00")));
+    }
+
+    @Test
+    void sellDealCreatesReceivableForAmountBeyondExistingPayable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Payable Partial Net").build());
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                t1, "existing payable 2000"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("25"), new BigDecimal("100"),
+                t2, "sell 2500"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("500.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("500.00")));
+
+        LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + party.getId(), cutoff)
+                .negate()
+                .compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff)
+                .compareTo(new BigDecimal("500.00")));
+    }
+
+    @Test
+    void buyDealAutoNetsExistingReceivableBeforeCreatingPayable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Receivable Net By Buy").build());
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                t1, "existing receivable 2000"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("15"), new BigDecimal("100"),
+                t2, "buy 1500"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("500.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("500.00")));
+    }
+
+    @Test
+    void buyDealCreatesPayableForAmountBeyondExistingReceivable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Receivable Partial Net").build());
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                t1, "existing receivable 2000"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("25"), new BigDecimal("100"),
+                t2, "buy 2500"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("500.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-500.00")));
+
+        LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff)
+                .compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + party.getId(), cutoff)
+                .negate()
+                .compareTo(new BigDecimal("500.00")));
     }
 
     @Test
@@ -721,7 +823,7 @@ class TradingServiceTest {
                 day.atTime(11, 0), "sell"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
-                party.getId(), sellDeal.getId(), new BigDecimal("50"), day.atTime(12, 0), SettlementPaymentMethod.CASH, null, "incoming", false
+                party.getId(), sellDeal.getId(), new BigDecimal("50"), day.atTime(12, 0), SettlementPaymentMethod.CASH, null, "incoming", true
         ));
 
         TradingDtos.TransactionExportReport report = tradingService.transactionExportReport(day, day, null, null, null, "occurredAt", "asc");

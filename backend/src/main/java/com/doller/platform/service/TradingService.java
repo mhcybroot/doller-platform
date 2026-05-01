@@ -919,6 +919,8 @@ public class TradingService {
         BigDecimal sellDealReceivable = BigDecimal.ZERO;
         BigDecimal incomingReceivableApplied = BigDecimal.ZERO;
         BigDecimal outgoingPayableApplied = BigDecimal.ZERO;
+        BigDecimal receivableClearedByBuy = BigDecimal.ZERO;
+        BigDecimal payableClearedBySell = BigDecimal.ZERO;
         BigDecimal advanceFromPartyAdded = BigDecimal.ZERO;
         BigDecimal advanceToPartyAdded = BigDecimal.ZERO;
         BigDecimal advanceFromPartyCleared = BigDecimal.ZERO;
@@ -944,19 +946,29 @@ public class TradingService {
         for (PartyLedgerEvent event : events) {
             if (event.deal() != null) {
                 TradeDeal deal = event.deal();
-                DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                DealDueConsumption dueConsumption = consumeDueForDeal(
                         deal.getDealType(),
                         deal.getBdtGross(),
+                        receivable,
+                        payable
+                );
+                receivable = dueConsumption.remainingReceivable();
+                payable = dueConsumption.remainingPayable();
+                DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                        deal.getDealType(),
+                        dueConsumption.remainingExposure(),
                         advanceFromParty,
                         advanceToParty
                 );
                 advanceFromParty = consumption.remainingAdvanceFromParty();
                 advanceToParty = consumption.remainingAdvanceToParty();
                 if (deal.getDealType() == DealType.BUY) {
+                    receivableClearedByBuy = receivableClearedByBuy.add(dueConsumption.consumedOppositeDue());
                     payable = payable.add(consumption.remainingExposure());
                     buyDealPayable = buyDealPayable.add(consumption.remainingExposure());
                     advanceToPartyCleared = advanceToPartyCleared.add(consumption.consumedAdvance());
                 } else {
+                    payableClearedBySell = payableClearedBySell.add(dueConsumption.consumedOppositeDue());
                     receivable = receivable.add(consumption.remainingExposure());
                     sellDealReceivable = sellDealReceivable.add(consumption.remainingExposure());
                     advanceFromPartyCleared = advanceFromPartyCleared.add(consumption.consumedAdvance());
@@ -996,13 +1008,15 @@ public class TradingService {
         BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
         BalancePosition position = new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, aging);
         if (tradingDebug) {
-            log.info("party_balance_projection partyId={} asOfDate={} openingReceivable={} openingPayable={} buyDealAddedPayable={} sellDealAddedReceivable={} incomingSettlementApplied={} outgoingSettlementApplied={} advanceInAdded={} advanceOutAdded={} advanceInCleared={} advanceOutCleared={} finalReceivable={} finalPayable={} finalAdvanceIn={} finalAdvanceOut={} finalNet={} finalAging={}",
+            log.info("party_balance_projection partyId={} asOfDate={} openingReceivable={} openingPayable={} buyDealAddedPayable={} sellDealAddedReceivable={} receivableClearedByBuy={} payableClearedBySell={} incomingSettlementApplied={} outgoingSettlementApplied={} advanceInAdded={} advanceOutAdded={} advanceInCleared={} advanceOutCleared={} finalReceivable={} finalPayable={} finalAdvanceIn={} finalAdvanceOut={} finalNet={} finalAging={}",
                     party.getId(),
                     asOfDate,
                     openingReceivable,
                     openingPayable,
                     buyDealPayable,
                     sellDealReceivable,
+                    receivableClearedByBuy,
+                    payableClearedBySell,
                     incomingReceivableApplied,
                     outgoingPayableApplied,
                     advanceFromPartyAdded,
@@ -1385,9 +1399,18 @@ public class TradingService {
         String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
         if (deal.getDealType() == DealType.BUY) {
             ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Buy " + deal.getInstrumentCode().name());
-            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+            DealDueConsumption dueConsumption = consumeDueForDeal(
                     DealType.BUY,
                     deal.getBdtGross(),
+                    currentReceivableAt(partyId, at),
+                    currentPayableAt(partyId, at)
+            );
+            if (dueConsumption.consumedOppositeDue().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "RECEIVABLE_" + partyId, BigDecimal.ZERO, dueConsumption.consumedOppositeDue(), referenceType, referenceId, "Receivable auto-netted by buy deal");
+            }
+            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                    DealType.BUY,
+                    dueConsumption.remainingExposure(),
                     currentAdvanceFromPartyAt(partyId, at),
                     currentAdvanceToPartyAt(partyId, at)
             );
@@ -1398,9 +1421,18 @@ public class TradingService {
                 ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, consumption.remainingExposure(), referenceType, referenceId, "Payable to party");
             }
         } else {
-            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+            DealDueConsumption dueConsumption = consumeDueForDeal(
                     DealType.SELL,
                     deal.getBdtGross(),
+                    currentReceivableAt(partyId, at),
+                    currentPayableAt(partyId, at)
+            );
+            if (dueConsumption.consumedOppositeDue().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "PAYABLE_" + partyId, dueConsumption.consumedOppositeDue(), BigDecimal.ZERO, referenceType, referenceId, "Payable auto-netted by sell deal");
+            }
+            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                    DealType.SELL,
+                    dueConsumption.remainingExposure(),
                     currentAdvanceFromPartyAt(partyId, at),
                     currentAdvanceToPartyAt(partyId, at)
             );
@@ -1436,6 +1468,39 @@ public class TradingService {
 
     private BigDecimal currentAdvanceToPartyAt(Long partyId, LocalDateTime at) {
         return netForAccountUntilActive("ADVANCE_TO_" + partyId, at).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal currentReceivableAt(Long partyId, LocalDateTime at) {
+        return netForAccountUntilActive("RECEIVABLE_" + partyId, at).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal currentPayableAt(Long partyId, LocalDateTime at) {
+        return netForAccountUntilActive("PAYABLE_" + partyId, at).negate().max(BigDecimal.ZERO);
+    }
+
+    private DealDueConsumption consumeDueForDeal(
+            DealType dealType,
+            BigDecimal gross,
+            BigDecimal receivable,
+            BigDecimal payable
+    ) {
+        BigDecimal safeGross = gross == null ? BigDecimal.ZERO : gross.max(BigDecimal.ZERO);
+        BigDecimal safeReceivable = receivable == null ? BigDecimal.ZERO : receivable.max(BigDecimal.ZERO);
+        BigDecimal safePayable = payable == null ? BigDecimal.ZERO : payable.max(BigDecimal.ZERO);
+        BigDecimal consumedOppositeDue;
+        BigDecimal remainingReceivable = safeReceivable;
+        BigDecimal remainingPayable = safePayable;
+
+        if (dealType == DealType.BUY) {
+            consumedOppositeDue = safeGross.min(safeReceivable);
+            remainingReceivable = safeReceivable.subtract(consumedOppositeDue);
+        } else {
+            consumedOppositeDue = safeGross.min(safePayable);
+            remainingPayable = safePayable.subtract(consumedOppositeDue);
+        }
+
+        BigDecimal remainingExposure = safeGross.subtract(consumedOppositeDue);
+        return new DealDueConsumption(consumedOppositeDue, remainingExposure, remainingReceivable, remainingPayable);
     }
 
     private DealAdvanceConsumption consumeAdvanceForDeal(
@@ -1544,6 +1609,13 @@ public class TradingService {
             BigDecimal remainingExposure,
             BigDecimal remainingAdvanceFromParty,
             BigDecimal remainingAdvanceToParty
+    ) {}
+
+    private record DealDueConsumption(
+            BigDecimal consumedOppositeDue,
+            BigDecimal remainingExposure,
+            BigDecimal remainingReceivable,
+            BigDecimal remainingPayable
     ) {}
 
     private record PartyLedgerEvent(
