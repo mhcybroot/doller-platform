@@ -334,7 +334,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Settlements");
             String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID", "Amount BDT"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 92, 76});
+            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 68, 100});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
