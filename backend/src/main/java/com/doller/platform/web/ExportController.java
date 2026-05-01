@@ -251,9 +251,9 @@ public class ExportController {
             ensure(230);
             float cardWidth = page.getMediaBox().getWidth() - margin * 2;
             float cardHeight = 62f;
-            Color customerCardBg = new Color(32, 110, 68);
-            Color customerTitleColor = new Color(238, 255, 245);
-            Color customerMetaColor = new Color(218, 243, 227);
+            Color customerCardBg = new Color(165, 216, 188);
+            Color customerTitleColor = new Color(27, 82, 57);
+            Color customerMetaColor = new Color(42, 102, 72);
             fill(margin, y - cardHeight, cardWidth, cardHeight, customerCardBg);
             float innerX = margin + cardPadding;
             float phoneX = innerX;
@@ -275,8 +275,8 @@ public class ExportController {
         private void drawDealTable(List<TradingDtos.TransactionDealExportRow> rows, TradingDtos.TransactionDealSummary summary) throws IOException {
             ensure(80);
             sectionTitleCard("Deals");
-            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amt", "Rate", "Amount"};
-            float[] cols = {44, 58, 56, 66, 118, 60, 58, 74};
+            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amount Foreign Currency", "Rate BDT", "Amount BDT"};
+            float[] cols = {44, 48, 48, 56, 104, 130, 50, 54};
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionDealExportRow r : rows) {
@@ -322,8 +322,7 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
             ensure(exposureHeight + 18);
-            boolean grandSummary = title != null && title.toLowerCase().contains("grand");
-            Color cardBg = grandSummary ? new Color(154, 28, 36) : new Color(181, 37, 49);
+            Color cardBg = new Color(248, 16, 52);
             Color textColor = new Color(255, 248, 248);
             fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
             text(title, margin + 8, y - 18, bold, 10, textColor);
@@ -377,7 +376,8 @@ public class ExportController {
             float chipHeight = 15f;
             fill(x, topY - chipHeight, width, chipHeight, bgColor);
             String chipText = label + ": " + value;
-            text(truncate(chipText, width - 4f, fontSize), x + 3, centeredTextY(topY, chipHeight, fontSize), bold, fontSize, textColor);
+            String display = truncate(chipText, width - 4f, fontSize);
+            textCentered(display, x, width, centeredTextY(topY, chipHeight, fontSize), bold, fontSize, textColor);
         }
 
         private void drawGrandSummary() throws IOException {
@@ -394,10 +394,11 @@ public class ExportController {
             ensure(tableHeaderHeight + 2);
             float tableWidth = sum(cols);
             fill(margin, y - tableHeaderHeight + 1, tableWidth, tableHeaderHeight, new Color(225, 233, 246));
-            float x = margin + 2;
+            float x = margin;
             float headerTextY = centeredTextY(y, tableHeaderHeight, 8f);
             for (int i = 0; i < headers.length; i++) {
-                text(headers[i], x, headerTextY, bold, 8, new Color(32, 47, 82));
+                String header = truncate(headers[i], cols[i] - 4f, 8f);
+                textCentered(header, x, cols[i], headerTextY, bold, 8, new Color(32, 47, 82));
                 x += cols[i];
             }
             drawRowBorder(y, tableHeaderHeight, cols, new Color(184, 196, 214));
@@ -464,6 +465,14 @@ public class ExportController {
         private void textRight(String value, float rightX, float yAt, PDType1Font font, float size, Color color) throws IOException {
             float w = font.getStringWidth(value) / 1000f * size;
             text(value, rightX - w, yAt, font, size, color);
+        }
+
+        private void textCentered(String value, float cellX, float cellWidth, float yAt,
+                                  PDType1Font font, float size, Color color) throws IOException {
+            String safeValue = value == null ? "" : value;
+            float textWidth = font.getStringWidth(safeValue) / 1000f * size;
+            float centeredX = cellX + Math.max((cellWidth - textWidth) / 2f, 0f);
+            text(safeValue, centeredX, yAt, font, size, color);
         }
 
         private void fill(float x, float yAt, float width, float height, Color color) throws IOException {
