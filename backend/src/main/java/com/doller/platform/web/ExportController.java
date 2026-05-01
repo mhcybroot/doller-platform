@@ -291,9 +291,9 @@ public class ExportController {
             float innerX = margin + cardPadding;
             float phoneX = innerX;
             float addressX = margin + cardWidth * 0.38f;
-            text("Customer: " + safe(section.party().partyName()), innerX, y - 22, bold, 11, customerTitleColor);
-            text("Phone: " + safe(section.party().phone()), phoneX, y - 42, regular, 9, customerMetaColor);
-            String address = "Address: " + safe(section.party().address());
+            text("Client Name: " + safe(section.party().partyName()), innerX, y - 22, bold, 11, customerTitleColor);
+            text("Client Mobile Number: " + safe(section.party().phone()), phoneX, y - 42, regular, 9, customerMetaColor);
+            String address = "Client Address: " + safe(section.party().address());
             text(truncate(address, cardWidth * 0.60f, 9), addressX, y - 42, regular, 9, customerMetaColor);
             y -= (cardHeight + customerToDealsGap);
 
@@ -371,10 +371,10 @@ public class ExportController {
             float cardWidth = page.getMediaBox().getWidth() - margin * 2;
             fill(margin, y - summaryHeight, cardWidth, summaryHeight, new Color(236, 243, 252));
             drawMetricRow(
-                    new String[]{"Deal Count", "Total Buy", "Total Sell", "Net Exposure"},
-                    new String[]{String.valueOf(s.count()), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), fmt(s.netDealExposureBdt())},
-                    new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86)},
-                    new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242)}
+                    new String[]{"Deal Count", "Total Buy", "Total Sell", "", "Net Exposure"},
+                    new String[]{String.valueOf(s.count()), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), "", fmt(s.netDealExposureBdt())},
+                    new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86), new Color(56, 69, 86)},
+                    new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242), new Color(231, 236, 242)}
             );
             y -= (summaryHeight + 8);
         }
@@ -410,6 +410,9 @@ public class ExportController {
         private void drawMetricChip(String label, String value, float x, float topY, float height, float width, float fontSize,
                                     Color textColor, Color bgColor) throws IOException {
             String chipText = label + ": " + value;
+            if (label.isBlank() && value.isBlank()) {
+                return;
+            }
             String display = truncate(chipText, width - 4f, fontSize);
             textCentered(display, x, width, centeredTextBaselineY(topY, height, bold, fontSize), bold, fontSize, textColor);
         }
