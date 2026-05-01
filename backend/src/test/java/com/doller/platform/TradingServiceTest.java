@@ -541,6 +541,68 @@ class TradingServiceTest {
     }
 
     @Test
+    void sellDealConsumesAdvanceInBeforePayableWhenBothExist() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Sell Priority Advance Then Due").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(4);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t3 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                t0, "seed receivable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("250"), t1, SettlementPaymentMethod.CASH, null, "advance in 150", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                t2, "create payable 300"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("100"),
+                t3, "sell 200 should consume advance 150 then payable 50"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("250.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void buyDealConsumesAdvanceOutBeforeReceivableWhenBothExist() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Buy Priority Advance Then Due").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(4);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t3 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                t0, "seed payable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("250"), t1, SettlementPaymentMethod.CASH, null, "advance out 150", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                t2, "create receivable 300"
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("100"),
+                t3, "buy 200 should consume advance 150 then receivable 50"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("250.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
     void deletingDealRemovesDueImmediately() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party party = partyRepository.save(Party.builder().name("Delete Due").build());
