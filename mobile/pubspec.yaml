@@ -15,6 +15,7 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.5
   share_plus: ^10.1.4
+  syncfusion_flutter_pdfviewer: ^27.2.5
   google_fonts: ^6.2.1
   flutter_dotenv: ^5.2.1
 

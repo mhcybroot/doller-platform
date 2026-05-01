@@ -9,6 +9,13 @@ import 'api_client.dart';
 import 'app_logger.dart';
 import 'auth_store.dart';
 
+class PdfExportResult {
+  final File file;
+  final String filename;
+
+  const PdfExportResult({required this.file, required this.filename});
+}
+
 class DollerRepository {
   DollerRepository(this._api, this._store);
 
@@ -589,11 +596,35 @@ class DollerRepository {
     required DateTime to,
     String? type,
     int? partyId,
+    String? fallbackPartyName,
     String? search,
     String? sortField,
     String? sortDirection,
   }) async {
-    final bytes = await _api.download(
+    final result = await exportTransactionDetailsPdf(
+      from: from,
+      to: to,
+      type: type,
+      partyId: partyId,
+      fallbackPartyName: fallbackPartyName,
+      search: search,
+      sortField: sortField,
+      sortDirection: sortDirection,
+    );
+    await Share.shareXFiles([XFile(result.file.path)], fileNameOverrides: [result.filename]);
+  }
+
+  Future<PdfExportResult> exportTransactionDetailsPdf({
+    required DateTime from,
+    required DateTime to,
+    String? type,
+    int? partyId,
+    String? fallbackPartyName,
+    String? search,
+    String? sortField,
+    String? sortDirection,
+  }) async {
+    final download = await _api.downloadWithMetadata(
       '/exports/pdf',
       query: {
         'reportType': 'TRANSACTION_DETAILS',
@@ -607,10 +638,18 @@ class DollerRepository {
       },
     );
     final tempDir = await getTemporaryDirectory();
-    final file = File(
-        '${tempDir.path}/transaction_details_${_date(from)}_${_date(to)}.pdf');
-    await file.writeAsBytes(bytes);
-    await Share.shareXFiles([XFile(file.path)]);
+    final fallbackName = _fallbackTransactionFilename(
+      from: from,
+      to: to,
+      fallbackPartyName: fallbackPartyName,
+    );
+    final filename = _resolveExportFilename(
+      contentDisposition: download.headers['content-disposition'],
+      fallbackName: fallbackName,
+    );
+    final file = File('${tempDir.path}/$filename');
+    await file.writeAsBytes(download.bytes);
+    return PdfExportResult(file: file, filename: filename);
   }
 
   Future<void> exportAndShare(String kind, DateTime from, DateTime to) async {
@@ -633,5 +672,76 @@ class DollerRepository {
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '${value.year}-$month-$day';
+  }
+
+  String _resolveExportFilename({
+    required String? contentDisposition,
+    required String fallbackName,
+  }) {
+    final parsed = _extractFilenameFromContentDisposition(contentDisposition);
+    if (parsed == null || parsed.isEmpty) {
+      return _ensurePdfExtension(_sanitizeFilename(fallbackName));
+    }
+    return _ensurePdfExtension(_sanitizeFilename(parsed));
+  }
+
+  String? _extractFilenameFromContentDisposition(String? contentDisposition) {
+    if (contentDisposition == null || contentDisposition.trim().isEmpty) {
+      return null;
+    }
+    final utf8Match =
+        RegExp(r"filename\*=UTF-8''([^;]+)", caseSensitive: false).firstMatch(contentDisposition);
+    if (utf8Match != null) {
+      return Uri.decodeComponent(utf8Match.group(1)!);
+    }
+    final quoted =
+        RegExp(r'filename="([^"]+)"', caseSensitive: false).firstMatch(contentDisposition);
+    if (quoted != null) {
+      return quoted.group(1);
+    }
+    final plain = RegExp(r'filename=([^;]+)', caseSensitive: false).firstMatch(contentDisposition);
+    if (plain != null) {
+      return plain.group(1)?.trim();
+    }
+    return null;
+  }
+
+  String _fallbackTransactionFilename({
+    required DateTime from,
+    required DateTime to,
+    String? fallbackPartyName,
+  }) {
+    final dateRange = '${_date(from)}_${_date(to)}';
+    final partySlug = _partySlug(fallbackPartyName);
+    if (partySlug.isNotEmpty) {
+      return '${partySlug}_details_$dateRange.pdf';
+    }
+    return 'statement_details_$dateRange.pdf';
+  }
+
+  String _partySlug(String? name) {
+    if (name == null || name.trim().isEmpty) {
+      return '';
+    }
+    final out = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s_-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^[_-]+|[_-]+$'), '');
+    return out.length > 60 ? out.substring(0, 60).replaceAll(RegExp(r'_+$'), '') : out;
+  }
+
+  String _sanitizeFilename(String value) {
+    final cleaned = value
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .trim();
+    return cleaned.isEmpty ? 'statement_details.pdf' : cleaned;
+  }
+
+  String _ensurePdfExtension(String value) {
+    return value.toLowerCase().endsWith('.pdf') ? value : '$value.pdf';
   }
 }

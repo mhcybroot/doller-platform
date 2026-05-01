@@ -78,7 +78,7 @@ public class ExportController {
         if ("TRANSACTION_DETAILS".equals(normalizedType)) {
             TradingDtos.TransactionExportReport response = service.transactionExportReport(from, to, type, partyId, search, sortField, sortDirection);
             out = renderTransactionPdf(response);
-            filename = "transaction_details.pdf";
+            filename = transactionPdfFilename(response);
             rangeHeader = response.from() + "_" + response.to();
         } else {
             TradingDtos.BalanceSheetResponse response = service.balanceSheetReport(mode, date, month, year, from, to);
@@ -91,6 +91,39 @@ public class ExportController {
                 .header("X-Export-Range", rangeHeader)
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(out);
+    }
+
+    private String transactionPdfFilename(TradingDtos.TransactionExportReport report) {
+        String dateRange = report.from() + "_" + report.to();
+        if (report.partySections() != null && report.partySections().size() == 1) {
+            String partyName = report.partySections().get(0).party() == null
+                    ? null
+                    : report.partySections().get(0).party().partyName();
+            String partySlug = sanitizeForFilename(partyName);
+            if (!partySlug.isBlank()) {
+                return partySlug + "_details_" + dateRange + ".pdf";
+            }
+        }
+        return "statement_details_" + dateRange + ".pdf";
+    }
+
+    private String sanitizeForFilename(String input) {
+        if (input == null || input.isBlank()) {
+            return "";
+        }
+        String normalized = input.toLowerCase(Locale.ROOT).trim();
+        normalized = normalized.replaceAll("[^a-z0-9\\s_-]", "");
+        normalized = normalized.replaceAll("\\s+", "_");
+        normalized = normalized.replaceAll("_+", "_");
+        normalized = normalized.replaceAll("^-+|_+|-+$", "");
+        if (normalized.isBlank()) {
+            return "";
+        }
+        if (normalized.length() > 60) {
+            normalized = normalized.substring(0, 60);
+            normalized = normalized.replaceAll("_+$", "");
+        }
+        return normalized;
     }
 
     private byte[] renderBalanceSheetPdf(TradingDtos.BalanceSheetResponse response) throws Exception {
@@ -276,7 +309,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Deals");
             String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amount Foreign Currency", "Rate BDT", "Amount BDT"};
-            float[] cols = {44, 48, 48, 56, 104, 130, 50, 54};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{44, 48, 48, 56, 104, 130, 50, 54});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionDealExportRow r : rows) {
@@ -301,7 +334,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Settlements");
             String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID"};
-            float[] cols = {72, 64, 56, 132, 72, 92};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 92});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
@@ -491,6 +524,20 @@ public class ExportController {
         private float sum(float[] cols) {
             float out = 0;
             for (float col : cols) out += col;
+            return out;
+        }
+
+        private float[] fitColumnsToAvailableWidth(float[] cols) {
+            float total = sum(cols);
+            float available = page.getMediaBox().getWidth() - (margin * 2);
+            if (total <= 0 || available <= 0) {
+                return cols;
+            }
+            float scale = available / total;
+            float[] out = new float[cols.length];
+            for (int i = 0; i < cols.length; i++) {
+                out[i] = cols[i] * scale;
+            }
             return out;
         }
 

@@ -22,6 +22,13 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+class DownloadResult {
+  final Uint8List bytes;
+  final Map<String, String> headers;
+
+  const DownloadResult({required this.bytes, required this.headers});
+}
+
 class ApiClient {
   ApiClient(this._store)
       : _dio = Dio(
@@ -208,6 +215,33 @@ class ApiClient {
         ),
       );
       return Uint8List.fromList(response.data as List<int>);
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+  }
+
+  Future<DownloadResult> downloadWithMetadata(
+    String path, {
+    required Map<String, dynamic> query,
+  }) async {
+    try {
+      final response = await _request(
+        () => _dio.get(
+          path,
+          queryParameters: query,
+          options: Options(responseType: ResponseType.bytes),
+        ),
+      );
+      final headers = <String, String>{};
+      response.headers.map.forEach((key, value) {
+        if (value.isNotEmpty) {
+          headers[key.toLowerCase()] = value.join(',');
+        }
+      });
+      return DownloadResult(
+        bytes: Uint8List.fromList(response.data as List<int>),
+        headers: headers,
+      );
     } on DioException catch (error) {
       throw _mapError(error);
     }

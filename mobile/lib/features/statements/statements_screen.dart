@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../app/app_theme.dart';
 import '../../shared/models/auth_models.dart';
@@ -672,14 +676,33 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
 
   Future<void> _export() async {
     try {
-      await widget.repository.exportAndShareTransactionDetails(
+      String? selectedPartyName;
+      if (_partyId != null) {
+        for (final party in _parties) {
+          if (party.id == _partyId) {
+            selectedPartyName = party.name;
+            break;
+          }
+        }
+      }
+      final result = await widget.repository.exportTransactionDetailsPdf(
         from: _from,
         to: _to,
         type: _type,
         partyId: _partyId,
+        fallbackPartyName: selectedPartyName,
         search: _searchController.text,
         sortField: _sortField,
         sortDirection: _sortDirection,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _PdfPreviewScreen(
+            filePath: result.file.path,
+            fileName: result.filename,
+          ),
+        ),
       );
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -1387,5 +1410,56 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         isOutgoingSettlement ||
         isOpeningPayable ||
         isSellDeal;
+  }
+}
+
+class _PdfPreviewScreen extends StatefulWidget {
+  const _PdfPreviewScreen({
+    required this.filePath,
+    required this.fileName,
+  });
+
+  final String filePath;
+  final String fileName;
+
+  @override
+  State<_PdfPreviewScreen> createState() => _PdfPreviewScreenState();
+}
+
+class _PdfPreviewScreenState extends State<_PdfPreviewScreen> {
+  bool _sharing = false;
+
+  Future<void> _share() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      await Share.shareXFiles(
+        [XFile(widget.filePath)],
+        fileNameOverrides: [widget.fileName],
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sharing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.fileName),
+        actions: [
+          IconButton(
+            onPressed: _sharing ? null : _share,
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share PDF',
+          ),
+        ],
+      ),
+      body: SfPdfViewer.file(
+        File(widget.filePath),
+      ),
+    );
   }
 }
