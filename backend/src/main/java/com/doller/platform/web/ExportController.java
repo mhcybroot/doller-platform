@@ -333,8 +333,8 @@ public class ExportController {
         private void drawSettlementTable(List<TradingDtos.TransactionSettlementExportRow> rows, TradingDtos.TransactionSettlementSummary summary) throws IOException {
             ensure(80);
             sectionTitleCard("Settlements");
-            String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 92});
+            String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID", "Amount BDT"};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 92, 76});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
@@ -345,9 +345,10 @@ public class ExportController {
                         safe(r.time()),
                         safe(r.direction()),
                         paymentMethodLabel(r.paymentMethod()),
-                        safe(r.relatedDealId())
+                        safe(r.relatedDealId()),
+                        fmt(r.amountBdt())
                 };
-                tableRow(cells, cols, List.of());
+                tableRow(cells, cols, List.of(6));
             }
             y -= tableToSummaryGap;
             settlementSummary(summary);
@@ -427,7 +428,7 @@ public class ExportController {
             float tableWidth = sum(cols);
             fill(margin, y - tableHeaderHeight + 1, tableWidth, tableHeaderHeight, new Color(225, 233, 246));
             float x = margin;
-            float headerTextY = centeredTextY(y, tableHeaderHeight, 8f);
+            float headerTextY = centeredTextBaselineY(y, tableHeaderHeight, bold, 8f);
             for (int i = 0; i < headers.length; i++) {
                 String header = truncate(headers[i], cols[i] - 4f, 8f);
                 textCentered(header, x, cols[i], headerTextY, bold, 8, new Color(32, 47, 82));
@@ -467,6 +468,14 @@ public class ExportController {
 
         private float centeredTextY(float topY, float cellHeight, float fontSize) {
             return topY - ((cellHeight - fontSize) / 2f) - 1f;
+        }
+
+        private float centeredTextBaselineY(float topY, float cellHeight, PDType1Font font, float fontSize) {
+            float ascent = (font.getFontDescriptor().getAscent() / 1000f) * fontSize;
+            float descent = (font.getFontDescriptor().getDescent() / 1000f) * fontSize;
+            float textHeight = ascent - descent;
+            float topInset = (cellHeight - textHeight) / 2f;
+            return topY - topInset - ascent;
         }
 
         private void drawRowBorder(float topY, float height, float[] cols, Color strokeColor) throws IOException {
