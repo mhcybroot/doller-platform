@@ -924,23 +924,47 @@ public class TradingService {
         BigDecimal advanceFromPartyCleared = BigDecimal.ZERO;
         BigDecimal advanceToPartyCleared = BigDecimal.ZERO;
 
+        List<PartyLedgerEvent> events = new ArrayList<>();
         for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
             if (!deal.getParty().getId().equals(party.getId()) || deal.getDealTime().isAfter(cutoff)) {
                 continue;
             }
-            if (deal.getDealType() == DealType.BUY) {
-                payable = payable.add(deal.getBdtGross());
-                buyDealPayable = buyDealPayable.add(deal.getBdtGross());
-            } else {
-                receivable = receivable.add(deal.getBdtGross());
-                sellDealReceivable = sellDealReceivable.add(deal.getBdtGross());
-            }
+            events.add(PartyLedgerEvent.forDeal(deal));
         }
-
         for (Settlement settlement : settlementRepo.findByPartyAndDeletedFalseOrderBySettlementTimeAsc(party)) {
-            if (settlement.getSettlementTime().isAfter(cutoff)) {
+            if (!settlement.getParty().getId().equals(party.getId()) || settlement.getSettlementTime().isAfter(cutoff)) {
                 continue;
             }
+            events.add(PartyLedgerEvent.forSettlement(settlement));
+        }
+        events.sort(Comparator.comparing(PartyLedgerEvent::at)
+                .thenComparing(PartyLedgerEvent::order)
+                .thenComparing(PartyLedgerEvent::id));
+
+        for (PartyLedgerEvent event : events) {
+            if (event.deal() != null) {
+                TradeDeal deal = event.deal();
+                DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                        deal.getDealType(),
+                        deal.getBdtGross(),
+                        advanceFromParty,
+                        advanceToParty
+                );
+                advanceFromParty = consumption.remainingAdvanceFromParty();
+                advanceToParty = consumption.remainingAdvanceToParty();
+                if (deal.getDealType() == DealType.BUY) {
+                    payable = payable.add(consumption.remainingExposure());
+                    buyDealPayable = buyDealPayable.add(consumption.remainingExposure());
+                    advanceToPartyCleared = advanceToPartyCleared.add(consumption.consumedAdvance());
+                } else {
+                    receivable = receivable.add(consumption.remainingExposure());
+                    sellDealReceivable = sellDealReceivable.add(consumption.remainingExposure());
+                    advanceFromPartyCleared = advanceFromPartyCleared.add(consumption.consumedAdvance());
+                }
+                continue;
+            }
+
+            Settlement settlement = event.settlement();
             if (settlement.getDirection() == SettlementDirection.INCOMING) {
                 if (settlement.getBasis() == SettlementBasis.RECEIVABLE) {
                     receivable = receivable.subtract(settlement.getAppliedAmount());
@@ -1357,12 +1381,35 @@ public class TradingService {
     private void postDealLedger(TradeDeal deal, LocalDateTime at) {
         String referenceType = "DEAL";
         Long referenceId = deal.getId();
+        Long partyId = deal.getParty().getId();
         String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
         if (deal.getDealType() == DealType.BUY) {
             ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Buy " + deal.getInstrumentCode().name());
-            ledgerService.post(at, "PAYABLE_" + deal.getParty().getId(), BigDecimal.ZERO, deal.getBdtGross(), referenceType, referenceId, "Payable to party");
+            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                    DealType.BUY,
+                    deal.getBdtGross(),
+                    currentAdvanceFromPartyAt(partyId, at),
+                    currentAdvanceToPartyAt(partyId, at)
+            );
+            if (consumption.consumedAdvance().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_TO_" + partyId, BigDecimal.ZERO, consumption.consumedAdvance(), referenceType, referenceId, "Advance out auto-consumed by buy deal");
+            }
+            if (consumption.remainingExposure().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, consumption.remainingExposure(), referenceType, referenceId, "Payable to party");
+            }
         } else {
-            ledgerService.post(at, "RECEIVABLE_" + deal.getParty().getId(), deal.getBdtGross(), BigDecimal.ZERO, referenceType, referenceId, "Receivable from party");
+            DealAdvanceConsumption consumption = consumeAdvanceForDeal(
+                    DealType.SELL,
+                    deal.getBdtGross(),
+                    currentAdvanceFromPartyAt(partyId, at),
+                    currentAdvanceToPartyAt(partyId, at)
+            );
+            if (consumption.consumedAdvance().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "ADVANCE_FROM_" + partyId, consumption.consumedAdvance(), BigDecimal.ZERO, referenceType, referenceId, "Advance in auto-consumed by sell deal");
+            }
+            if (consumption.remainingExposure().compareTo(BigDecimal.ZERO) > 0) {
+                ledgerService.post(at, "RECEIVABLE_" + partyId, consumption.remainingExposure(), BigDecimal.ZERO, referenceType, referenceId, "Receivable from party");
+            }
             ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Sell " + deal.getInstrumentCode().name());
         }
     }
@@ -1370,14 +1417,49 @@ public class TradingService {
     private void reverseDealLedger(TradeDeal deal, LocalDateTime at) {
         String referenceType = "DEAL_REVERSAL";
         Long referenceId = deal.getId();
-        String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
-        if (deal.getDealType() == DealType.BUY) {
-            ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Reversal buy " + deal.getInstrumentCode().name());
-            ledgerService.post(at, "PAYABLE_" + deal.getParty().getId(), deal.getBdtGross(), BigDecimal.ZERO, referenceType, referenceId, "Reversal payable");
-        } else {
-            ledgerService.post(at, "RECEIVABLE_" + deal.getParty().getId(), BigDecimal.ZERO, deal.getBdtGross(), referenceType, referenceId, "Reversal receivable");
-            ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Reversal sell " + deal.getInstrumentCode().name());
+        for (LedgerEntry posted : ledgerRepo.findByReferenceTypeAndReferenceId("DEAL", deal.getId())) {
+            ledgerService.post(
+                    at,
+                    posted.getAccountCode(),
+                    posted.getCredit(),
+                    posted.getDebit(),
+                    referenceType,
+                    referenceId,
+                    "Reversal " + posted.getNarration()
+            );
         }
+    }
+
+    private BigDecimal currentAdvanceFromPartyAt(Long partyId, LocalDateTime at) {
+        return netForAccountUntilActive("ADVANCE_FROM_" + partyId, at).negate().max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal currentAdvanceToPartyAt(Long partyId, LocalDateTime at) {
+        return netForAccountUntilActive("ADVANCE_TO_" + partyId, at).max(BigDecimal.ZERO);
+    }
+
+    private DealAdvanceConsumption consumeAdvanceForDeal(
+            DealType dealType,
+            BigDecimal gross,
+            BigDecimal advanceFromParty,
+            BigDecimal advanceToParty
+    ) {
+        BigDecimal safeGross = gross == null ? BigDecimal.ZERO : gross.max(BigDecimal.ZERO);
+        BigDecimal safeAdvanceFromParty = advanceFromParty == null ? BigDecimal.ZERO : advanceFromParty.max(BigDecimal.ZERO);
+        BigDecimal safeAdvanceToParty = advanceToParty == null ? BigDecimal.ZERO : advanceToParty.max(BigDecimal.ZERO);
+        BigDecimal consumed;
+        BigDecimal remainingFrom = safeAdvanceFromParty;
+        BigDecimal remainingTo = safeAdvanceToParty;
+
+        if (dealType == DealType.SELL) {
+            consumed = safeGross.min(safeAdvanceFromParty);
+            remainingFrom = safeAdvanceFromParty.subtract(consumed);
+        } else {
+            consumed = safeGross.min(safeAdvanceToParty);
+            remainingTo = safeAdvanceToParty.subtract(consumed);
+        }
+        BigDecimal remainingExposure = safeGross.subtract(consumed);
+        return new DealAdvanceConsumption(consumed, remainingExposure, remainingFrom, remainingTo);
     }
 
     private void postExpenseLedger(Expense expense, LocalDateTime at) {
@@ -1456,6 +1538,29 @@ public class TradingService {
             BigDecimal netBalanceBdt,
             BigDecimal agingDueBdt
     ) {}
+
+    private record DealAdvanceConsumption(
+            BigDecimal consumedAdvance,
+            BigDecimal remainingExposure,
+            BigDecimal remainingAdvanceFromParty,
+            BigDecimal remainingAdvanceToParty
+    ) {}
+
+    private record PartyLedgerEvent(
+            LocalDateTime at,
+            int order,
+            Long id,
+            TradeDeal deal,
+            Settlement settlement
+    ) {
+        static PartyLedgerEvent forDeal(TradeDeal deal) {
+            return new PartyLedgerEvent(deal.getDealTime(), 1, deal.getId(), deal, null);
+        }
+
+        static PartyLedgerEvent forSettlement(Settlement settlement) {
+            return new PartyLedgerEvent(settlement.getSettlementTime(), 2, settlement.getId(), null, settlement);
+        }
+    }
 
     private record SettlementPlan(
             SettlementDirection direction,

@@ -304,7 +304,9 @@ class _DuesScreenState extends State<DuesScreen>
 
     return Column(
       children: rows.map((row) {
-        final netAbs = row.netBdt.abs();
+        final tabDue = isReceivable
+            ? _effectiveReceivable(row)
+            : _effectivePayable(row);
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Card(
@@ -319,7 +321,7 @@ class _DuesScreenState extends State<DuesScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatBdt(netAbs),
+                    '${isReceivable ? '+' : '-'}${formatBdt(tabDue)}',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       color: isReceivable

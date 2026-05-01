@@ -321,6 +321,124 @@ class TradingServiceTest {
     }
 
     @Test
+    void sellDealAutoConsumesExistingAdvanceInBeforeCreatingReceivable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Advance In Consume").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                t0, "seed receivable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "incoming advance", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("20"),
+                t2, "sell against advance"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-300.00")));
+
+        LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("ADVANCE_FROM_" + party.getId(), cutoff)
+                .negate()
+                .compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff)
+                .compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void sellDealCreatesReceivableForAmountBeyondAdvanceIn() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Advance In Partial").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                t0, "seed receivable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "incoming advance", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("80"),
+                t2, "sell larger than advance"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("300.00")));
+    }
+
+    @Test
+    void buyDealAutoConsumesExistingAdvanceOutBeforeCreatingPayable() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Advance Out Consume").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                t0, "seed payable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "outgoing advance", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("20"),
+                t2, "buy against advance"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("300.00")));
+
+        LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("ADVANCE_TO_" + party.getId(), cutoff)
+                .compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + party.getId(), cutoff)
+                .negate()
+                .compareTo(new BigDecimal("0.00")));
+    }
+
+    @Test
+    void buyDealCreatesPayableForAmountBeyondAdvanceOut() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
+        Party party = partyRepository.save(Party.builder().name("Advance Out Partial").build());
+        LocalDateTime t0 = LocalDateTime.now().minusMinutes(3);
+        LocalDateTime t1 = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
+
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                t0, "seed payable"
+        ));
+        tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
+                party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "outgoing advance", true
+        ));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(
+                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("80"),
+                t2, "buy larger than advance"
+        ));
+
+        var ledger = tradingService.partyLedger(party.getId());
+        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-300.00")));
+    }
+
+    @Test
     void deletingDealRemovesDueImmediately() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party party = partyRepository.save(Party.builder().name("Delete Due").build());
