@@ -357,7 +357,7 @@ public class ExportController {
         private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
             ensure(exposureHeight + 18);
             Color cardBg = new Color(248, 16, 52);
-            Color textColor = new Color(255, 248, 248);
+            Color textColor = Color.BLACK;
             fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
             text(title, margin + 8, y - 18, bold, 10, textColor);
             text(String.format("Receivable: %s | Payable: %s | Net: %s",
@@ -398,19 +398,20 @@ public class ExportController {
             float availableWidth = page.getMediaBox().getWidth() - (margin * 2) - 16f;
             int count = labels.length;
             float chipWidth = (availableWidth - (gutter * (count - 1))) / count;
+            float innerTopY = y - 4f;
+            float innerHeight = summaryHeight - 8f;
             float x = startX;
             for (int i = 0; i < count; i++) {
-                drawMetricChip(labels[i], values[i], x, y - 7, chipWidth, 9f, textColors[i], bgColors[i]);
+                drawMetricChip(labels[i], values[i], x, innerTopY, innerHeight, chipWidth, 9f, textColors[i], bgColors[i]);
                 x += chipWidth + gutter;
             }
         }
 
-        private void drawMetricChip(String label, String value, float x, float topY, float width, float fontSize,
+        private void drawMetricChip(String label, String value, float x, float topY, float height, float width, float fontSize,
                                     Color textColor, Color bgColor) throws IOException {
-            float chipHeight = 15f;
             String chipText = label + ": " + value;
             String display = truncate(chipText, width - 4f, fontSize);
-            textCentered(display, x, width, centeredTextY(topY, chipHeight, fontSize), bold, fontSize, textColor);
+            textCentered(display, x, width, centeredTextBaselineY(topY, height, bold, fontSize), bold, fontSize, textColor);
         }
 
         private void drawGrandSummary() throws IOException {
@@ -452,7 +453,7 @@ public class ExportController {
         private void tableRow(String[] cells, float[] cols, List<Integer> rightAlignCols) throws IOException {
             float rowTop = y;
             float x = margin + 2;
-            float rowTextY = centeredTextY(y, tableRowHeight, 8f);
+            float rowTextY = centeredTextBaselineY(y, tableRowHeight, regular, 8f);
             for (int i = 0; i < cells.length; i++) {
                 String value = truncate(cells[i], cols[i], 8);
                 if (rightAlignCols.contains(i)) {
