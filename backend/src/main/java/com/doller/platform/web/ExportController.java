@@ -318,8 +318,8 @@ public class ExportController {
             ensure(exposureHeight + 18);
             fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, new Color(249, 250, 252));
             text(title, margin + 8, y - 18, bold, 10, Color.BLACK);
-            text(String.format("Receivable: %s | Payable: %s | Advance In: %s | Advance Out: %s | Aging: %s | Net: %s",
-                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.advanceFromPartyBdt()), fmt(b.advanceToPartyBdt()), fmt(b.agingDueBdt()), fmt(b.netBalanceBdt())),
+            text(String.format("Receivable: %s | Payable: %s | Aging: %s | Net: %s",
+                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.agingDueBdt()), fmt(b.netBalanceBdt())),
                     margin + 8, y - 36, regular, 9, Color.DARK_GRAY);
             y -= (exposureHeight + 8);
         }

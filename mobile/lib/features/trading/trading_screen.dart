@@ -531,16 +531,6 @@ class _SettlementPreviewCard extends StatelessWidget {
                 value: formatBdt(inference.current.payableBdt),
                 tone: BalancePillTone.payable,
               ),
-              BalancePill(
-                label: 'Advance In',
-                value: formatBdt(inference.current.advanceFromPartyBdt),
-                tone: BalancePillTone.advanceIn,
-              ),
-              BalancePill(
-                label: 'Advance Out',
-                value: formatBdt(inference.current.advanceToPartyBdt),
-                tone: BalancePillTone.advanceOut,
-              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -559,16 +549,6 @@ class _SettlementPreviewCard extends StatelessWidget {
                 label: 'Payable',
                 value: formatBdt(inference.projected.payableBdt),
                 tone: BalancePillTone.payable,
-              ),
-              BalancePill(
-                label: 'Advance In',
-                value: formatBdt(inference.projected.advanceFromPartyBdt),
-                tone: BalancePillTone.advanceIn,
-              ),
-              BalancePill(
-                label: 'Advance Out',
-                value: formatBdt(inference.projected.advanceToPartyBdt),
-                tone: BalancePillTone.advanceOut,
               ),
             ],
           ),

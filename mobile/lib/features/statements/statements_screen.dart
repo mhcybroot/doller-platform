@@ -340,22 +340,6 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                       'Closing Payable',
                       formatBdt(report.closingPayableBdt),
                       BalancePillTone.payable),
-                  _summaryPill(
-                      'Opening Advance In',
-                      formatBdt(report.openingAdvanceFromPartyBdt),
-                      BalancePillTone.advanceIn),
-                  _summaryPill(
-                      'Closing Advance In',
-                      formatBdt(report.closingAdvanceFromPartyBdt),
-                      BalancePillTone.advanceIn),
-                  _summaryPill(
-                      'Opening Advance Out',
-                      formatBdt(report.openingAdvanceToPartyBdt),
-                      BalancePillTone.advanceOut),
-                  _summaryPill(
-                      'Closing Advance Out',
-                      formatBdt(report.closingAdvanceToPartyBdt),
-                      BalancePillTone.advanceOut),
                 ],
               ),
               const SizedBox(height: 12),
@@ -448,22 +432,6 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                                   'Close Payable',
                                   formatBdt(line.closingPayableBdt),
                                   BalancePillTone.payable),
-                              _reportPill(
-                                  'Open Advance In',
-                                  formatBdt(line.openingAdvanceFromPartyBdt),
-                                  BalancePillTone.advanceIn),
-                              _reportPill(
-                                  'Close Advance In',
-                                  formatBdt(line.closingAdvanceFromPartyBdt),
-                                  BalancePillTone.advanceIn),
-                              _reportPill(
-                                  'Open Advance Out',
-                                  formatBdt(line.openingAdvanceToPartyBdt),
-                                  BalancePillTone.advanceOut),
-                              _reportPill(
-                                  'Close Advance Out',
-                                  formatBdt(line.closingAdvanceToPartyBdt),
-                                  BalancePillTone.advanceOut),
                               _reportPill(
                                   'Open Aging',
                                   formatBdt(line.openingAgingBdt),

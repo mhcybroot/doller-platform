@@ -349,12 +349,10 @@ class _DuesScreenState extends State<DuesScreen>
   }
 
   double _effectivePayable(PartyDueRowModel row) {
-    final effective = row.payableBdt - row.advanceToPartyBdt;
-    return effective > 0 ? effective : 0;
+    return row.payableBdt > 0 ? row.payableBdt : 0;
   }
 
   double _effectiveReceivable(PartyDueRowModel row) {
-    final effective = row.receivableBdt - row.advanceFromPartyBdt;
-    return effective > 0 ? effective : 0;
+    return row.receivableBdt > 0 ? row.receivableBdt : 0;
   }
 }

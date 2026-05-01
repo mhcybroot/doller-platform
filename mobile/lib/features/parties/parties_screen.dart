@@ -368,16 +368,6 @@ class _PartiesScreenState extends State<PartiesScreen> {
                             tone: BalancePillTone.payable,
                           ),
                           BalancePill(
-                            label: 'Advance In',
-                            value: formatBdt(ledger!.balances.advanceFromPartyBdt),
-                            tone: BalancePillTone.advanceIn,
-                          ),
-                          BalancePill(
-                            label: 'Advance Out',
-                            value: formatBdt(ledger!.balances.advanceToPartyBdt),
-                            tone: BalancePillTone.advanceOut,
-                          ),
-                          BalancePill(
                             label: 'NET POSITION ✅',
                             value: _formatSignedAmount(
                                 ledger!.balances.netBalanceBdt),

@@ -898,8 +898,8 @@ public class TradingService {
         return new TradingDtos.PartyBalanceSummary(
                 bdt(balance.receivableBdt()),
                 bdt(balance.payableBdt()),
-                bdt(balance.advanceFromPartyBdt()),
-                bdt(balance.advanceToPartyBdt()),
+                bdt(BigDecimal.ZERO),
+                bdt(BigDecimal.ZERO),
                 bdt(balance.netBalanceBdt()),
                 bdt(balance.agingDueBdt())
         );
@@ -982,20 +982,20 @@ public class TradingService {
                     receivable = receivable.subtract(settlement.getAppliedAmount());
                     incomingReceivableApplied = incomingReceivableApplied.add(settlement.getAppliedAmount());
                 } else if (settlement.getBasis() == SettlementBasis.ADVANCE_TO_PARTY) {
-                    advanceToParty = advanceToParty.subtract(settlement.getAppliedAmount());
-                    advanceToPartyCleared = advanceToPartyCleared.add(settlement.getAppliedAmount());
+                    receivable = receivable.subtract(settlement.getAppliedAmount());
+                    incomingReceivableApplied = incomingReceivableApplied.add(settlement.getAppliedAmount());
                 }
-                advanceFromParty = advanceFromParty.add(settlement.getAdvanceAmount());
+                payable = payable.add(settlement.getAdvanceAmount());
                 advanceFromPartyAdded = advanceFromPartyAdded.add(settlement.getAdvanceAmount());
             } else {
                 if (settlement.getBasis() == SettlementBasis.PAYABLE) {
                     payable = payable.subtract(settlement.getAppliedAmount());
                     outgoingPayableApplied = outgoingPayableApplied.add(settlement.getAppliedAmount());
                 } else if (settlement.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY) {
-                    advanceFromParty = advanceFromParty.subtract(settlement.getAppliedAmount());
-                    advanceFromPartyCleared = advanceFromPartyCleared.add(settlement.getAppliedAmount());
+                    payable = payable.subtract(settlement.getAppliedAmount());
+                    outgoingPayableApplied = outgoingPayableApplied.add(settlement.getAppliedAmount());
                 }
-                advanceToParty = advanceToParty.add(settlement.getAdvanceAmount());
+                receivable = receivable.add(settlement.getAdvanceAmount());
                 advanceToPartyAdded = advanceToPartyAdded.add(settlement.getAdvanceAmount());
             }
         }
@@ -1005,7 +1005,11 @@ public class TradingService {
         BigDecimal aging = computeAgingDue(party, asOfDate == null ? businessToday() : asOfDate);
         advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
         advanceToParty = advanceToParty.max(BigDecimal.ZERO);
-        BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
+        receivable = receivable.add(advanceToParty);
+        payable = payable.add(advanceFromParty);
+        advanceFromParty = BigDecimal.ZERO;
+        advanceToParty = BigDecimal.ZERO;
+        BigDecimal net = receivable.subtract(payable);
         BalancePosition position = new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, aging);
         if (tradingDebug) {
             log.info("party_balance_projection partyId={} asOfDate={} openingReceivable={} openingPayable={} buyDealAddedPayable={} sellDealAddedReceivable={} receivableClearedByAdvanceOut={} receivableClearedByBuy={} payableClearedByAdvanceIn={} payableClearedBySell={} incomingSettlementApplied={} outgoingSettlementApplied={} advanceInAdded={} advanceOutAdded={} advanceInCleared={} advanceOutCleared={} finalReceivable={} finalPayable={} finalAdvanceIn={} finalAdvanceOut={} finalNet={} finalAging={}",
@@ -1099,14 +1103,6 @@ public class TradingService {
         } else if (current.payableBdt().compareTo(BigDecimal.ZERO) > 0) {
             direction = SettlementDirection.OUTGOING;
             basis = SettlementBasis.PAYABLE;
-        } else if (current.advanceToPartyBdt().compareTo(BigDecimal.ZERO) > 0 && current.advanceFromPartyBdt().compareTo(BigDecimal.ZERO) > 0) {
-            throw new ApiException("Party has advance on both sides. Select a related deal.");
-        } else if (current.advanceToPartyBdt().compareTo(BigDecimal.ZERO) > 0) {
-            direction = SettlementDirection.INCOMING;
-            basis = SettlementBasis.ADVANCE_TO_PARTY;
-        } else if (current.advanceFromPartyBdt().compareTo(BigDecimal.ZERO) > 0) {
-            direction = SettlementDirection.OUTGOING;
-            basis = SettlementBasis.ADVANCE_FROM_PARTY;
         } else {
             TradeDeal latestDeal = latestDealForParty(party.getId());
             if (latestDeal == null) {
@@ -1124,8 +1120,7 @@ public class TradingService {
         BigDecimal baseOutstanding = switch (basis) {
             case RECEIVABLE -> current.receivableBdt();
             case PAYABLE -> current.payableBdt();
-            case ADVANCE_FROM_PARTY -> current.advanceFromPartyBdt();
-            case ADVANCE_TO_PARTY -> current.advanceToPartyBdt();
+            case ADVANCE_FROM_PARTY, ADVANCE_TO_PARTY -> BigDecimal.ZERO;
             case NONE -> BigDecimal.ZERO;
         };
         BigDecimal applied = safeAmount.min(baseOutstanding);
@@ -1166,35 +1161,27 @@ public class TradingService {
     private BalancePosition applyPlan(BalancePosition current, SettlementPlan plan) {
         BigDecimal receivable = current.receivableBdt();
         BigDecimal payable = current.payableBdt();
-        BigDecimal advanceFromParty = current.advanceFromPartyBdt();
-        BigDecimal advanceToParty = current.advanceToPartyBdt();
 
         if (plan.direction() == SettlementDirection.INCOMING) {
             if (plan.basis() == SettlementBasis.RECEIVABLE) {
                 receivable = receivable.subtract(plan.appliedAmount());
-            } else if (plan.basis() == SettlementBasis.ADVANCE_TO_PARTY) {
-                advanceToParty = advanceToParty.subtract(plan.appliedAmount());
             }
-            advanceFromParty = advanceFromParty.add(plan.advanceAmount());
+            payable = payable.add(plan.advanceAmount());
         } else {
             if (plan.basis() == SettlementBasis.PAYABLE) {
                 payable = payable.subtract(plan.appliedAmount());
-            } else if (plan.basis() == SettlementBasis.ADVANCE_FROM_PARTY) {
-                advanceFromParty = advanceFromParty.subtract(plan.appliedAmount());
             }
-            advanceToParty = advanceToParty.add(plan.advanceAmount());
+            receivable = receivable.add(plan.advanceAmount());
         }
 
         receivable = receivable.max(BigDecimal.ZERO);
         payable = payable.max(BigDecimal.ZERO);
-        advanceFromParty = advanceFromParty.max(BigDecimal.ZERO);
-        advanceToParty = advanceToParty.max(BigDecimal.ZERO);
         BigDecimal agingDue = current.agingDueBdt();
         if (plan.direction() == SettlementDirection.INCOMING && plan.basis() == SettlementBasis.RECEIVABLE) {
             agingDue = agingDue.subtract(plan.appliedAmount()).max(BigDecimal.ZERO);
         }
-        BigDecimal net = receivable.add(advanceToParty).subtract(payable).subtract(advanceFromParty);
-        return new BalancePosition(receivable, payable, advanceFromParty, advanceToParty, net, agingDue);
+        BigDecimal net = receivable.subtract(payable);
+        return new BalancePosition(receivable, payable, BigDecimal.ZERO, BigDecimal.ZERO, net, agingDue);
     }
 
     private TradingDtos.StatementLine toStatementLine(StatementSnapshot snapshot) {
@@ -1349,20 +1336,20 @@ public class TradingService {
             if (st.getBasis() == SettlementBasis.RECEIVABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
                 ledgerService.post(at, "RECEIVABLE_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Settlement against receivable");
             } else if (st.getBasis() == SettlementBasis.ADVANCE_TO_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_TO_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Advance returned by party");
+                ledgerService.post(at, "RECEIVABLE_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Settlement against receivable");
             }
             if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_FROM_" + partyId, BigDecimal.ZERO, st.getAdvanceAmount(), referenceType, referenceId, "Advance received from party");
+                ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, st.getAdvanceAmount(), referenceType, referenceId, "Extra incoming becomes payable");
             }
         } else {
             ledgerService.post(at, "CASH", BigDecimal.ZERO, st.getBdtAmount(), referenceType, referenceId, "Cash paid out");
             if (st.getBasis() == SettlementBasis.PAYABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
                 ledgerService.post(at, "PAYABLE_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Settlement against payable");
             } else if (st.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_FROM_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Advance refunded to party");
+                ledgerService.post(at, "PAYABLE_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Settlement against payable");
             }
             if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_TO_" + partyId, st.getAdvanceAmount(), BigDecimal.ZERO, referenceType, referenceId, "Advance paid to party");
+                ledgerService.post(at, "RECEIVABLE_" + partyId, st.getAdvanceAmount(), BigDecimal.ZERO, referenceType, referenceId, "Extra outgoing becomes receivable");
             }
         }
     }
@@ -1376,20 +1363,20 @@ public class TradingService {
             if (st.getBasis() == SettlementBasis.RECEIVABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
                 ledgerService.post(at, "RECEIVABLE_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal receivable settlement");
             } else if (st.getBasis() == SettlementBasis.ADVANCE_TO_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_TO_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal advance returned");
+                ledgerService.post(at, "RECEIVABLE_" + partyId, st.getAppliedAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal receivable settlement");
             }
             if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_FROM_" + partyId, st.getAdvanceAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal advance received");
+                ledgerService.post(at, "PAYABLE_" + partyId, st.getAdvanceAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal payable from incoming extra");
             }
         } else {
             ledgerService.post(at, "CASH", st.getBdtAmount(), BigDecimal.ZERO, referenceType, referenceId, "Reversal cash paid");
             if (st.getBasis() == SettlementBasis.PAYABLE && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
                 ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Reversal payable settlement");
             } else if (st.getBasis() == SettlementBasis.ADVANCE_FROM_PARTY && st.getAppliedAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_FROM_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Reversal advance refund");
+                ledgerService.post(at, "PAYABLE_" + partyId, BigDecimal.ZERO, st.getAppliedAmount(), referenceType, referenceId, "Reversal payable settlement");
             }
             if (st.getAdvanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                ledgerService.post(at, "ADVANCE_TO_" + partyId, BigDecimal.ZERO, st.getAdvanceAmount(), referenceType, referenceId, "Reversal advance paid");
+                ledgerService.post(at, "RECEIVABLE_" + partyId, BigDecimal.ZERO, st.getAdvanceAmount(), referenceType, referenceId, "Reversal receivable from outgoing extra");
             }
         }
     }

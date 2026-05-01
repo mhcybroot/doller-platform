@@ -184,7 +184,7 @@ class TradingServiceTest {
     }
 
     @Test
-    void incomingSettlementReducesReceivableAndCreatesAdvance() {
+    void incomingSettlementReducesReceivableAndCreatesPayableOverflow() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("owner", null));
         Party p = partyRepository.save(Party.builder().name("Customer A").build());
 
@@ -204,7 +204,8 @@ class TradingServiceTest {
 
         var ledger = tradingService.partyLedger(p.getId());
         assertEquals(new BigDecimal("0.00"), ledger.balances().receivableBdt());
-        assertEquals(new BigDecimal("3000.00"), ledger.balances().advanceFromPartyBdt());
+        assertEquals(new BigDecimal("3000.00"), ledger.balances().payableBdt());
+        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(BigDecimal.ZERO));
         assertTrue(ledger.lines().stream().anyMatch(line -> line.kind().contains("SETTLEMENT-INCOMING")));
     }
 
@@ -341,12 +342,13 @@ class TradingServiceTest {
         ));
 
         var ledger = tradingService.partyLedger(party.getId());
-        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().advanceFromPartyBdt().compareTo(new BigDecimal("0.00")));
         assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("300.00")));
         assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("-300.00")));
 
         LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
-        assertEquals(0, ledgerEntryRepository.netForAccountUntil("ADVANCE_FROM_" + party.getId(), cutoff)
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + party.getId(), cutoff)
                 .negate()
                 .compareTo(new BigDecimal("300.00")));
         assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff)
@@ -400,12 +402,13 @@ class TradingServiceTest {
         ));
 
         var ledger = tradingService.partyLedger(party.getId());
-        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("300.00")));
+        assertEquals(0, ledger.balances().advanceToPartyBdt().compareTo(new BigDecimal("0.00")));
         assertEquals(0, ledger.balances().payableBdt().compareTo(new BigDecimal("0.00")));
+        assertEquals(0, ledger.balances().receivableBdt().compareTo(new BigDecimal("300.00")));
         assertEquals(0, ledger.balances().netBalanceBdt().compareTo(new BigDecimal("300.00")));
 
         LocalDateTime cutoff = LocalDateTime.now().plusMinutes(1);
-        assertEquals(0, ledgerEntryRepository.netForAccountUntil("ADVANCE_TO_" + party.getId(), cutoff)
+        assertEquals(0, ledgerEntryRepository.netForAccountUntil("RECEIVABLE_" + party.getId(), cutoff)
                 .compareTo(new BigDecimal("300.00")));
         assertEquals(0, ledgerEntryRepository.netForAccountUntil("PAYABLE_" + party.getId(), cutoff)
                 .negate()
