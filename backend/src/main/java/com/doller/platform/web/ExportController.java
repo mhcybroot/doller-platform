@@ -309,7 +309,7 @@ public class ExportController {
             ensure(80);
             sectionTitleCard("Deals");
             String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amount Foreign Currency", "Rate BDT", "Amount BDT"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{44, 48, 48, 56, 104, 130, 50, 54});
+            float[] cols = fitColumnsToAvailableWidth(new float[]{44, 48, 48, 56, 82, 98, 52, 146});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionDealExportRow r : rows) {
@@ -407,7 +407,6 @@ public class ExportController {
         private void drawMetricChip(String label, String value, float x, float topY, float width, float fontSize,
                                     Color textColor, Color bgColor) throws IOException {
             float chipHeight = 15f;
-            fill(x, topY - chipHeight, width, chipHeight, bgColor);
             String chipText = label + ": " + value;
             String display = truncate(chipText, width - 4f, fontSize);
             textCentered(display, x, width, centeredTextY(topY, chipHeight, fontSize), bold, fontSize, textColor);
