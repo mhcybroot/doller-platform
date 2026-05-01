@@ -175,7 +175,7 @@ public class ExportController {
         private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD);
         private final DecimalFormat bdt = new DecimalFormat("#,##0.00");
         private final float margin = 34f;
-        private final float top = 806f;
+        private final float topPadding = 36f;
         private final float bottom = 48f;
         private final float sectionTitleGap = 14f;
         private final float sectionGap = 10f;
@@ -217,10 +217,10 @@ public class ExportController {
 
         private void newPage(boolean continued) throws IOException {
             if (cs != null) cs.close();
-            page = new PDPage(PDRectangle.A4);
+            page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
             doc.addPage(page);
             cs = new PDPageContentStream(doc, page);
-            y = top;
+            y = page.getMediaBox().getHeight() - topPadding;
             drawHeader(continued);
         }
 
