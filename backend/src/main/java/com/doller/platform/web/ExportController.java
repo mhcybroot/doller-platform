@@ -222,7 +222,7 @@ public class ExportController {
         private final float tableToSummaryGap = 10f;
         private final float summaryHeight = 32f;
         private final float summaryTextOffset = 20f;
-        private final float exposureHeight = 48f;
+        private final float exposureHeight = 72f;
         private final float sectionTitleCardHeight = 22f;
 
         private PDPage page;
@@ -359,11 +359,11 @@ public class ExportController {
             Color cardBg = new Color(5, 84, 90);
             Color textColor = new Color(236, 245, 246);
             fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
-            text(title, margin + 8, y - 16, bold, 12, textColor);
+            text(title, margin + 12, y - 24, bold, 16, textColor);
             text(String.format("Receivable: %s | Payable: %s | Net: %s",
                     fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())),
-                    margin + 8, y - 36, regular, 11, textColor);
-            y -= (exposureHeight + 8);
+                    margin + 12, y - 50, regular, 14, textColor);
+            y -= (exposureHeight + 12);
         }
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
