@@ -250,14 +250,17 @@ public class ExportController {
             ensure(230);
             float cardWidth = page.getMediaBox().getWidth() - margin * 2;
             float cardHeight = 62f;
-            fill(margin, y - cardHeight, cardWidth, cardHeight, new Color(245, 248, 252));
+            Color customerCardBg = new Color(32, 110, 68);
+            Color customerTitleColor = new Color(238, 255, 245);
+            Color customerMetaColor = new Color(218, 243, 227);
+            fill(margin, y - cardHeight, cardWidth, cardHeight, customerCardBg);
             float innerX = margin + cardPadding;
             float phoneX = innerX;
             float addressX = margin + cardWidth * 0.38f;
-            text("Customer: " + safe(section.party().partyName()), innerX, y - 22, bold, 11, Color.BLACK);
-            text("Phone: " + safe(section.party().phone()), phoneX, y - 42, regular, 9, Color.DARK_GRAY);
+            text("Customer: " + safe(section.party().partyName()), innerX, y - 22, bold, 11, customerTitleColor);
+            text("Phone: " + safe(section.party().phone()), phoneX, y - 42, regular, 9, customerMetaColor);
             String address = "Address: " + safe(section.party().address());
-            text(truncate(address, cardWidth * 0.60f, 9), addressX, y - 42, regular, 9, Color.DARK_GRAY);
+            text(truncate(address, cardWidth * 0.60f, 9), addressX, y - 42, regular, 9, customerMetaColor);
             y -= (cardHeight + customerToDealsGap);
 
             drawDealTable(section.deals(), section.dealSummary());
@@ -316,11 +319,14 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
             ensure(exposureHeight + 18);
-            fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, new Color(249, 250, 252));
-            text(title, margin + 8, y - 18, bold, 10, Color.BLACK);
-            text(String.format("Receivable: %s | Payable: %s | Aging: %s | Net: %s",
-                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.agingDueBdt()), fmt(b.netBalanceBdt())),
-                    margin + 8, y - 36, regular, 9, Color.DARK_GRAY);
+            boolean grandSummary = title != null && title.toLowerCase().contains("grand");
+            Color cardBg = grandSummary ? new Color(154, 28, 36) : new Color(181, 37, 49);
+            Color textColor = new Color(255, 248, 248);
+            fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
+            text(title, margin + 8, y - 18, bold, 10, textColor);
+            text(String.format("Receivable: %s | Payable: %s | Net: %s",
+                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())),
+                    margin + 8, y - 36, regular, 9, textColor);
             y -= (exposureHeight + 8);
         }
 
@@ -354,14 +360,15 @@ public class ExportController {
 
         private void tableHeader(String[] headers, float[] cols) throws IOException {
             ensure(tableHeaderHeight + 2);
-            fill(margin, y - tableHeaderHeight + 1, sum(cols), tableHeaderHeight, new Color(225, 233, 246));
+            float tableWidth = sum(cols);
+            fill(margin, y - tableHeaderHeight + 1, tableWidth, tableHeaderHeight, new Color(225, 233, 246));
             float x = margin + 2;
             for (int i = 0; i < headers.length; i++) {
                 text(headers[i], x, y - tableHeaderTextOffset, bold, 8, new Color(32, 47, 82));
                 x += cols[i];
             }
+            drawRowBorder(y, tableHeaderHeight, cols, new Color(184, 196, 214));
             y -= tableHeaderHeight;
-            line(y + 3);
         }
 
         private void sectionTitleCard(String title) throws IOException {
@@ -376,6 +383,7 @@ public class ExportController {
         }
 
         private void tableRow(String[] cells, float[] cols, List<Integer> rightAlignCols) throws IOException {
+            float rowTop = y;
             float x = margin + 2;
             for (int i = 0; i < cells.length; i++) {
                 String value = truncate(cells[i], cols[i], 8);
@@ -386,7 +394,24 @@ public class ExportController {
                 }
                 x += cols[i];
             }
+            drawRowBorder(rowTop, tableRowHeight, cols, new Color(214, 220, 230));
             y -= tableRowHeight;
+        }
+
+        private void drawRowBorder(float topY, float height, float[] cols, Color strokeColor) throws IOException {
+            float tableWidth = sum(cols);
+            float bottomY = topY - height;
+            cs.setStrokingColor(strokeColor);
+            cs.addRect(margin, bottomY, tableWidth, height);
+            cs.stroke();
+
+            float columnX = margin;
+            for (int i = 0; i < cols.length - 1; i++) {
+                columnX += cols[i];
+                cs.moveTo(columnX, bottomY);
+                cs.lineTo(columnX, topY);
+                cs.stroke();
+            }
         }
 
         private void text(String value, float x, float yAt, PDType1Font font, float size, Color color) throws IOException {
