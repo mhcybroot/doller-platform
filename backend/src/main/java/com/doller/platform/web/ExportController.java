@@ -356,13 +356,13 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
             ensure(exposureHeight + 18);
-            Color cardBg = new Color(248, 16, 52);
-            Color textColor = Color.BLACK;
+            Color cardBg = new Color(5, 84, 90);
+            Color textColor = new Color(236, 245, 246);
             fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
-            text(title, margin + 8, y - 18, bold, 10, textColor);
+            text(title, margin + 8, y - 16, bold, 12, textColor);
             text(String.format("Receivable: %s | Payable: %s | Net: %s",
                     fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())),
-                    margin + 8, y - 36, regular, 9, textColor);
+                    margin + 8, y - 36, regular, 11, textColor);
             y -= (exposureHeight + 8);
         }
 
@@ -417,8 +417,7 @@ public class ExportController {
         private void drawGrandSummary() throws IOException {
             ensure(150);
             line(y + 4);
-            text("Grand Totals (All Parties)", margin, y - 8, bold, 12, new Color(17, 48, 87));
-            y -= 22;
+            y -= 10;
             dealSummary(report.grandDealSummary());
             settlementSummary(report.grandSettlementSummary());
             drawExposure("Grand Exposure Summary", report.grandExposureSummary());
