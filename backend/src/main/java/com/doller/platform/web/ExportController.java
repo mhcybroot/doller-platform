@@ -356,51 +356,93 @@ public class ExportController {
         }
 
         private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
-            ensure(exposureHeight + 18);
+            String summaryLine = String.format("Receivable: %s | Payable: %s | Net: %s",
+                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt()));
+            float exposureTextWidth = page.getMediaBox().getWidth() - margin * 2 - 24f;
+            List<String> lines = wrapLines(summaryLine, exposureTextWidth, 14f, 4);
+            float dynamicExposureHeight = Math.max(exposureHeight, 36f + (lines.size() * 16f));
+            ensure(dynamicExposureHeight + 18);
             Color cardBg = new Color(5, 84, 90);
             Color textColor = new Color(236, 245, 246);
-            fill(margin, y - exposureHeight, page.getMediaBox().getWidth() - margin * 2, exposureHeight, cardBg);
+            fill(margin, y - dynamicExposureHeight, page.getMediaBox().getWidth() - margin * 2, dynamicExposureHeight, cardBg);
             text(title, margin + 12, y - 24, bold, 16, textColor);
-            text(String.format("Receivable: %s | Payable: %s | Net: %s",
-                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())),
-                    margin + 12, y - 50, regular, 14, textColor);
-            y -= (exposureHeight + 12);
+            float lineY = y - 50;
+            for (String line : lines) {
+                text(line, margin + 12, lineY, regular, 14, textColor);
+                lineY -= 16f;
+            }
+            y -= (dynamicExposureHeight + 12);
         }
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
             ensure(summaryHeight + 10);
             float cardWidth = page.getMediaBox().getWidth() - margin * 2;
-            fill(margin, y - summaryHeight, cardWidth, summaryHeight, new Color(236, 243, 252));
+            float contentHeight = drawMetricRowHeight(
+                    new String[]{"Deal Count", "Total Buy", "Total Sell", "", "Net Exposure"},
+                    new String[]{String.valueOf(s.count()), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), "", fmt(s.netDealExposureBdt())}
+            );
+            float cardHeight = Math.max(summaryHeight, contentHeight + 8f);
+            ensure(cardHeight + 10);
+            fill(margin, y - cardHeight, cardWidth, cardHeight, new Color(236, 243, 252));
             drawMetricRow(
+                    y,
+                    cardHeight,
                     new String[]{"Deal Count", "Total Buy", "Total Sell", "", "Net Exposure"},
                     new String[]{String.valueOf(s.count()), fmt(s.totalBuyBdt()), fmt(s.totalSellBdt()), "", fmt(s.netDealExposureBdt())},
                     new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86), new Color(56, 69, 86)},
                     new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242), new Color(231, 236, 242)}
             );
-            y -= (summaryHeight + 8);
+            y -= (cardHeight + 8);
         }
 
         private void settlementSummary(TradingDtos.TransactionSettlementSummary s) throws IOException {
             ensure(summaryHeight + 10);
             float cardWidth = page.getMediaBox().getWidth() - margin * 2;
-            fill(margin, y - summaryHeight, cardWidth, summaryHeight, new Color(236, 243, 252));
+            float contentHeight = drawMetricRowHeight(
+                    new String[]{"Settle Count", "Incoming", "Outgoing", "Linked", "Unlinked"},
+                    new String[]{String.valueOf(s.count()), fmt(s.totalIncomingBdt()), fmt(s.totalOutgoingBdt()), String.valueOf(s.linkedCount()), String.valueOf(s.unlinkedCount())}
+            );
+            float cardHeight = Math.max(summaryHeight, contentHeight + 8f);
+            ensure(cardHeight + 10);
+            fill(margin, y - cardHeight, cardWidth, cardHeight, new Color(236, 243, 252));
             drawMetricRow(
+                    y,
+                    cardHeight,
                     new String[]{"Settle Count", "Incoming", "Outgoing", "Linked", "Unlinked"},
                     new String[]{String.valueOf(s.count()), fmt(s.totalIncomingBdt()), fmt(s.totalOutgoingBdt()), String.valueOf(s.linkedCount()), String.valueOf(s.unlinkedCount())},
                     new Color[]{new Color(27, 61, 107), new Color(25, 109, 73), new Color(153, 39, 48), new Color(56, 69, 86), new Color(90, 92, 102)},
                     new Color[]{new Color(226, 236, 249), new Color(222, 244, 235), new Color(249, 229, 232), new Color(231, 236, 242), new Color(240, 241, 246)}
             );
-            y -= (summaryHeight + 8);
+            y -= (cardHeight + 8);
         }
 
-        private void drawMetricRow(String[] labels, String[] values, Color[] textColors, Color[] bgColors) throws IOException {
+        private float drawMetricRowHeight(String[] labels, String[] values) throws IOException {
+            float gutter = 6f;
+            float availableWidth = page.getMediaBox().getWidth() - (margin * 2) - 16f;
+            int count = labels.length;
+            float chipWidth = (availableWidth - (gutter * (count - 1))) / count;
+            int maxLines = 1;
+            for (int i = 0; i < count; i++) {
+                String chipText = labels[i] + ": " + values[i];
+                if (labels[i].isBlank() && values[i].isBlank()) {
+                    continue;
+                }
+                int lines = wrapLines(chipText, chipWidth - 8f, 9f, 4).size();
+                if (lines > maxLines) {
+                    maxLines = lines;
+                }
+            }
+            return Math.max(summaryHeight - 8f, 8f + (maxLines * 11f));
+        }
+
+        private void drawMetricRow(float topY, float cardHeight, String[] labels, String[] values, Color[] textColors, Color[] bgColors) throws IOException {
             float gutter = 6f;
             float startX = margin + 8f;
             float availableWidth = page.getMediaBox().getWidth() - (margin * 2) - 16f;
             int count = labels.length;
             float chipWidth = (availableWidth - (gutter * (count - 1))) / count;
-            float innerTopY = y - 4f;
-            float innerHeight = summaryHeight - 8f;
+            float innerTopY = topY - 4f;
+            float innerHeight = cardHeight - 8f;
             float x = startX;
             for (int i = 0; i < count; i++) {
                 drawMetricChip(labels[i], values[i], x, innerTopY, innerHeight, chipWidth, 9f, textColors[i], bgColors[i]);
@@ -414,8 +456,13 @@ public class ExportController {
             if (label.isBlank() && value.isBlank()) {
                 return;
             }
-            String display = truncate(chipText, width - 4f, fontSize);
-            textCentered(display, x, width, centeredTextBaselineY(topY, height, bold, fontSize), bold, fontSize, textColor);
+            List<String> lines = wrapLines(chipText, width - 8f, fontSize, 4);
+            float lineGap = fontSize + 2f;
+            float totalHeight = lines.size() * lineGap;
+            float firstBaseline = topY - ((height - totalHeight) / 2f) - fontSize;
+            for (int i = 0; i < lines.size(); i++) {
+                textCentered(lines.get(i), x, width, firstBaseline - (i * lineGap), bold, fontSize, textColor);
+            }
         }
 
         private void drawGrandSummary() throws IOException {
