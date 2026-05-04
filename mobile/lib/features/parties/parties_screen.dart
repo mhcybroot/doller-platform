@@ -338,6 +338,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
                     ),
                   );
                 }
+                final flow = _partyFlowSummary(ledger!.lines);
 
                 return Padding(
                   padding: const EdgeInsets.all(20),
@@ -374,6 +375,33 @@ class _PartiesScreenState extends State<PartiesScreen> {
                             tone: ledger!.balances.netBalanceBdt >= 0
                                 ? BalancePillTone.netPositive
                                 : BalancePillTone.netNegative,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          BalancePill(
+                            label: 'Total Buy',
+                            value: formatBdt(flow.totalBuy),
+                            tone: BalancePillTone.neutral,
+                          ),
+                          BalancePill(
+                            label: 'Total Sell',
+                            value: formatBdt(flow.totalSell),
+                            tone: BalancePillTone.neutral,
+                          ),
+                          BalancePill(
+                            label: 'Settlement In',
+                            value: formatBdt(flow.settlementIn),
+                            tone: BalancePillTone.neutral,
+                          ),
+                          BalancePill(
+                            label: 'Settlement Out',
+                            value: formatBdt(flow.settlementOut),
+                            tone: BalancePillTone.neutral,
                           ),
                         ],
                       ),
@@ -986,6 +1014,39 @@ class _PartiesScreenState extends State<PartiesScreen> {
         isOutgoingSettlement ||
         isOpeningPayable ||
         isSellDeal;
+  }
+
+  ({double totalBuy, double totalSell, double settlementIn, double settlementOut})
+      _partyFlowSummary(List<PartyLedgerLineModel> rows) {
+    double totalBuy = 0;
+    double totalSell = 0;
+    double settlementIn = 0;
+    double settlementOut = 0;
+
+    for (final row in rows) {
+      final direction = (row.directionLabel ?? '').toUpperCase();
+      final amount = row.amountBdt;
+      if (row.entryType == 'DEAL') {
+        if (direction.contains('BUY')) {
+          totalBuy += amount;
+        } else if (direction.contains('SELL')) {
+          totalSell += amount;
+        }
+      } else if (row.entryType == 'SETTLEMENT') {
+        if (direction.startsWith('INCOMING')) {
+          settlementIn += amount;
+        } else if (direction.startsWith('OUTGOING')) {
+          settlementOut += amount;
+        }
+      }
+    }
+
+    return (
+      totalBuy: totalBuy,
+      totalSell: totalSell,
+      settlementIn: settlementIn,
+      settlementOut: settlementOut
+    );
   }
 
   @override
