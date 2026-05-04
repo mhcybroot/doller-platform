@@ -545,39 +545,37 @@ public class ExportController {
         }
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
-            ensure(100);
+            ensure(80);
             sectionTitleCard(title);
-            String[] headers = {"Metric", "Receivable", "Payable", "Net"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{120, 120, 120, 120});
-            float cardWidth = page.getMediaBox().getWidth() - margin * 2;
+            float availableWidth = page.getMediaBox().getWidth() - (margin * 2);
+            float[] cols = fitColumnsToAvailableWidth(new float[]{100, 120, 120, 120});
             float tableWidth = sum(cols);
-            float headerHeight = 20f;
-            float rowHeight = 22f;
+            float rowHeight = 20f;
 
-            // Table header
-            fill(margin, y - headerHeight, tableWidth, headerHeight, new Color(225, 233, 246));
+            // Table header row
+            fill(margin, y - rowHeight, tableWidth, rowHeight, new Color(225, 233, 246));
             float x = margin;
+            String[] headers = {"Metric", "Receivable", "Payable", "Net"};
             for (int i = 0; i < headers.length; i++) {
-                textCentered(headers[i], x, cols[i], y - 14, bold, 9f, new Color(32, 47, 82));
+                if (i == 0) {
+                    text(headers[i], x + 4, y - 14, bold, 9f, new Color(32, 47, 82));
+                } else {
+                    textRight(headers[i], x + cols[i] - 5, y - 14, bold, 9f, new Color(32, 47, 82));
+                }
                 x += cols[i];
             }
-            drawRowBorder(y, headerHeight, cols, new Color(184, 196, 214));
-            y -= headerHeight;
+            drawRowBorder(y, rowHeight, cols, new Color(184, 196, 214));
+            y -= rowHeight;
 
             // Before row
             fill(margin, y - rowHeight, tableWidth, rowHeight, Color.WHITE);
             x = margin;
-            String[] beforeCells = {
-                    "Before",
-                    fmt(b.beforeReceivableBdt()),
-                    fmt(b.beforePayableBdt()),
-                    "-"
-            };
+            String[] beforeCells = {"Before", fmt(b.beforeReceivableBdt()), fmt(b.beforePayableBdt()), "-"};
             for (int i = 0; i < beforeCells.length; i++) {
                 if (i == 0) {
-                    text(beforeCells[i], x + 4, y - 14, bold, 10f, new Color(17, 48, 87));
+                    text(beforeCells[i], x + 4, y - 14, regular, 9f, Color.BLACK);
                 } else {
-                    textRight(beforeCells[i], x + cols[i] - 5, y - 14, regular, 10f, Color.BLACK);
+                    textRight(beforeCells[i], x + cols[i] - 5, y - 14, regular, 9f, Color.BLACK);
                 }
                 x += cols[i];
             }
@@ -587,22 +585,17 @@ public class ExportController {
             // Now row
             fill(margin, y - rowHeight, tableWidth, rowHeight, new Color(242, 244, 247));
             x = margin;
-            String[] nowCells = {
-                    "Now",
-                    fmt(b.receivableBdt()),
-                    fmt(b.payableBdt()),
-                    fmt(b.netBalanceBdt())
-            };
+            String[] nowCells = {"Now", fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())};
             for (int i = 0; i < nowCells.length; i++) {
                 if (i == 0) {
-                    text(nowCells[i], x + 4, y - 14, bold, 10f, new Color(17, 48, 87));
+                    text(nowCells[i], x + 4, y - 14, regular, 9f, Color.BLACK);
                 } else {
-                    textRight(nowCells[i], x + cols[i] - 5, y - 14, regular, 10f, Color.BLACK);
+                    textRight(nowCells[i], x + cols[i] - 5, y - 14, regular, 9f, Color.BLACK);
                 }
                 x += cols[i];
             }
             drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
-            y -= (rowHeight + 12);
+            y -= (rowHeight + 10);
         }
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
