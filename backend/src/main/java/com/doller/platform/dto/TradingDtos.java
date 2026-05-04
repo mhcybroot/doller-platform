@@ -246,6 +246,7 @@ public class TradingDtos {
             String time,
             String direction,
             String paymentMethod,
+            String paymentReference,
             Long relatedDealId,
             BigDecimal amountBdt
     ) {}

@@ -701,6 +701,7 @@ public class TradingService {
                             r.occurredAt().toLocalTime().withNano(0).toString(),
                             r.directionLabel(),
                             r.paymentMethod(),
+                            r.paymentReference(),
                             r.tradeDealId(),
                             r.amountBdt() == null ? BigDecimal.ZERO : r.amountBdt()
                     ))

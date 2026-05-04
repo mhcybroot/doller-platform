@@ -333,8 +333,8 @@ public class ExportController {
         private void drawSettlementTable(List<TradingDtos.TransactionSettlementExportRow> rows, TradingDtos.TransactionSettlementSummary summary) throws IOException {
             ensure(80);
             sectionTitleCard("Settlements");
-            String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Related Deal ID", "Amount BDT"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{72, 64, 56, 132, 72, 68, 100});
+            String[] headers = {"Settlement ID", "Date", "Time", "Direction", "Payment Method", "Payment Reference", "Related Deal ID", "Amount BDT"};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{66, 58, 54, 126, 66, 90, 62, 84});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
@@ -345,10 +345,11 @@ public class ExportController {
                         safe(r.time()),
                         safe(r.direction()),
                         paymentMethodLabel(r.paymentMethod()),
+                        safe(r.paymentReference()),
                         safe(r.relatedDealId()),
                         fmt(r.amountBdt())
                 };
-                tableRow(cells, cols, List.of(6));
+                tableRow(cells, cols, List.of(7));
             }
             y -= tableToSummaryGap;
             settlementSummary(summary);
