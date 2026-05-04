@@ -712,6 +712,9 @@ public class TradingService {
             TradingDtos.PartyBalanceSummary exposure = party == null
                     ? new TradingDtos.PartyBalanceSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)
                     : partyBalanceSummary(party, details.to());
+            TradingDtos.PartyBalanceSummary beforeExposure = party == null
+                    ? new TradingDtos.PartyBalanceSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)
+                    : partyBalanceSummary(party, details.from().minusDays(1));
 
             sections.add(new TradingDtos.TransactionPartyExportSection(
                     partyIdentity,
@@ -719,11 +722,11 @@ public class TradingService {
                     settlements,
                     dealSummary,
                     settlementSummary,
-                    new TradingDtos.PartyBalanceSummary(
+                    new TradingDtos.TransactionPartyExposureSummary(
+                            bdt(beforeExposure.receivableBdt()),
+                            bdt(beforeExposure.payableBdt()),
                             bdt(exposure.receivableBdt()),
                             bdt(exposure.payableBdt()),
-                            bdt(exposure.advanceFromPartyBdt()),
-                            bdt(exposure.advanceToPartyBdt()),
                             bdt(exposure.netBalanceBdt()),
                             bdt(exposure.agingDueBdt())
                     )
@@ -739,8 +742,8 @@ public class TradingService {
         TradingDtos.PartyBalanceSummary grandExposure = new TradingDtos.PartyBalanceSummary(
                 bdt(sections.stream().map(s -> s.exposureSummary().receivableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 bdt(sections.stream().map(s -> s.exposureSummary().payableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
-                bdt(sections.stream().map(s -> s.exposureSummary().advanceFromPartyBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
-                bdt(sections.stream().map(s -> s.exposureSummary().advanceToPartyBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                BigDecimal.ZERO.setScale(2),
+                BigDecimal.ZERO.setScale(2),
                 bdt(sections.stream().map(s -> s.exposureSummary().netBalanceBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 bdt(sections.stream().map(s -> s.exposureSummary().agingDueBdt()).reduce(BigDecimal.ZERO, BigDecimal::add))
         );

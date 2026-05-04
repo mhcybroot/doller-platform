@@ -269,13 +269,21 @@ public class TradingDtos {
             String phone,
             String address
     ) {}
+    public record TransactionPartyExposureSummary(
+            BigDecimal beforeReceivableBdt,
+            BigDecimal beforePayableBdt,
+            BigDecimal receivableBdt,
+            BigDecimal payableBdt,
+            BigDecimal netBalanceBdt,
+            BigDecimal agingDueBdt
+    ) {}
     public record TransactionPartyExportSection(
             PartyIdentity party,
             List<TransactionDealExportRow> deals,
             List<TransactionSettlementExportRow> settlements,
             TransactionDealSummary dealSummary,
             TransactionSettlementSummary settlementSummary,
-            PartyBalanceSummary exposureSummary
+            TransactionPartyExposureSummary exposureSummary
     ) {}
     public record TransactionExportReport(
             LocalDate from,
