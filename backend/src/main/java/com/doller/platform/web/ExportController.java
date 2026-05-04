@@ -338,6 +338,7 @@ public class ExportController {
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
+                ensure(tableRowHeight + 2);
                 String[] cells = {
                         safe(r.settlementId()),
                         safe(r.date()),
@@ -348,10 +349,7 @@ public class ExportController {
                         safe(r.relatedDealId()),
                         fmt(r.amountBdt())
                 };
-                int wrappedLineCount = wrappedLineCount(cells[5], cols[5], 8f, 2);
-                float rowHeight = tableRowHeight * Math.max(1, wrappedLineCount);
-                ensure(rowHeight + 2);
-                tableRowWithWrappedCell(cells, cols, List.of(7), 5, 2, rowHeight);
+                tableRow(cells, cols, List.of(7));
             }
             y -= tableToSummaryGap;
             settlementSummary(summary);
@@ -430,18 +428,37 @@ public class ExportController {
         }
 
         private void tableHeader(String[] headers, float[] cols) throws IOException {
-            ensure(tableHeaderHeight + 2);
-            float tableWidth = sum(cols);
-            fill(margin, y - tableHeaderHeight + 1, tableWidth, tableHeaderHeight, new Color(225, 233, 246));
-            float x = margin;
-            float headerTextY = centeredTextBaselineY(y, tableHeaderHeight, bold, 8f);
+            int maxLines = 1;
             for (int i = 0; i < headers.length; i++) {
-                String header = truncate(headers[i], cols[i] - 4f, 8f);
-                textCentered(header, x, cols[i], headerTextY, bold, 8, new Color(32, 47, 82));
+                int lines = wrapLines(headers[i], cols[i] - 4f, 8f, 2).size();
+                if (lines > maxLines) {
+                    maxLines = lines;
+                }
+            }
+            float headerHeight = tableHeaderHeight * maxLines;
+            ensure(headerHeight + 2);
+            float tableWidth = sum(cols);
+            fill(margin, y - headerHeight + 1, tableWidth, headerHeight, new Color(225, 233, 246));
+            float x = margin;
+            float lineGap = 8.5f;
+            float firstBaseline = y - 11f;
+            for (int i = 0; i < headers.length; i++) {
+                List<String> lines = wrapLines(headers[i], cols[i] - 4f, 8f, 2);
+                for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                    textCentered(
+                            lines.get(lineIndex),
+                            x,
+                            cols[i],
+                            firstBaseline - (lineIndex * lineGap),
+                            bold,
+                            8,
+                            new Color(32, 47, 82)
+                    );
+                }
                 x += cols[i];
             }
-            drawRowBorder(y, tableHeaderHeight, cols, new Color(184, 196, 214));
-            y -= tableHeaderHeight;
+            drawRowBorder(y, headerHeight, cols, new Color(184, 196, 214));
+            y -= headerHeight;
         }
 
         private void sectionTitleCard(String title) throws IOException {
@@ -456,53 +473,33 @@ public class ExportController {
         }
 
         private void tableRow(String[] cells, float[] cols, List<Integer> rightAlignCols) throws IOException {
-            float rowTop = y;
-            float x = margin + 2;
-            float rowTextY = centeredTextBaselineY(y, tableRowHeight, regular, 8f);
+            int maxLines = 1;
             for (int i = 0; i < cells.length; i++) {
-                String value = truncate(cells[i], cols[i], 8);
-                if (rightAlignCols.contains(i)) {
-                    textRight(value, x + cols[i] - 3, rowTextY, regular, 8, Color.BLACK);
-                } else {
-                    text(value, x, rowTextY, regular, 8, Color.BLACK);
+                int lines = wrapLines(cells[i], cols[i] - 4f, 8f, 2).size();
+                if (lines > maxLines) {
+                    maxLines = lines;
                 }
-                x += cols[i];
             }
-            drawRowBorder(rowTop, tableRowHeight, cols, new Color(214, 220, 230));
-            y -= tableRowHeight;
-        }
+            float rowHeight = tableRowHeight * maxLines;
+            ensure(rowHeight + 2);
 
-        private void tableRowWithWrappedCell(
-                String[] cells,
-                float[] cols,
-                List<Integer> rightAlignCols,
-                int wrapColIndex,
-                int maxWrapLines,
-                float rowHeight
-        ) throws IOException {
             float rowTop = y;
             float x = margin + 2;
-            float defaultTextY = centeredTextBaselineY(y, rowHeight, regular, 8f);
-
+            float lineGap = 8.5f;
+            float firstBaseline = rowTop - 11f;
             for (int i = 0; i < cells.length; i++) {
-                if (i == wrapColIndex) {
-                    List<String> lines = wrapLines(cells[i], cols[i] - 4f, 8f, maxWrapLines);
-                    float lineGap = 8.5f;
-                    float firstBaseline = rowTop - 11f;
-                    for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-                        text(lines.get(lineIndex), x, firstBaseline - (lineIndex * lineGap), regular, 8, Color.BLACK);
-                    }
-                } else {
-                    String value = truncate(cells[i], cols[i], 8);
+                List<String> lines = wrapLines(cells[i], cols[i] - 4f, 8f, 2);
+                for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                    String value = lines.get(lineIndex);
+                    float lineY = firstBaseline - (lineIndex * lineGap);
                     if (rightAlignCols.contains(i)) {
-                        textRight(value, x + cols[i] - 3, defaultTextY, regular, 8, Color.BLACK);
+                        textRight(value, x + cols[i] - 3, lineY, regular, 8, Color.BLACK);
                     } else {
-                        text(value, x, defaultTextY, regular, 8, Color.BLACK);
+                        text(value, x, lineY, regular, 8, Color.BLACK);
                     }
                 }
                 x += cols[i];
             }
-
             drawRowBorder(rowTop, rowHeight, cols, new Color(214, 220, 230));
             y -= rowHeight;
         }
@@ -615,10 +612,6 @@ public class ExportController {
                 return "-";
             }
             return "CHECK".equalsIgnoreCase(value) ? "CHEQUE" : value;
-        }
-
-        private int wrappedLineCount(String value, float colWidth, float fontSize, int maxLines) throws IOException {
-            return wrapLines(value, colWidth - 4f, fontSize, maxLines).size();
         }
 
         private List<String> wrapLines(String value, float colWidth, float fontSize, int maxLines) throws IOException {
