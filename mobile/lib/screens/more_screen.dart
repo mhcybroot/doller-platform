@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/custom/custom_profit_cost_screen.dart';
+import '../features/custom/custom_profit_cost_home.dart';
 import '../features/dues/dues_screen.dart';
 import '../features/pnl/pnl_explain_screen.dart';
 import '../features/statements/statements_screen.dart';
@@ -134,7 +134,8 @@ class MoreScreen extends StatelessWidget {
                       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                       appBar: AppBar(title: const Text('Custom Profit/Cost')),
                       body: SafeArea(
-                        child: CustomProfitCostScreen(repository: repository),
+                        child: CustomProfitCostHome(repository: repository),
+                        
                       ),
                     ),
                   ),
