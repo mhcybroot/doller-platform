@@ -56,14 +56,6 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
       setState(() {
         _companies = companies;
         _companySummaries = summaries;
-        if (companies.isEmpty) {
-          _companyId = null;
-        } else {
-          _companyId ??= companies.first.id;
-          if (!companies.any((c) => c.id == _companyId)) {
-            _companyId = companies.first.id;
-          }
-        }
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -89,11 +81,16 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Create Company', style: Theme.of(context).textTheme.titleLarge),
+            Text('Create Company',
+                style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'Company Name')),
+            TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Company Name')),
             const SizedBox(height: 12),
-            TextField(controller: notes, decoration: const InputDecoration(labelText: 'Notes')),
+            TextField(
+                controller: notes,
+                decoration: const InputDecoration(labelText: 'Notes')),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
@@ -136,9 +133,13 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
           children: [
             Text('Edit Company', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'Company Name')),
+            TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Company Name')),
             const SizedBox(height: 12),
-            TextField(controller: notes, decoration: const InputDecoration(labelText: 'Notes')),
+            TextField(
+                controller: notes,
+                decoration: const InputDecoration(labelText: 'Notes')),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
@@ -170,8 +171,12 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
         title: const Text('Delete Company'),
         content: Text('Delete ${company.name}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -209,6 +214,7 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
         if (selected != null) _deleteCompany(selected);
       },
       onContinue: () {
+        if (_companyId == null) return;
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CustomSummaryPage(

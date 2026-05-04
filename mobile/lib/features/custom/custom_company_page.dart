@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../shared/models/domain_models.dart';
 import '../../shared/widgets/finance_widgets.dart';
 
-class CustomCompanyPage extends StatefulWidget {
+class CustomCompanyPage extends StatelessWidget {
   const CustomCompanyPage({
     super.key,
     required this.companies,
@@ -26,23 +26,16 @@ class CustomCompanyPage extends StatefulWidget {
   final VoidCallback onContinue;
 
   @override
-  State<CustomCompanyPage> createState() => _CustomCompanyPageState();
-}
-
-class _CustomCompanyPageState extends State<CustomCompanyPage> {
-  int? _expandedCompanyId;
-
-  @override
   Widget build(BuildContext context) {
     var allProfit = 0.0;
     var allLoss = 0.0;
-    for (final summary in widget.companySummaries.values) {
+    for (final summary in companySummaries.values) {
       allProfit += summary.totalProfitBdt;
       allLoss += summary.totalLossBdt;
     }
     final allNet = allProfit - allLoss;
 
-    if (widget.companies.isEmpty) {
+    if (companies.isEmpty) {
       return Scaffold(
         body: ListView(
           padding: const EdgeInsets.all(20),
@@ -56,7 +49,7 @@ class _CustomCompanyPageState extends State<CustomCompanyPage> {
                   const Text('No company yet. Create your first company.'),
                   const SizedBox(height: 10),
                   ElevatedButton(
-                      onPressed: widget.onCreateCompany,
+                      onPressed: onCreateCompany,
                       child: const Text('Create Company')),
                 ],
               ),
@@ -64,11 +57,26 @@ class _CustomCompanyPageState extends State<CustomCompanyPage> {
           ],
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: widget.onCreateCompany,
+          onPressed: onCreateCompany,
           child: const Icon(Icons.add),
         ),
       );
     }
+
+    final selectedCompany = selectedCompanyId != null
+        ? companies.firstWhere(
+            (c) => c.id == selectedCompanyId,
+            orElse: () => companies.first,
+          )
+        : null;
+    final selectedSummary = selectedCompanyId != null
+        ? companySummaries[selectedCompanyId] ??
+            const CustomEntrySummaryModel(
+              totalProfitBdt: 0,
+              totalLossBdt: 0,
+              netBdt: 0,
+            )
+        : null;
 
     return Scaffold(
       body: ListView(
@@ -103,170 +111,116 @@ class _CustomCompanyPageState extends State<CustomCompanyPage> {
             ],
           ),
           const SizedBox(height: 12),
-          FinanceSection(
-            title: 'Company Wise',
-            child: Column(
-              children: widget.companies.map((company) {
-                final summary = widget.companySummaries[company.id] ??
-                    const CustomEntrySummaryModel(
-                      totalProfitBdt: 0,
-                      totalLossBdt: 0,
-                      netBdt: 0,
-                    );
-                final isSelected = company.id == widget.selectedCompanyId;
-                final isExpanded = _expandedCompanyId == company.id;
-                return Card(
-                  key: ValueKey(company.id),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.2),
-                      width: isSelected ? 1.5 : 1,
+          Text('Company Wise', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: DropdownButtonFormField<int>(
+                initialValue: selectedCompanyId,
+                decoration: const InputDecoration(
+                  labelText: 'Select Company',
+                  border: InputBorder.none,
+                ),
+                hint: const Text('No company selected'),
+                isExpanded: true,
+                items: companies.map((company) {
+                  final summary = companySummaries[company.id] ??
+                      const CustomEntrySummaryModel(
+                        totalProfitBdt: 0,
+                        totalLossBdt: 0,
+                        netBdt: 0,
+                      );
+                  return DropdownMenuItem<int>(
+                    value: company.id,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text(company.name)),
+                        // Text(
+                        //   'P: ${formatBdt(summary.totalProfitBdt)} | L: ${formatBdt(summary.totalLossBdt)}',
+                        //   style:
+                        //       Theme.of(context).textTheme.bodySmall?.copyWith(
+                        //             color: Theme.of(context)
+                        //                 .colorScheme
+                        //                 .onSurfaceVariant,
+                        //           ),
+                        // ),
+                      ],
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        onTap: () {
-                          setState(() {
-                            if (_expandedCompanyId == company.id) {
-                              _expandedCompanyId = null;
-                            } else {
-                              _expandedCompanyId = company.id;
-                            }
-                          });
-                        },
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        leading: CircleAvatar(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primaryContainer,
-                          radius: 20,
-                          child: Text(
-                            company.name.isNotEmpty
-                                ? company.name[0].toUpperCase()
-                                : 'C',
-                            style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          company.name,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.15,
-                                  ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (isSelected)
-                              const Icon(Icons.check_circle, size: 20),
-                            Icon(
-                              isExpanded
-                                  ? Icons.expand_less
-                                  : Icons.expand_more,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isExpanded)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Wrap(spacing: 8, runSpacing: 8, children: [
-                            BalancePill(
-                              label: 'Total Profit',
-                              value: '${formatBdt(summary.totalProfitBdt)}',
-                              tone: BalancePillTone.receivable,
-                            ),
-                            BalancePill(
-                              label: 'Total Cost',
-                              value: '${formatBdt(summary.totalLossBdt)}',
-                              tone: BalancePillTone.payable,
-                            ),
-                            BalancePill(
-                              label: 'Net',
-                              value: summary.netBdt >= 0
-                                  ? '+${formatBdt(summary.netBdt)}'
-                                  : '-${formatBdt(summary.netBdt.abs())}',
-                              tone: summary.netBdt >= 0
-                                  ? BalancePillTone.netPositive
-                                  : BalancePillTone.netNegative,
-                            ),
-                          ]),
-                        ),
-                      if (isExpanded)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () {
-                                  widget.onChangedCompanyId(company.id);
-                                },
-                                icon: Icon(
-                                  isSelected
-                                      ? Icons.remove_circle_outline
-                                      : Icons.add_circle_outline,
-                                  size: 18,
-                                ),
-                                label: Text(isSelected ? 'Deselect' : 'Select'),
-                              ),
-                              const SizedBox(width: 8),
-                              TextButton.icon(
-                                onPressed: widget.onEditCompany,
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                label: const Text('Edit'),
-                              ),
-                              TextButton.icon(
-                                onPressed: widget.onDeleteCompany,
-                                icon: Icon(
-                                  Icons.delete_outline,
-                                  size: 18,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                label: Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                      color:
-                                          Theme.of(context).colorScheme.error),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+                onChanged: (value) => onChangedCompanyId(value),
+              ),
             ),
           ),
+          if (selectedCompany != null && selectedSummary != null) ...[
+            const SizedBox(height: 12),
+            Text('Selected: ${selectedCompany.name}',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                BalancePill(
+                  label: 'Total Profit',
+                  value: '+${formatBdt(selectedSummary.totalProfitBdt)}',
+                  tone: BalancePillTone.receivable,
+                ),
+                BalancePill(
+                  label: 'Total Cost',
+                  value: '-${formatBdt(selectedSummary.totalLossBdt)}',
+                  tone: BalancePillTone.payable,
+                ),
+                BalancePill(
+                  label: 'Net',
+                  value: selectedSummary.netBdt >= 0
+                      ? '+${formatBdt(selectedSummary.netBdt)}'
+                      : '-${formatBdt(selectedSummary.netBdt.abs())}',
+                  tone: selectedSummary.netBdt >= 0
+                      ? BalancePillTone.netPositive
+                      : BalancePillTone.netNegative,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onEditCompany,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
+                ),
+                TextButton.icon(
+                  onPressed: onDeleteCompany,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  label: Text(
+                    'Delete',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           ElevatedButton(
-            onPressed:
-                widget.selectedCompanyId == null ? null : widget.onContinue,
+            onPressed: selectedCompanyId == null ? null : onContinue,
             child: const Text('Continue'),
           )
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: widget.onCreateCompany,
+        onPressed: onCreateCompany,
         child: const Icon(Icons.add),
       ),
     );
