@@ -546,14 +546,16 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
             ensure(80);
-            sectionTitleCard(title);
-            float availableWidth = page.getMediaBox().getWidth() - (margin * 2);
+            // Title centered across full width
+            float pageWidth = page.getMediaBox().getWidth() - (margin * 2);
+            float titleWidth = bold.getStringWidth(title) / 1000f * 11f;
+            float centeredX = margin + (pageWidth - titleWidth) / 2f;
+            text(title, centeredX, y - 14, bold, 11, new Color(17, 48, 87));
+            y -= (22f + sectionTitleGap);
             float[] cols = fitColumnsToAvailableWidth(new float[]{100, 120, 120, 120});
-            float tableWidth = sum(cols);
             float rowHeight = 20f;
 
-            // Table header row
-            fill(margin, y - rowHeight, tableWidth, rowHeight, new Color(225, 233, 246));
+            // Table header row - no background
             float x = margin;
             String[] headers = {"Metric", "Receivable", "Payable", "Net"};
             for (int i = 0; i < headers.length; i++) {
@@ -564,11 +566,9 @@ public class ExportController {
                 }
                 x += cols[i];
             }
-            drawRowBorder(y, rowHeight, cols, new Color(184, 196, 214));
             y -= rowHeight;
 
-            // Before row
-            fill(margin, y - rowHeight, tableWidth, rowHeight, Color.WHITE);
+            // Before row - no background
             x = margin;
             String[] beforeCells = {"Before", fmt(b.beforeReceivableBdt()), fmt(b.beforePayableBdt()), "-"};
             for (int i = 0; i < beforeCells.length; i++) {
@@ -579,11 +579,9 @@ public class ExportController {
                 }
                 x += cols[i];
             }
-            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
             y -= rowHeight;
 
-            // Now row
-            fill(margin, y - rowHeight, tableWidth, rowHeight, new Color(242, 244, 247));
+            // Now row - no background
             x = margin;
             String[] nowCells = {"Now", fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())};
             for (int i = 0; i < nowCells.length; i++) {
@@ -594,7 +592,6 @@ public class ExportController {
                 }
                 x += cols[i];
             }
-            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
             y -= (rowHeight + 10);
         }
 
