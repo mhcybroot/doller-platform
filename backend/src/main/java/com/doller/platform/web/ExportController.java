@@ -286,7 +286,9 @@ public class ExportController {
 
                 // Table header
                 String[] headers = {"Date", "Purpose", "Type", "Amount", "Notes"};
-                float[] cols = fitColumnsToAvailableWidth(new float[]{80, 140, 60, 100, 180});
+                float pageWidth = page.getMediaBox().getWidth();
+                float availableWidth = pageWidth - margin * 2;
+                float[] cols = fitColumnsToAvailableWidth(new float[]{80, 140, 60, 100, 180}, availableWidth);
                 float headerHeight = 20f;
                 float tableWidth = sum(cols);
                 fill(cs, margin, y - headerHeight, tableWidth, headerHeight, new Color(225, 233, 246));
@@ -375,11 +377,10 @@ public class ExportController {
         return out;
     }
 
-    private float[] fitColumnsToAvailableWidth(float[] cols) {
+    private float[] fitColumnsToAvailableWidth(float[] cols, float availableWidth) {
         float total = sum(cols);
-        float available = 500f; // A4 width minus margins
-        if (total <= 0 || available <= 0) return cols;
-        float scale = available / total;
+        if (total <= 0 || availableWidth <= 0) return cols;
+        float scale = availableWidth / total;
         float[] out = new float[cols.length];
         for (int i = 0; i < cols.length; i++) out[i] = cols[i] * scale;
         return out;
