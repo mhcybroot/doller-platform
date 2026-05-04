@@ -34,72 +34,41 @@ class CustomCompanyPage extends StatelessWidget {
       allLoss += summary.totalLossBdt;
     }
     final allNet = allProfit - allLoss;
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text('Custom Profit/Cost', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 12),
-        FinanceSection(
-          title: 'Company',
-          trailing: IconButton(
-            onPressed: onCreateCompany,
-            icon: const Icon(Icons.add_business_outlined),
-          ),
-          child: companies.isEmpty
-              ? Column(
-                  children: [
-                    const Text('No company yet. Create your first company.'),
-                    const SizedBox(height: 10),
-                    ElevatedButton(onPressed: onCreateCompany, child: const Text('Create Company')),
-                  ],
-                )
-              : Column(
-                  children: [
-                    DropdownButtonFormField<int>(
-                      initialValue: selectedCompanyId,
-                      isExpanded: true,
-                      items: companies
-                          .map((c) => DropdownMenuItem<int>(value: c.id, child: Text(c.name)))
-                          .toList(),
-                      onChanged: onChangedCompanyId,
-                      decoration: const InputDecoration(labelText: 'Select Company'),
-                    ),
-                    const SizedBox(height: 10),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 340;
-                        final editButton = OutlinedButton(
-                          onPressed: selectedCompanyId == null ? null : onEditCompany,
-                          child: const Text('Edit Company'),
-                        );
-                        final deleteButton = OutlinedButton(
-                          onPressed: selectedCompanyId == null ? null : onDeleteCompany,
-                          child: const Text('Delete Company'),
-                        );
-                        if (compact) {
-                          return Column(
-                            children: [
-                              SizedBox(width: double.infinity, child: editButton),
-                              const SizedBox(height: 10),
-                              SizedBox(width: double.infinity, child: deleteButton),
-                            ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(child: editButton),
-                            const SizedBox(width: 10),
-                            Expanded(child: deleteButton),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+
+    if (companies.isEmpty) {
+      return Scaffold(
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text('Custom Profit/Cost',
+                style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  const Text('No company yet. Create your first company.'),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                      onPressed: onCreateCompany,
+                      child: const Text('Create Company')),
+                ],
+              ),
+            ),
+          ],
         ),
-        if (companies.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text('All Companies Summary', style: Theme.of(context).textTheme.titleMedium),
+        floatingActionButton: FloatingActionButton(
+          onPressed: onCreateCompany,
+          child: const Icon(Icons.add),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text('All Companies Summary',
+              style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 10,
@@ -120,8 +89,9 @@ class CustomCompanyPage extends StatelessWidget {
                 value: allNet >= 0
                     ? '+${formatBdt(allNet)}'
                     : '-${formatBdt(allNet.abs())}',
-                tone:
-                    allNet >= 0 ? BalancePillTone.netPositive : BalancePillTone.netNegative,
+                tone: allNet >= 0
+                    ? BalancePillTone.netPositive
+                    : BalancePillTone.netNegative,
               ),
             ],
           ),
@@ -146,19 +116,45 @@ class CustomCompanyPage extends StatelessWidget {
                     subtitle: Text(
                       'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
                     ),
-                    trailing: isSelected ? const Icon(Icons.check_circle) : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) const Icon(Icons.check_circle),
+                        PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              onEditCompany();
+                              return;
+                            }
+                            if (value == 'delete') {
+                              onDeleteCompany();
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(value: 'edit', child: Text('Edit')),
+                            PopupMenuItem(
+                                value: 'delete', child: Text('Delete')),
+                          ],
+                          child: const Icon(Icons.more_vert),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
             ),
           ),
+          const SizedBox(height: 14),
+          ElevatedButton(
+            onPressed: selectedCompanyId == null ? null : onContinue,
+            child: const Text('Continue'),
+          )
         ],
-        const SizedBox(height: 14),
-        ElevatedButton(
-          onPressed: selectedCompanyId == null ? null : onContinue,
-          child: const Text('Continue'),
-        )
-      ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: onCreateCompany,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
