@@ -176,64 +176,66 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('All Companies Summary', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              BalancePill(
-                label: 'Total Profit',
-                value: '+${formatBdt(allSummary.totalProfitBdt)}',
-                tone: BalancePillTone.receivable,
-              ),
-              BalancePill(
-                label: 'Total Loss',
-                value: '-${formatBdt(allSummary.totalLossBdt)}',
-                tone: BalancePillTone.payable,
-              ),
-              BalancePill(
-                label: 'Net',
-                value: allSummary.netBdt >= 0
-                    ? '+${formatBdt(allSummary.netBdt)}'
-                    : '-${formatBdt(allSummary.netBdt.abs())}',
-                tone: allSummary.netBdt >= 0
-                    ? BalancePillTone.netPositive
-                    : BalancePillTone.netNegative,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          FinanceSection(
-            title: 'Company Wise',
-            child: Column(
-              children: _companies.map((company) {
-                final data = _companyDataById[company.id];
-                final summary = data?.summary ??
-                    const CustomEntrySummaryModel(
-                      totalProfitBdt: 0,
-                      totalLossBdt: 0,
-                      netBdt: 0,
-                    );
-                final isSelected = company.id == selectedCompany.id;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    selected: isSelected,
-                    onTap: () => setState(() => _selectedCompanyId = company.id),
-                    title: Text(company.name),
-                    subtitle: Text(
-                      'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
-                    ),
-                    trailing: isSelected ? const Icon(Icons.check_circle) : null,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text('Selected Company: ${selectedCompany.name}',
-              style: Theme.of(context).textTheme.titleMedium),
+          // Text('${selectedCompany.name}', style: Theme.of(context).textTheme.titleMedium),
+          Text(' ${selectedCompany.name}',
+              style: Theme.of(context).textTheme.titleLarge),
+          // const SizedBox(height: 8),
+          // Wrap(
+          //   spacing: 10,
+          //   runSpacing: 10,
+          //   children: [
+          //     BalancePill(
+          //       label: 'Total Profit',
+          //       value: '+${formatBdt(allSummary.totalProfitBdt)}',
+          //       tone: BalancePillTone.receivable,
+          //     ),
+          //     BalancePill(
+          //       label: 'Total Loss',
+          //       value: '-${formatBdt(allSummary.totalLossBdt)}',
+          //       tone: BalancePillTone.payable,
+          //     ),
+          //     BalancePill(
+          //       label: 'Net',
+          //       value: allSummary.netBdt >= 0
+          //           ? '+${formatBdt(allSummary.netBdt)}'
+          //           : '-${formatBdt(allSummary.netBdt.abs())}',
+          //       tone: allSummary.netBdt >= 0
+          //           ? BalancePillTone.netPositive
+          //           : BalancePillTone.netNegative,
+          //     ),
+          //   ],
+          // ),
+          // const SizedBox(height: 12),
+          // FinanceSection(
+          //   title: 'Company Wise',
+          //   child: Column(
+          //     children: _companies.map((company) {
+          //       final data = _companyDataById[company.id];
+          //       final summary = data?.summary ??
+          //           const CustomEntrySummaryModel(
+          //             totalProfitBdt: 0,
+          //             totalLossBdt: 0,
+          //             netBdt: 0,
+          //           );
+          //       final isSelected = company.id == selectedCompany.id;
+          //       return Card(
+          //         margin: const EdgeInsets.only(bottom: 8),
+          //         child: ListTile(
+          //           selected: isSelected,
+          //           onTap: () => setState(() => _selectedCompanyId = company.id),
+          //           title: Text(company.name),
+          //           subtitle: Text(
+          //             'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
+          //           ),
+          //           trailing: isSelected ? const Icon(Icons.check_circle) : null,
+          //         ),
+          //       );
+          //     }).toList(),
+          //   ),
+          // ),
+          // const SizedBox(height: 12),
+          // Text('Selected Company: ${selectedCompany.name}',
+          //     style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 10,
@@ -245,7 +247,7 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                 tone: BalancePillTone.receivable,
               ),
               BalancePill(
-                label: 'Total Loss',
+                label: 'Total Cost',
                 value: '-${formatBdt(selectedData.summary.totalLossBdt)}',
                 tone: BalancePillTone.payable,
               ),

@@ -69,7 +69,7 @@ class CustomCompanyPage extends StatelessWidget {
         children: [
           Text('All Companies Summary',
               style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -113,9 +113,31 @@ class CustomCompanyPage extends StatelessWidget {
                     selected: isSelected,
                     onTap: () => onChangedCompanyId(company.id),
                     title: Text(company.name),
-                    subtitle: Text(
-                      'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
-                    ),
+                    titleAlignment: ListTileTitleAlignment.center,
+                    subtitle: Wrap(spacing: 15,children: [
+                     
+                   BalancePill(
+                label: 'Total Profit',
+                value: '${formatBdt(summary.totalProfitBdt)}',
+                tone: BalancePillTone.receivable,
+              ),
+ BalancePill(
+                label: 'Total Cost',
+                value: '${formatBdt(summary.totalLossBdt)} ',
+                tone: BalancePillTone.payable,
+              ),
+BalancePill(
+                label: 'Net',
+                value: summary.netBdt >= 0
+                    ? '+${formatBdt(summary.netBdt)}'
+                    : '-${formatBdt(summary.netBdt.abs())}',
+                tone: summary.netBdt >= 0
+                    ? BalancePillTone.netPositive
+                    : BalancePillTone.netNegative,
+              ),
+                    ],
+            runSpacing: 10,
+                       ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
