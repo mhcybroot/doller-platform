@@ -59,6 +59,59 @@ public class TradingController {
     @DeleteMapping("/expenses/{id}")
     public void deleteExpense(@PathVariable("id") Long id) { service.deleteExpense(id); }
 
+    @PreAuthorize("hasRole('OWNER')")
+    @GetMapping("/owner/companies")
+    public List<TradingDtos.CompanyResponse> companies() {
+        return service.listCompanies();
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PostMapping("/owner/companies")
+    public TradingDtos.CompanyResponse createCompany(@Valid @RequestBody TradingDtos.CompanyCreateRequest req) {
+        return service.createCompany(req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/owner/companies/{id}")
+    public TradingDtos.CompanyResponse updateCompany(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.CompanyUpdateRequest req) {
+        return service.updateCompany(id, req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/owner/companies/{id}")
+    public void deleteCompany(@PathVariable("id") Long id) {
+        service.deleteCompany(id);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @GetMapping("/owner/custom-entries")
+    public TradingDtos.CustomEntryListResponse customEntries(
+            @RequestParam("companyId") Long companyId,
+            @RequestParam(value = "from", required = false) LocalDate from,
+            @RequestParam(value = "to", required = false) LocalDate to,
+            @RequestParam(value = "search", required = false) String search
+    ) {
+        return service.listCustomEntries(companyId, from, to, search);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PostMapping("/owner/custom-entries")
+    public TradingDtos.CustomEntryRow createCustomEntry(@Valid @RequestBody TradingDtos.CustomEntryCreateRequest req) {
+        return service.createCustomEntry(req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/owner/custom-entries/{id}")
+    public TradingDtos.CustomEntryRow updateCustomEntry(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.CustomEntryUpdateRequest req) {
+        return service.updateCustomEntry(id, req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/owner/custom-entries/{id}")
+    public void deleteCustomEntry(@PathVariable("id") Long id) {
+        service.deleteCustomEntry(id);
+    }
+
     @GetMapping("/day-close/{date}") public TradingDtos.DayClosePreview preview(@PathVariable("date") LocalDate date) { return service.previewDayClose(date); }
     @PreAuthorize("hasRole('OWNER')")
     @PostMapping("/day-close/{date}") public TradingDtos.DayCloseResponse confirm(@PathVariable("date") LocalDate date) { return service.confirmDayClose(date); }

@@ -1000,6 +1000,114 @@ class SettlementInferenceModel {
   }
 }
 
+class CompanyModel {
+  final int id;
+  final String name;
+  final String? notes;
+
+  const CompanyModel({
+    required this.id,
+    required this.name,
+    required this.notes,
+  });
+
+  factory CompanyModel.fromJson(Map<String, dynamic> json) {
+    return CompanyModel(
+      id: (json["id"] as num).toInt(),
+      name: json["name"] as String,
+      notes: json["notes"] as String?,
+    );
+  }
+}
+
+class CustomEntryRowModel {
+  final int id;
+  final int companyId;
+  final String companyName;
+  final String entryType;
+  final double amountBdt;
+  final DateTime entryTime;
+  final String itemPurpose;
+  final String? notes;
+
+  const CustomEntryRowModel({
+    required this.id,
+    required this.companyId,
+    required this.companyName,
+    required this.entryType,
+    required this.amountBdt,
+    required this.entryTime,
+    required this.itemPurpose,
+    required this.notes,
+  });
+
+  factory CustomEntryRowModel.fromJson(Map<String, dynamic> json) {
+    return CustomEntryRowModel(
+      id: (json["id"] as num).toInt(),
+      companyId: (json["companyId"] as num).toInt(),
+      companyName: json["companyName"] as String,
+      entryType: json["entryType"] as String,
+      amountBdt: (json["amountBdt"] as num).toDouble(),
+      entryTime: DateTime.parse(json["entryTime"] as String),
+      itemPurpose: json["itemPurpose"] as String,
+      notes: json["notes"] as String?,
+    );
+  }
+}
+
+class CustomEntrySummaryModel {
+  final double totalProfitBdt;
+  final double totalLossBdt;
+  final double netBdt;
+
+  const CustomEntrySummaryModel({
+    required this.totalProfitBdt,
+    required this.totalLossBdt,
+    required this.netBdt,
+  });
+
+  factory CustomEntrySummaryModel.fromJson(Map<String, dynamic> json) {
+    return CustomEntrySummaryModel(
+      totalProfitBdt: (json["totalProfitBdt"] as num).toDouble(),
+      totalLossBdt: (json["totalLossBdt"] as num).toDouble(),
+      netBdt: (json["netBdt"] as num).toDouble(),
+    );
+  }
+}
+
+class CustomEntryListModel {
+  final int companyId;
+  final DateTime from;
+  final DateTime to;
+  final String? search;
+  final CustomEntrySummaryModel summary;
+  final List<CustomEntryRowModel> rows;
+
+  const CustomEntryListModel({
+    required this.companyId,
+    required this.from,
+    required this.to,
+    required this.search,
+    required this.summary,
+    required this.rows,
+  });
+
+  factory CustomEntryListModel.fromJson(Map<String, dynamic> json) {
+    return CustomEntryListModel(
+      companyId: (json["companyId"] as num).toInt(),
+      from: DateTime.parse(json["from"] as String),
+      to: DateTime.parse(json["to"] as String),
+      search: json["search"] as String?,
+      summary: CustomEntrySummaryModel.fromJson(
+          json["summary"] as Map<String, dynamic>),
+      rows: (json["rows"] as List<dynamic>)
+          .map((item) =>
+              CustomEntryRowModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class UserModel {
   final int id;
   final String username;

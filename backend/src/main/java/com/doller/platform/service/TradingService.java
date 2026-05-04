@@ -3,6 +3,7 @@ package com.doller.platform.service;
 import com.doller.platform.common.ApiException;
 import com.doller.platform.domain.*;
 import com.doller.platform.domain.enums.DealType;
+import com.doller.platform.domain.enums.CustomEntryType;
 import com.doller.platform.domain.enums.ExpenseType;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
@@ -32,6 +33,8 @@ public class TradingService {
     private final UserAccountRepository userRepo;
     private final SettlementRepository settlementRepo;
     private final ExpenseRepository expenseRepo;
+    private final CompanyRepository companyRepo;
+    private final OwnerCustomEntryRepository ownerCustomEntryRepo;
     private final DailyCloseRepository dailyCloseRepo;
     private final StatementSnapshotRepository snapshotRepo;
     private final LedgerEntryRepository ledgerRepo;
@@ -42,6 +45,7 @@ public class TradingService {
 
     public TradingService(TradeDealRepository dealRepo, PartyRepository partyRepo, UserAccountRepository userRepo,
                           SettlementRepository settlementRepo, ExpenseRepository expenseRepo,
+                          CompanyRepository companyRepo, OwnerCustomEntryRepository ownerCustomEntryRepo,
                           DailyCloseRepository dailyCloseRepo, StatementSnapshotRepository snapshotRepo,
                           LedgerEntryRepository ledgerRepo, LedgerService ledgerService, AuditService auditService,
                           @Value("${app.logging.trading-debug:false}") boolean tradingDebug,
@@ -51,6 +55,8 @@ public class TradingService {
         this.userRepo = userRepo;
         this.settlementRepo = settlementRepo;
         this.expenseRepo = expenseRepo;
+        this.companyRepo = companyRepo;
+        this.ownerCustomEntryRepo = ownerCustomEntryRepo;
         this.dailyCloseRepo = dailyCloseRepo;
         this.snapshotRepo = snapshotRepo;
         this.ledgerRepo = ledgerRepo;
@@ -270,6 +276,125 @@ public class TradingService {
         expense.setDeletedBy(currentActor());
         expenseRepo.save(expense);
         auditService.log("DELETE_EXPENSE", "/expenses/" + id, null, null, before, null);
+    }
+
+    public List<TradingDtos.CompanyResponse> listCompanies() {
+        return companyRepo.findByDeletedFalseOrderByNameAsc().stream()
+                .map(c -> new TradingDtos.CompanyResponse(c.getId(), c.getName(), c.getNotes()))
+                .toList();
+    }
+
+    @Transactional
+    public TradingDtos.CompanyResponse createCompany(TradingDtos.CompanyCreateRequest req) {
+        Company saved = companyRepo.save(Company.builder()
+                .name(req.name().trim())
+                .notes(req.notes())
+                .deleted(false)
+                .build());
+        auditService.log("CREATE_COMPANY", "/owner/companies", "name=" + req.name(), null, null, "company:" + saved.getId());
+        return new TradingDtos.CompanyResponse(saved.getId(), saved.getName(), saved.getNotes());
+    }
+
+    @Transactional
+    public TradingDtos.CompanyResponse updateCompany(Long id, TradingDtos.CompanyUpdateRequest req) {
+        Company company = companyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Company not found"));
+        String before = "id=" + company.getId() + ",name=" + company.getName() + ",notes=" + company.getNotes();
+        company.setName(req.name().trim());
+        company.setNotes(req.notes());
+        Company saved = companyRepo.save(company);
+        auditService.log("UPDATE_COMPANY", "/owner/companies/" + id, null, null, before,
+                "id=" + saved.getId() + ",name=" + saved.getName() + ",notes=" + saved.getNotes());
+        return new TradingDtos.CompanyResponse(saved.getId(), saved.getName(), saved.getNotes());
+    }
+
+    @Transactional
+    public void deleteCompany(Long id) {
+        Company company = companyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Company not found"));
+        company.setDeleted(true);
+        company.setDeletedAt(businessNow());
+        company.setDeletedBy(currentActor());
+        companyRepo.save(company);
+        auditService.log("DELETE_COMPANY", "/owner/companies/" + id, null, null, "company:" + id, null);
+    }
+
+    @Transactional
+    public TradingDtos.CustomEntryRow createCustomEntry(TradingDtos.CustomEntryCreateRequest req) {
+        Company company = companyRepo.findByIdAndDeletedFalse(req.companyId()).orElseThrow(() -> new ApiException("Company not found"));
+        BigDecimal amount = req.amountBdt().abs();
+        OwnerCustomEntry saved = ownerCustomEntryRepo.save(OwnerCustomEntry.builder()
+                .company(company)
+                .entryType(req.entryType())
+                .amountBdt(amount)
+                .entryTime(req.entryTime() == null ? businessNow() : req.entryTime())
+                .itemPurpose(req.itemPurpose().trim())
+                .notes(req.notes())
+                .deleted(false)
+                .build());
+        auditService.log("CREATE_CUSTOM_ENTRY", "/owner/custom-entries", "companyId=" + company.getId(), null, null,
+                "entry:" + saved.getId());
+        return toCustomEntryRow(saved);
+    }
+
+    @Transactional
+    public TradingDtos.CustomEntryRow updateCustomEntry(Long id, TradingDtos.CustomEntryUpdateRequest req) {
+        OwnerCustomEntry entry = ownerCustomEntryRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Custom entry not found"));
+        Company company = companyRepo.findByIdAndDeletedFalse(req.companyId()).orElseThrow(() -> new ApiException("Company not found"));
+        entry.setCompany(company);
+        entry.setEntryType(req.entryType());
+        entry.setAmountBdt(req.amountBdt().abs());
+        entry.setEntryTime(req.entryTime());
+        entry.setItemPurpose(req.itemPurpose().trim());
+        entry.setNotes(req.notes());
+        OwnerCustomEntry saved = ownerCustomEntryRepo.save(entry);
+        auditService.log("UPDATE_CUSTOM_ENTRY", "/owner/custom-entries/" + id, "companyId=" + company.getId(), null, null,
+                "entry:" + saved.getId());
+        return toCustomEntryRow(saved);
+    }
+
+    @Transactional
+    public void deleteCustomEntry(Long id) {
+        OwnerCustomEntry entry = ownerCustomEntryRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Custom entry not found"));
+        entry.setDeleted(true);
+        entry.setDeletedAt(businessNow());
+        entry.setDeletedBy(currentActor());
+        ownerCustomEntryRepo.save(entry);
+        auditService.log("DELETE_CUSTOM_ENTRY", "/owner/custom-entries/" + id, null, null, "entry:" + id, null);
+    }
+
+    public TradingDtos.CustomEntryListResponse listCustomEntries(Long companyId, LocalDate from, LocalDate to, String search) {
+        Company company = companyRepo.findByIdAndDeletedFalse(companyId).orElseThrow(() -> new ApiException("Company not found"));
+        LocalDate safeFrom = from == null ? businessToday().withDayOfMonth(1) : from;
+        LocalDate safeTo = to == null ? businessToday() : to;
+        String safeSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        LocalDateTime[] range = dayRange(safeFrom, safeTo);
+        List<OwnerCustomEntry> entries = ownerCustomEntryRepo
+                .findByCompanyIdAndDeletedFalseAndEntryTimeBetween(company.getId(), range[0], range[1])
+                .stream()
+                .filter(entry -> safeSearch.isEmpty()
+                        || containsIgnoreCase(entry.getItemPurpose(), safeSearch)
+                        || containsIgnoreCase(entry.getNotes(), safeSearch))
+                .sorted(Comparator.comparing(OwnerCustomEntry::getEntryTime).reversed()
+                        .thenComparing(OwnerCustomEntry::getId).reversed())
+                .toList();
+
+        BigDecimal totalProfit = entries.stream()
+                .filter(e -> e.getEntryType() == CustomEntryType.PROFIT)
+                .map(OwnerCustomEntry::getAmountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalLoss = entries.stream()
+                .filter(e -> e.getEntryType() == CustomEntryType.COST)
+                .map(OwnerCustomEntry::getAmountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal net = totalProfit.subtract(totalLoss);
+
+        return new TradingDtos.CustomEntryListResponse(
+                company.getId(),
+                safeFrom,
+                safeTo,
+                search,
+                new TradingDtos.CustomEntrySummary(bdt(totalProfit), bdt(totalLoss), bdt(net)),
+                entries.stream().map(this::toCustomEntryRow).toList()
+        );
     }
 
     public TradingDtos.DayClosePreview previewDayClose(LocalDate date) {
@@ -2225,6 +2350,19 @@ public class TradingService {
                 + ",time=" + expense.getExpenseTime()
                 + ",category=" + expense.getCategory()
                 + ",notes=" + expense.getNotes();
+    }
+
+    private TradingDtos.CustomEntryRow toCustomEntryRow(OwnerCustomEntry entry) {
+        return new TradingDtos.CustomEntryRow(
+                entry.getId(),
+                entry.getCompany().getId(),
+                entry.getCompany().getName(),
+                entry.getEntryType(),
+                bdt(entry.getAmountBdt()),
+                entry.getEntryTime(),
+                entry.getItemPurpose(),
+                entry.getNotes()
+        );
     }
 
 }

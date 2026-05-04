@@ -1,6 +1,7 @@
 package com.doller.platform.dto;
 
 import com.doller.platform.domain.enums.DealType;
+import com.doller.platform.domain.enums.CustomEntryType;
 import com.doller.platform.domain.enums.ExpenseType;
 import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.SettlementBasis;
@@ -46,6 +47,48 @@ public class TradingDtos {
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record ExpenseUpdateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
+    public record CompanyCreateRequest(@NotBlank String name, String notes) {}
+    public record CompanyUpdateRequest(@NotBlank String name, String notes) {}
+    public record CompanyResponse(Long id, String name, String notes) {}
+    public record CustomEntryCreateRequest(
+            @NotNull Long companyId,
+            @NotNull CustomEntryType entryType,
+            @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
+            LocalDateTime entryTime,
+            @NotBlank String itemPurpose,
+            String notes
+    ) {}
+    public record CustomEntryUpdateRequest(
+            @NotNull Long companyId,
+            @NotNull CustomEntryType entryType,
+            @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
+            @NotNull LocalDateTime entryTime,
+            @NotBlank String itemPurpose,
+            String notes
+    ) {}
+    public record CustomEntryRow(
+            Long id,
+            Long companyId,
+            String companyName,
+            CustomEntryType entryType,
+            BigDecimal amountBdt,
+            LocalDateTime entryTime,
+            String itemPurpose,
+            String notes
+    ) {}
+    public record CustomEntrySummary(
+            BigDecimal totalProfitBdt,
+            BigDecimal totalLossBdt,
+            BigDecimal netBdt
+    ) {}
+    public record CustomEntryListResponse(
+            Long companyId,
+            LocalDate from,
+            LocalDate to,
+            String search,
+            CustomEntrySummary summary,
+            List<CustomEntryRow> rows
+    ) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}
     public record DashboardResponse(

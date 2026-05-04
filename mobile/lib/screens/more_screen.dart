@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/custom/custom_profit_cost_screen.dart';
 import '../features/dues/dues_screen.dart';
 import '../features/pnl/pnl_explain_screen.dart';
 import '../features/statements/statements_screen.dart';
@@ -119,6 +120,28 @@ class MoreScreen extends StatelessWidget {
             },
           ),
         ),
+        if (session.isOwner)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.assessment_outlined),
+              title: const Text('Custom Profit/Cost'),
+              subtitle: const Text('Owner custom entries by company with summary'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                      appBar: AppBar(title: const Text('Custom Profit/Cost')),
+                      body: SafeArea(
+                        child: CustomProfitCostScreen(repository: repository),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
       ],
     );
   }

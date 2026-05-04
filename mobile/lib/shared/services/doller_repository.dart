@@ -336,6 +336,116 @@ class DollerRepository {
     );
   }
 
+  Future<List<CompanyModel>> listCompanies() async {
+    return _api.get<List<CompanyModel>>(
+      '/owner/companies',
+      parser: (json) => (json as List<dynamic>)
+          .map((item) => CompanyModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<CompanyModel> createCompany({
+    required String name,
+    String? notes,
+  }) async {
+    return _api.post<CompanyModel>(
+      '/owner/companies',
+      data: {'name': name, 'notes': notes},
+      parser: (json) => CompanyModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<CompanyModel> updateCompany({
+    required int id,
+    required String name,
+    String? notes,
+  }) async {
+    return _api.put<CompanyModel>(
+      '/owner/companies/$id',
+      data: {'name': name, 'notes': notes},
+      parser: (json) => CompanyModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> deleteCompany(int id) async {
+    await _api.delete<void>(
+      '/owner/companies/$id',
+      parser: (_) {},
+    );
+  }
+
+  Future<CustomEntryListModel> listCustomEntries({
+    required int companyId,
+    required DateTime from,
+    required DateTime to,
+    String? search,
+  }) async {
+    return _api.get<CustomEntryListModel>(
+      '/owner/custom-entries',
+      query: {
+        'companyId': companyId,
+        'from': _date(from),
+        'to': _date(to),
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      },
+      parser: (json) =>
+          CustomEntryListModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<CustomEntryRowModel> createCustomEntry({
+    required int companyId,
+    required String entryType,
+    required double amount,
+    DateTime? entryTime,
+    required String itemPurpose,
+    String? notes,
+  }) async {
+    return _api.post<CustomEntryRowModel>(
+      '/owner/custom-entries',
+      data: {
+        'companyId': companyId,
+        'entryType': entryType,
+        'amountBdt': amount,
+        if (entryTime != null) 'entryTime': entryTime.toIso8601String(),
+        'itemPurpose': itemPurpose,
+        'notes': notes,
+      },
+      parser: (json) => CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<CustomEntryRowModel> updateCustomEntry({
+    required int id,
+    required int companyId,
+    required String entryType,
+    required double amount,
+    required DateTime entryTime,
+    required String itemPurpose,
+    String? notes,
+  }) async {
+    return _api.put<CustomEntryRowModel>(
+      '/owner/custom-entries/$id',
+      data: {
+        'companyId': companyId,
+        'entryType': entryType,
+        'amountBdt': amount,
+        'entryTime': entryTime.toIso8601String(),
+        'itemPurpose': itemPurpose,
+        'notes': notes,
+      },
+      parser: (json) => CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> deleteCustomEntry(int id) async {
+    await _api.delete<void>(
+      '/owner/custom-entries/$id',
+      parser: (_) {},
+    );
+  }
+
   Future<DashboardMetrics> dashboard(DateTime from, DateTime to) async {
     AppLogger.log('repo', 'dashboard:start', fields: {
       'from': _date(from),
