@@ -80,7 +80,7 @@ class CustomCompanyPage extends StatelessWidget {
                 tone: BalancePillTone.receivable,
               ),
               BalancePill(
-                label: 'Total Loss',
+                label: 'Total Cost',
                 value: '-${formatBdt(allLoss)}',
                 tone: BalancePillTone.payable,
               ),
@@ -109,35 +109,70 @@ class CustomCompanyPage extends StatelessWidget {
                 final isSelected = company.id == selectedCompanyId;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.2),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
                   child: ListTile(
                     selected: isSelected,
                     onTap: () => onChangedCompanyId(company.id),
-                    title: Text(company.name),
-                    titleAlignment: ListTileTitleAlignment.center,
-                    subtitle: Wrap(spacing: 15,children: [
-                     
-                   BalancePill(
-                label: 'Total Profit',
-                value: '${formatBdt(summary.totalProfitBdt)}',
-                tone: BalancePillTone.receivable,
-              ),
- BalancePill(
-                label: 'Total Cost',
-                value: '${formatBdt(summary.totalLossBdt)} ',
-                tone: BalancePillTone.payable,
-              ),
-BalancePill(
-                label: 'Net',
-                value: summary.netBdt >= 0
-                    ? '+${formatBdt(summary.netBdt)}'
-                    : '-${formatBdt(summary.netBdt.abs())}',
-                tone: summary.netBdt >= 0
-                    ? BalancePillTone.netPositive
-                    : BalancePillTone.netNegative,
-              ),
-                    ],
-            runSpacing: 10,
-                       ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
+                      radius: 20,
+                      child: Text(
+                        company.name.isNotEmpty
+                            ? company.name[0].toUpperCase()
+                            : 'C',
+                        style: TextStyle(
+                          color:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      company.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.15,
+                          ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Wrap(spacing: 8, runSpacing: 8, children: [
+                        BalancePill(
+                          label: 'Total Profit',
+                          value: '${formatBdt(summary.totalProfitBdt)}',
+                          tone: BalancePillTone.receivable,
+                        ),
+                        BalancePill(
+                          label: 'Total Cost',
+                          value: '${formatBdt(summary.totalLossBdt)}',
+                          tone: BalancePillTone.payable,
+                        ),
+                        BalancePill(
+                          label: 'Net',
+                          value: summary.netBdt >= 0
+                              ? '+${formatBdt(summary.netBdt)}'
+                              : '-${formatBdt(summary.netBdt.abs())}',
+                          tone: summary.netBdt >= 0
+                              ? BalancePillTone.netPositive
+                              : BalancePillTone.netNegative,
+                        ),
+                      ]),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
