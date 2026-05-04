@@ -7,6 +7,7 @@ class CustomCompanyPage extends StatelessWidget {
   const CustomCompanyPage({
     super.key,
     required this.companies,
+    required this.companySummaries,
     required this.selectedCompanyId,
     required this.onChangedCompanyId,
     required this.onCreateCompany,
@@ -16,6 +17,7 @@ class CustomCompanyPage extends StatelessWidget {
   });
 
   final List<CompanyModel> companies;
+  final Map<int, CustomEntrySummaryModel> companySummaries;
   final int? selectedCompanyId;
   final ValueChanged<int?> onChangedCompanyId;
   final VoidCallback onCreateCompany;
@@ -25,6 +27,13 @@ class CustomCompanyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var allProfit = 0.0;
+    var allLoss = 0.0;
+    for (final summary in companySummaries.values) {
+      allProfit += summary.totalProfitBdt;
+      allLoss += summary.totalLossBdt;
+    }
+    final allNet = allProfit - allLoss;
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -88,6 +97,62 @@ class CustomCompanyPage extends StatelessWidget {
                   ],
                 ),
         ),
+        if (companies.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('All Companies Summary', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              BalancePill(
+                label: 'Total Profit',
+                value: '+${formatBdt(allProfit)}',
+                tone: BalancePillTone.receivable,
+              ),
+              BalancePill(
+                label: 'Total Loss',
+                value: '-${formatBdt(allLoss)}',
+                tone: BalancePillTone.payable,
+              ),
+              BalancePill(
+                label: 'Net',
+                value: allNet >= 0
+                    ? '+${formatBdt(allNet)}'
+                    : '-${formatBdt(allNet.abs())}',
+                tone:
+                    allNet >= 0 ? BalancePillTone.netPositive : BalancePillTone.netNegative,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FinanceSection(
+            title: 'Company Wise',
+            child: Column(
+              children: companies.map((company) {
+                final summary = companySummaries[company.id] ??
+                    const CustomEntrySummaryModel(
+                      totalProfitBdt: 0,
+                      totalLossBdt: 0,
+                      netBdt: 0,
+                    );
+                final isSelected = company.id == selectedCompanyId;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    selected: isSelected,
+                    onTap: () => onChangedCompanyId(company.id),
+                    title: Text(company.name),
+                    subtitle: Text(
+                      'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
+                    ),
+                    trailing: isSelected ? const Icon(Icons.check_circle) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         ElevatedButton(
           onPressed: selectedCompanyId == null ? null : onContinue,
@@ -97,4 +162,3 @@ class CustomCompanyPage extends StatelessWidget {
     );
   }
 }
-

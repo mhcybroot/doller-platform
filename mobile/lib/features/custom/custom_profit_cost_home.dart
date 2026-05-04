@@ -19,6 +19,9 @@ class CustomProfitCostHome extends StatefulWidget {
 class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
   List<CompanyModel> _companies = const [];
   int? _companyId;
+  DateTime? _from;
+  DateTime? _to;
+  Map<int, CustomEntrySummaryModel> _companySummaries = const {};
   bool _loading = true;
 
   @override
@@ -30,10 +33,29 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
   Future<void> _loadCompanies() async {
     setState(() => _loading = true);
     try {
+      final now = DateTime.now();
+      _from ??= DateTime(now.year, now.month, 1);
+      _to ??= now;
       final companies = await widget.repository.listCompanies();
+      final summaries = <int, CustomEntrySummaryModel>{};
+      if (companies.isNotEmpty) {
+        final responses = await Future.wait(
+          companies.map(
+            (company) => widget.repository.listCustomEntries(
+              companyId: company.id,
+              from: _from!,
+              to: _to!,
+            ),
+          ),
+        );
+        for (var i = 0; i < companies.length; i++) {
+          summaries[companies[i].id] = responses[i].summary;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _companies = companies;
+        _companySummaries = summaries;
         if (companies.isEmpty) {
           _companyId = null;
         } else {
@@ -176,6 +198,7 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
 
     return CustomCompanyPage(
       companies: _companies,
+      companySummaries: _companySummaries,
       selectedCompanyId: _companyId,
       onChangedCompanyId: (v) => setState(() => _companyId = v),
       onCreateCompany: _createCompany,

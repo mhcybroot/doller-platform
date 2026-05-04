@@ -26,8 +26,11 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
   final _search = TextEditingController();
   late DateTime _from;
   late DateTime _to;
-  CustomEntryListModel? _data;
+  List<CompanyModel> _companies = const [];
+  int? _selectedCompanyId;
+  Map<int, CustomEntryListModel> _companyDataById = const {};
   bool _loading = true;
+  _TimeSort _timeSort = _TimeSort.newestFirst;
 
   @override
   void initState() {
@@ -35,21 +38,42 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     final now = DateTime.now();
     _from = DateTime(now.year, now.month, 1);
     _to = now;
+    _selectedCompanyId = widget.companyId;
     _load();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final data = await widget.repository.listCustomEntries(
-        companyId: widget.companyId,
-        from: _from,
-        to: _to,
-        search: _search.text,
-      );
+      final companies = await widget.repository.listCompanies();
+      final selectedExists =
+          companies.any((company) => company.id == _selectedCompanyId);
+      final nextSelectedId = companies.isEmpty
+          ? null
+          : selectedExists
+              ? _selectedCompanyId
+              : companies.first.id;
+      final dataByCompany = <int, CustomEntryListModel>{};
+      if (companies.isNotEmpty) {
+        final responses = await Future.wait(
+          companies.map(
+            (company) => widget.repository.listCustomEntries(
+              companyId: company.id,
+              from: _from,
+              to: _to,
+              search: _search.text,
+            ),
+          ),
+        );
+        for (var i = 0; i < companies.length; i++) {
+          dataByCompany[companies[i].id] = responses[i];
+        }
+      }
       if (!mounted) return;
       setState(() {
-        _data = data;
+        _companies = companies;
+        _selectedCompanyId = nextSelectedId;
+        _companyDataById = dataByCompany;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -78,11 +102,13 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
   }
 
   Future<void> _openForm({CustomEntryRowModel? existing}) async {
+    final selectedId = _selectedCompanyId;
+    if (selectedId == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CustomEntryFormPage(
           repository: widget.repository,
-          companyId: widget.companyId,
+          companyId: selectedId,
           existing: existing,
         ),
       ),
@@ -108,6 +134,7 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
       if (!mounted) return;
       await _load();
     } on ApiException catch (e) {
+      if (!mounted) return;
       showAppMessage(context, e.message, isError: true);
     }
   }
@@ -115,10 +142,33 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    final data = _data;
-    if (data == null) return const Scaffold(body: SizedBox.shrink());
+    if (_companies.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
+        body: const Padding(
+          padding: EdgeInsets.all(20),
+          child: EmptyStateCard(
+            title: 'No company',
+            message: 'Create a company first to view summary and entries.',
+          ),
+        ),
+      );
+    }
+    final selectedCompany = _companies.firstWhere(
+      (company) => company.id == _selectedCompanyId,
+      orElse: () => _companies.first,
+    );
+    final selectedData = _companyDataById[selectedCompany.id];
+    if (selectedData == null) return const Scaffold(body: SizedBox.shrink());
+    final allSummary = _allCompaniesSummary();
+    final displayRows = List<CustomEntryRowModel>.from(selectedData.rows)
+      ..sort(
+        (a, b) => _timeSort == _TimeSort.newestFirst
+            ? b.entryTime.compareTo(a.entryTime)
+            : a.entryTime.compareTo(b.entryTime),
+      );
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.companyName} Summary')),
+      appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
@@ -126,26 +176,85 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          Text('All Companies Summary', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
               BalancePill(
                 label: 'Total Profit',
-                value: '+${formatBdt(data.summary.totalProfitBdt)}',
+                value: '+${formatBdt(allSummary.totalProfitBdt)}',
                 tone: BalancePillTone.receivable,
               ),
               BalancePill(
                 label: 'Total Loss',
-                value: '-${formatBdt(data.summary.totalLossBdt)}',
+                value: '-${formatBdt(allSummary.totalLossBdt)}',
                 tone: BalancePillTone.payable,
               ),
               BalancePill(
                 label: 'Net',
-                value: data.summary.netBdt >= 0
-                    ? '+${formatBdt(data.summary.netBdt)}'
-                    : '-${formatBdt(data.summary.netBdt.abs())}',
-                tone: data.summary.netBdt >= 0
+                value: allSummary.netBdt >= 0
+                    ? '+${formatBdt(allSummary.netBdt)}'
+                    : '-${formatBdt(allSummary.netBdt.abs())}',
+                tone: allSummary.netBdt >= 0
+                    ? BalancePillTone.netPositive
+                    : BalancePillTone.netNegative,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FinanceSection(
+            title: 'Company Wise',
+            child: Column(
+              children: _companies.map((company) {
+                final data = _companyDataById[company.id];
+                final summary = data?.summary ??
+                    const CustomEntrySummaryModel(
+                      totalProfitBdt: 0,
+                      totalLossBdt: 0,
+                      netBdt: 0,
+                    );
+                final isSelected = company.id == selectedCompany.id;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    selected: isSelected,
+                    onTap: () => setState(() => _selectedCompanyId = company.id),
+                    title: Text(company.name),
+                    subtitle: Text(
+                      'P: ${formatBdt(summary.totalProfitBdt)} | C: ${formatBdt(summary.totalLossBdt)} | N: ${summary.netBdt >= 0 ? '+' : '-'}${formatBdt(summary.netBdt.abs())}',
+                    ),
+                    trailing: isSelected ? const Icon(Icons.check_circle) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('Selected Company: ${selectedCompany.name}',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              BalancePill(
+                label: 'Total Profit',
+                value: '+${formatBdt(selectedData.summary.totalProfitBdt)}',
+                tone: BalancePillTone.receivable,
+              ),
+              BalancePill(
+                label: 'Total Loss',
+                value: '-${formatBdt(selectedData.summary.totalLossBdt)}',
+                tone: BalancePillTone.payable,
+              ),
+              BalancePill(
+                label: 'Net',
+                value: selectedData.summary.netBdt >= 0
+                    ? '+${formatBdt(selectedData.summary.netBdt)}'
+                    : '-${formatBdt(selectedData.summary.netBdt.abs())}',
+                tone: selectedData.summary.netBdt >= 0
                     ? BalancePillTone.netPositive
                     : BalancePillTone.netNegative,
               ),
@@ -174,6 +283,25 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                   ],
                 ),
                 const SizedBox(height: 10),
+                DropdownButtonFormField<_TimeSort>(
+                  initialValue: _timeSort,
+                  decoration: const InputDecoration(labelText: 'Time Sort'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: _TimeSort.newestFirst,
+                      child: Text('Newest First'),
+                    ),
+                    DropdownMenuItem(
+                      value: _TimeSort.oldestFirst,
+                      child: Text('Oldest First'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _timeSort = value);
+                  },
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _search,
                   onSubmitted: (_) => _load(),
@@ -189,13 +317,13 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
             ),
           ),
           const SizedBox(height: 12),
-          if (data.rows.isEmpty)
+          if (displayRows.isEmpty)
             const EmptyStateCard(
               title: 'No entries',
               message: 'Add profit/cost entries for selected filters.',
             )
           else
-            ...data.rows.map(
+            ...displayRows.map(
               (row) => Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: Padding(
@@ -243,4 +371,20 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
       ),
     );
   }
+
+  CustomEntrySummaryModel _allCompaniesSummary() {
+    var totalProfit = 0.0;
+    var totalLoss = 0.0;
+    for (final data in _companyDataById.values) {
+      totalProfit += data.summary.totalProfitBdt;
+      totalLoss += data.summary.totalLossBdt;
+    }
+    return CustomEntrySummaryModel(
+      totalProfitBdt: totalProfit,
+      totalLossBdt: totalLoss,
+      netBdt: totalProfit - totalLoss,
+    );
+  }
 }
+
+enum _TimeSort { newestFirst, oldestFirst }
