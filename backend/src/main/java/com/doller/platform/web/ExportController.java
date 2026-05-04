@@ -21,6 +21,7 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
@@ -69,7 +70,9 @@ public class ExportController {
             @RequestParam(value = "partyId", required = false) Long partyId,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "sortField", required = false) String sortField,
-            @RequestParam(value = "sortDirection", required = false) String sortDirection
+            @RequestParam(value = "sortDirection", required = false) String sortDirection,
+            @RequestParam(value = "companyId", required = false) Long companyId,
+            @RequestParam(value = "entryTypeFilter", required = false) String entryTypeFilter
     ) throws Exception {
         String normalizedType = reportType == null ? "BALANCE_SHEET" : reportType.trim().toUpperCase(Locale.ROOT);
         byte[] out;
@@ -79,6 +82,11 @@ public class ExportController {
             TradingDtos.TransactionExportReport response = service.transactionExportReport(from, to, type, partyId, search, sortField, sortDirection);
             out = renderTransactionPdf(response);
             filename = transactionPdfFilename(response);
+            rangeHeader = response.from() + "_" + response.to();
+        } else if ("CUSTOM_ENTRIES".equals(normalizedType)) {
+            TradingDtos.CustomEntryExportReport response = service.customEntriesExportReport(companyId, from, to, entryTypeFilter);
+            out = renderCustomEntriesPdf(response);
+            filename = customEntriesPdfFilename(response);
             rangeHeader = response.from() + "_" + response.to();
         } else {
             TradingDtos.BalanceSheetResponse response = service.balanceSheetReport(mode, date, month, year, from, to);
@@ -91,6 +99,15 @@ public class ExportController {
                 .header("X-Export-Range", rangeHeader)
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(out);
+    }
+
+    private String customEntriesPdfFilename(TradingDtos.CustomEntryExportReport report) {
+        String dateRange = report.from() + "_" + report.to();
+        String companySlug = sanitizeForFilename(report.companyName());
+        if (!companySlug.isBlank()) {
+            return companySlug + "_custom_entries_" + dateRange + ".pdf";
+        }
+        return "custom_entries_" + dateRange + ".pdf";
     }
 
     private String transactionPdfFilename(TradingDtos.TransactionExportReport report) {
@@ -134,7 +151,7 @@ public class ExportController {
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD), 14);
                 cs.beginText();
                 cs.newLineAtOffset(50, 790);
-                cs.showText("Doller Platform - Balance Sheet");
+                cs.showText("NexPay - Balance Sheet");
                 cs.endText();
 
                 cs.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER), 10);
@@ -199,6 +216,177 @@ public class ExportController {
             doc.save(baos);
             return baos.toByteArray();
         }
+    }
+
+    private byte[] renderCustomEntriesPdf(TradingDtos.CustomEntryExportReport response) throws Exception {
+        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
+            doc.addPage(page);
+            PDType1Font boldFont = new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD);
+            PDType1Font regularFont = new PDType1Font(Standard14Fonts.FontName.COURIER);
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                float margin = 50f;
+                float y = page.getMediaBox().getHeight() - 50f;
+                DecimalFormat bdtFormat = new DecimalFormat("#,##0.00");
+
+                // Header with logo
+                byte[] logo = null;
+                try (InputStream in = getClass().getClassLoader().getResourceAsStream("pdf/logo.jpeg")) {
+                    if (in != null) logo = in.readAllBytes();
+                }
+                float logoSize = 34f;
+                float brandY = y - 16;
+                if (logo != null) {
+                    try {
+                        PDImageXObject img = PDImageXObject.createFromByteArray(doc, logo, "logo");
+                        cs.drawImage(img, margin, y - logoSize, logoSize, logoSize);
+                    } catch (IOException ignored) {}
+                }
+                text(cs, "NexPay", margin + logoSize + 8, brandY, boldFont, 21f, new Color(17, 48, 87));
+                text(cs, "Custom Profit/Cost Report", margin + logoSize + 8, brandY - 22, regularFont, 12f, new Color(60, 60, 60));
+                y -= 70f;
+
+                // Company name and date range
+                text(cs, "Company: " + safe(response.companyName()), margin, y, boldFont, 12f, new Color(17, 48, 87));
+                y -= 18f;
+                text(cs, "Period: " + response.from() + " to " + response.to(), margin, y, regularFont, 10f, Color.GRAY);
+                y -= 18f;
+                if (response.entryTypeFilter() != null && !response.entryTypeFilter().isBlank()) {
+                    String filterLabel = "PROFIT_ONLY".equalsIgnoreCase(response.entryTypeFilter()) ? "Profit Only" : "LOSS_ONLY".equalsIgnoreCase(response.entryTypeFilter()) ? "Loss Only" : response.entryTypeFilter();
+                    text(cs, "Filter: " + filterLabel, margin, y, regularFont, 10f, Color.GRAY);
+                    y -= 18f;
+                }
+                y -= 10f;
+
+                // Summary cards
+                float cardWidth = (page.getMediaBox().getWidth() - margin * 2 - 20f) / 3;
+                float cardHeight = 50f;
+                float profitCardX = margin;
+                float costCardX = margin + cardWidth + 10f;
+                float netCardX = margin + (cardWidth + 10f) * 2;
+
+                // Profit card (green)
+                fill(cs, profitCardX, y - cardHeight, cardWidth, cardHeight, new Color(222, 244, 235));
+                text(cs, "Total Profit", profitCardX + 10, y - 18, boldFont, 9f, new Color(25, 109, 73));
+                text(cs, "+" + bdtFormat.format(response.totalProfitBdt()), profitCardX + 10, y - 38, boldFont, 14f, new Color(25, 109, 73));
+
+                // Cost card (red)
+                fill(cs, costCardX, y - cardHeight, cardWidth, cardHeight, new Color(249, 229, 232));
+                text(cs, "Total Cost", costCardX + 10, y - 18, boldFont, 9f, new Color(153, 39, 48));
+                text(cs, "-" + bdtFormat.format(response.totalLossBdt()), costCardX + 10, y - 38, boldFont, 14f, new Color(153, 39, 48));
+
+                // Net card
+                Color netBgColor = response.netBdt().compareTo(BigDecimal.ZERO) >= 0 ? new Color(226, 236, 249) : new Color(249, 229, 232);
+                Color netTextColor = response.netBdt().compareTo(BigDecimal.ZERO) >= 0 ? new Color(27, 61, 107) : new Color(153, 39, 48);
+                fill(cs, netCardX, y - cardHeight, cardWidth, cardHeight, netBgColor);
+                text(cs, "Net", netCardX + 10, y - 18, boldFont, 9f, netTextColor);
+                String netPrefix = response.netBdt().compareTo(BigDecimal.ZERO) >= 0 ? "+" : "-";
+                text(cs, netPrefix + bdtFormat.format(response.netBdt().abs()), netCardX + 10, y - 38, boldFont, 14f, netTextColor);
+                y -= (cardHeight + 25f);
+
+                // Table header
+                String[] headers = {"Date", "Purpose", "Type", "Amount", "Notes"};
+                float[] cols = fitColumnsToAvailableWidth(new float[]{80, 140, 60, 100, 180});
+                float headerHeight = 20f;
+                float tableWidth = sum(cols);
+                fill(cs, margin, y - headerHeight, tableWidth, headerHeight, new Color(225, 233, 246));
+                float x = margin;
+                for (int i = 0; i < headers.length; i++) {
+                    textCentered(cs, headers[i], x, cols[i], y - 14, boldFont, 8f, new Color(32, 47, 82));
+                    x += cols[i];
+                }
+                drawRowBorder(cs, margin, y, tableWidth, headerHeight, cols, new Color(184, 196, 214));
+                y -= headerHeight;
+
+                // Table rows
+                float rowHeight = 18f;
+                for (TradingDtos.CustomEntryRow row : response.entries()) {
+                    if (y < 60) break;
+                    fill(cs, margin, y - rowHeight, tableWidth, rowHeight, Color.WHITE);
+                    x = margin;
+                    String[] cells = {
+                            safe(row.entryTime() != null ? row.entryTime().toLocalDate().toString() : "-"),
+                            safe(row.itemPurpose()),
+                            safe(row.entryType() != null ? row.entryType().name() : "-"),
+                            bdtFormat.format(row.amountBdt()),
+                            safe(row.notes())
+                    };
+                    for (int i = 0; i < cells.length; i++) {
+                        if (i == 3) { // Amount column - right aligned
+                            textRight(cs, cells[i], x + cols[i] - 5, y - 12, regularFont, 8f, Color.BLACK);
+                        } else {
+                            text(cs, cells[i], x + 3, y - 12, regularFont, 8f, Color.BLACK);
+                        }
+                        x += cols[i];
+                    }
+                    drawRowBorder(cs, margin, y, tableWidth, rowHeight, cols, new Color(214, 220, 230));
+                    y -= rowHeight;
+                }
+            }
+            doc.save(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    private void text(PDPageContentStream cs, String value, float x, float y, PDType1Font font, float size, Color color) throws IOException {
+        cs.setFont(font, size);
+        cs.setNonStrokingColor(color);
+        cs.beginText();
+        cs.newLineAtOffset(x, y);
+        cs.showText(value == null ? "" : value);
+        cs.endText();
+    }
+
+    private void textRight(PDPageContentStream cs, String value, float rightX, float y, PDType1Font font, float size, Color color) throws IOException {
+        float w = font.getStringWidth(value) / 1000f * size;
+        text(cs, value, rightX - w, y, font, size, color);
+    }
+
+    private void textCentered(PDPageContentStream cs, String value, float cellX, float cellWidth, float y, PDType1Font font, float size, Color color) throws IOException {
+        String safeValue = value == null ? "" : value;
+        float textWidth = font.getStringWidth(safeValue) / 1000f * size;
+        float centeredX = cellX + Math.max((cellWidth - textWidth) / 2f, 0f);
+        text(cs, safeValue, centeredX, y, font, size, color);
+    }
+
+    private void fill(PDPageContentStream cs, float x, float y, float width, float height, Color color) throws IOException {
+        cs.setNonStrokingColor(color);
+        cs.addRect(x, y, width, height);
+        cs.fill();
+    }
+
+    private void drawRowBorder(PDPageContentStream cs, float margin, float topY, float tableWidth, float height, float[] cols, Color strokeColor) throws IOException {
+        float bottomY = topY - height;
+        cs.setStrokingColor(strokeColor);
+        cs.addRect(margin, bottomY, tableWidth, height);
+        cs.stroke();
+        float columnX = margin;
+        for (int i = 0; i < cols.length - 1; i++) {
+            columnX += cols[i];
+            cs.moveTo(columnX, bottomY);
+            cs.lineTo(columnX, topY);
+            cs.stroke();
+        }
+    }
+
+    private float sum(float[] cols) {
+        float out = 0;
+        for (float col : cols) out += col;
+        return out;
+    }
+
+    private float[] fitColumnsToAvailableWidth(float[] cols) {
+        float total = sum(cols);
+        float available = 500f; // A4 width minus margins
+        if (total <= 0 || available <= 0) return cols;
+        float scale = available / total;
+        float[] out = new float[cols.length];
+        for (int i = 0; i < cols.length; i++) out[i] = cols[i] * scale;
+        return out;
+    }
+
+    private String safe(Object value) {
+        return value == null ? "-" : String.valueOf(value);
     }
 
     private static final class TransactionPdfWriter {

@@ -89,6 +89,17 @@ public class TradingDtos {
             CustomEntrySummary summary,
             List<CustomEntryRow> rows
     ) {}
+    public record CustomEntryExportReport(
+            LocalDate from,
+            LocalDate to,
+            String entryTypeFilter,
+            Long companyId,
+            String companyName,
+            BigDecimal totalProfitBdt,
+            BigDecimal totalLossBdt,
+            BigDecimal netBdt,
+            List<CustomEntryRow> entries
+    ) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
     public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}
     public record DashboardResponse(

@@ -412,7 +412,8 @@ class DollerRepository {
         'itemPurpose': itemPurpose,
         'notes': notes,
       },
-      parser: (json) => CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -435,7 +436,8 @@ class DollerRepository {
         'itemPurpose': itemPurpose,
         'notes': notes,
       },
-      parser: (json) => CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
+      parser: (json) =>
+          CustomEntryRowModel.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -721,7 +723,8 @@ class DollerRepository {
       sortField: sortField,
       sortDirection: sortDirection,
     );
-    await Share.shareXFiles([XFile(result.file.path)], fileNameOverrides: [result.filename]);
+    await Share.shareXFiles([XFile(result.file.path)],
+        fileNameOverrides: [result.filename]);
   }
 
   Future<PdfExportResult> exportTransactionDetailsPdf({
@@ -753,6 +756,34 @@ class DollerRepository {
       to: to,
       fallbackPartyName: fallbackPartyName,
     );
+    final filename = _resolveExportFilename(
+      contentDisposition: download.headers['content-disposition'],
+      fallbackName: fallbackName,
+    );
+    final file = File('${tempDir.path}/$filename');
+    await file.writeAsBytes(download.bytes);
+    return PdfExportResult(file: file, filename: filename);
+  }
+
+  Future<PdfExportResult> exportCustomEntriesPdf({
+    required int companyId,
+    required DateTime from,
+    required DateTime to,
+    String? entryTypeFilter,
+  }) async {
+    final download = await _api.downloadWithMetadata(
+      '/exports/pdf',
+      query: {
+        'reportType': 'CUSTOM_ENTRIES',
+        'companyId': companyId,
+        'from': _date(from),
+        'to': _date(to),
+        if (entryTypeFilter != null && entryTypeFilter.isNotEmpty)
+          'entryTypeFilter': entryTypeFilter,
+      },
+    );
+    final tempDir = await getTemporaryDirectory();
+    final fallbackName = 'custom_entries_${_date(from)}_${_date(to)}.pdf';
     final filename = _resolveExportFilename(
       contentDisposition: download.headers['content-disposition'],
       fallbackName: fallbackName,
@@ -799,17 +830,18 @@ class DollerRepository {
     if (contentDisposition == null || contentDisposition.trim().isEmpty) {
       return null;
     }
-    final utf8Match =
-        RegExp(r"filename\*=UTF-8''([^;]+)", caseSensitive: false).firstMatch(contentDisposition);
+    final utf8Match = RegExp(r"filename\*=UTF-8''([^;]+)", caseSensitive: false)
+        .firstMatch(contentDisposition);
     if (utf8Match != null) {
       return Uri.decodeComponent(utf8Match.group(1)!);
     }
-    final quoted =
-        RegExp(r'filename="([^"]+)"', caseSensitive: false).firstMatch(contentDisposition);
+    final quoted = RegExp(r'filename="([^"]+)"', caseSensitive: false)
+        .firstMatch(contentDisposition);
     if (quoted != null) {
       return quoted.group(1);
     }
-    final plain = RegExp(r'filename=([^;]+)', caseSensitive: false).firstMatch(contentDisposition);
+    final plain = RegExp(r'filename=([^;]+)', caseSensitive: false)
+        .firstMatch(contentDisposition);
     if (plain != null) {
       return plain.group(1)?.trim();
     }
@@ -840,7 +872,9 @@ class DollerRepository {
         .replaceAll(RegExp(r'\s+'), '_')
         .replaceAll(RegExp(r'_+'), '_')
         .replaceAll(RegExp(r'^[_-]+|[_-]+$'), '');
-    return out.length > 60 ? out.substring(0, 60).replaceAll(RegExp(r'_+$'), '') : out;
+    return out.length > 60
+        ? out.substring(0, 60).replaceAll(RegExp(r'_+$'), '')
+        : out;
   }
 
   String _sanitizeFilename(String value) {

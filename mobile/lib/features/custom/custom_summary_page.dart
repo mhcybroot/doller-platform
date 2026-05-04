@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
@@ -144,6 +148,43 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     }
   }
 
+  bool _exporting = false;
+
+  Future<void> _exportPdf() async {
+    final selectedId = widget.companyId;
+    if (selectedId == null) return;
+    setState(() => _exporting = true);
+    try {
+      final entryTypeFilter = switch (_entryTypeFilter) {
+        _EntryTypeFilter.all => null,
+        _EntryTypeFilter.profitOnly => 'PROFIT_ONLY',
+        _EntryTypeFilter.lossOnly => 'LOSS_ONLY',
+      };
+      final result = await widget.repository.exportCustomEntriesPdf(
+        companyId: selectedId,
+        from: _from,
+        to: _to,
+        entryTypeFilter: entryTypeFilter,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _CustomEntriesPdfPreviewScreen(
+            filePath: result.file.path,
+            fileName: result.filename,
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      showAppMessage(context, error.message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _exporting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading)
@@ -193,7 +234,22 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     }
     final filteredNet = filteredProfit - filteredLoss;
     return Scaffold(
-      appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
+      appBar: AppBar(
+        title: const Text('Custom Profit/Cost Summary'),
+        actions: [
+          IconButton(
+            onPressed: _exporting ? null : _exportPdf,
+            icon: _exporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'Export PDF',
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
@@ -446,3 +502,55 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
 enum _TimeSort { newestFirst, oldestFirst }
 
 enum _EntryTypeFilter { all, profitOnly, lossOnly }
+
+class _CustomEntriesPdfPreviewScreen extends StatefulWidget {
+  const _CustomEntriesPdfPreviewScreen({
+    required this.filePath,
+    required this.fileName,
+  });
+
+  final String filePath;
+  final String fileName;
+
+  @override
+  State<_CustomEntriesPdfPreviewScreen> createState() =>
+      _CustomEntriesPdfPreviewScreenState();
+}
+
+class _CustomEntriesPdfPreviewScreenState
+    extends State<_CustomEntriesPdfPreviewScreen> {
+  bool _sharing = false;
+
+  Future<void> _share() async {
+    setState(() => _sharing = true);
+    try {
+      await Share.shareXFiles(
+        [XFile(widget.filePath)],
+        fileNameOverrides: [widget.fileName],
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sharing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.fileName),
+        actions: [
+          IconButton(
+            onPressed: _sharing ? null : _share,
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share PDF',
+          ),
+        ],
+      ),
+      body: SfPdfViewer.file(
+        File(widget.filePath),
+      ),
+    );
+  }
+}

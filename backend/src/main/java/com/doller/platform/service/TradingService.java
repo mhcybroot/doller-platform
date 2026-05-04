@@ -397,6 +397,51 @@ public class TradingService {
         );
     }
 
+    public TradingDtos.CustomEntryExportReport customEntriesExportReport(Long companyId, LocalDate from, LocalDate to, String entryTypeFilter) {
+        Company company = companyRepo.findByIdAndDeletedFalse(companyId).orElseThrow(() -> new ApiException("Company not found"));
+        LocalDate safeFrom = from == null ? businessToday().withDayOfMonth(1) : from;
+        LocalDate safeTo = to == null ? businessToday() : to;
+        LocalDateTime[] range = dayRange(safeFrom, safeTo);
+        List<OwnerCustomEntry> entries = ownerCustomEntryRepo
+                .findByCompanyIdAndDeletedFalseAndEntryTimeBetween(company.getId(), range[0], range[1])
+                .stream()
+                .sorted(Comparator.comparing(OwnerCustomEntry::getEntryTime).reversed()
+                        .thenComparing(OwnerCustomEntry::getId).reversed())
+                .toList();
+
+        // Apply entry type filter
+        if (entryTypeFilter != null && !entryTypeFilter.isBlank()) {
+            String filter = entryTypeFilter.trim().toUpperCase(Locale.ROOT);
+            if ("PROFIT_ONLY".equals(filter)) {
+                entries = entries.stream().filter(e -> e.getEntryType() == CustomEntryType.PROFIT).toList();
+            } else if ("LOSS_ONLY".equals(filter)) {
+                entries = entries.stream().filter(e -> e.getEntryType() == CustomEntryType.COST).toList();
+            }
+        }
+
+        BigDecimal totalProfit = entries.stream()
+                .filter(e -> e.getEntryType() == CustomEntryType.PROFIT)
+                .map(OwnerCustomEntry::getAmountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalLoss = entries.stream()
+                .filter(e -> e.getEntryType() == CustomEntryType.COST)
+                .map(OwnerCustomEntry::getAmountBdt)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal net = totalProfit.subtract(totalLoss);
+
+        return new TradingDtos.CustomEntryExportReport(
+                safeFrom,
+                safeTo,
+                entryTypeFilter,
+                company.getId(),
+                company.getName(),
+                bdt(totalProfit),
+                bdt(totalLoss),
+                bdt(net),
+                entries.stream().map(this::toCustomEntryRow).toList()
+        );
+    }
+
     public TradingDtos.DayClosePreview previewDayClose(LocalDate date) {
         var range = dayRange(date);
         PnlMetrics metrics = pnlMetrics(date, date);
