@@ -296,7 +296,7 @@ public class TradingDtos {
             List<TransactionPartyExportSection> partySections,
             TransactionDealSummary grandDealSummary,
             TransactionSettlementSummary grandSettlementSummary,
-            PartyBalanceSummary grandExposureSummary
+            TransactionPartyExposureSummary grandExposureSummary
     ) {}
     public record PartyLedgerLine(
             String kind,

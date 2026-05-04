@@ -739,11 +739,11 @@ public class TradingService {
         TradingDtos.TransactionSettlementSummary grandSettlements = summarizeSettlements(
                 sections.stream().flatMap(s -> s.settlements().stream()).toList()
         );
-        TradingDtos.PartyBalanceSummary grandExposure = new TradingDtos.PartyBalanceSummary(
+        TradingDtos.TransactionPartyExposureSummary grandExposure = new TradingDtos.TransactionPartyExposureSummary(
+                bdt(sections.stream().map(s -> s.exposureSummary().beforeReceivableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                bdt(sections.stream().map(s -> s.exposureSummary().beforePayableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 bdt(sections.stream().map(s -> s.exposureSummary().receivableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 bdt(sections.stream().map(s -> s.exposureSummary().payableBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
-                BigDecimal.ZERO.setScale(2),
-                BigDecimal.ZERO.setScale(2),
                 bdt(sections.stream().map(s -> s.exposureSummary().netBalanceBdt()).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 bdt(sections.stream().map(s -> s.exposureSummary().agingDueBdt()).reduce(BigDecimal.ZERO, BigDecimal::add))
         );

@@ -356,35 +356,21 @@ public class ExportController {
         }
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
-            String summaryLine = String.format(
-                    "Before Receivable: %s | Before Payable: %s | Receivable: %s | Payable: %s | Net: %s",
+            float exposureTextWidth = page.getMediaBox().getWidth() - margin * 2 - 24f;
+            String beforeLine = String.format(
+                    "Before Receivable: %s | Before Payable: %s",
                     fmt(b.beforeReceivableBdt()),
-                    fmt(b.beforePayableBdt()),
+                    fmt(b.beforePayableBdt())
+            );
+            String nowLine = String.format(
+                    "Now Receivable: %s | Now Payable: %s | Net: %s",
                     fmt(b.receivableBdt()),
                     fmt(b.payableBdt()),
                     fmt(b.netBalanceBdt())
             );
-            float exposureTextWidth = page.getMediaBox().getWidth() - margin * 2 - 24f;
-            List<String> lines = wrapLines(summaryLine, exposureTextWidth, 14f, 4);
-            float dynamicExposureHeight = Math.max(exposureHeight, 36f + (lines.size() * 16f));
-            ensure(dynamicExposureHeight + 18);
-            Color cardBg = new Color(5, 84, 90);
-            Color textColor = new Color(236, 245, 246);
-            fill(margin, y - dynamicExposureHeight, page.getMediaBox().getWidth() - margin * 2, dynamicExposureHeight, cardBg);
-            text(title, margin + 12, y - 24, bold, 16, textColor);
-            float lineY = y - 50;
-            for (String line : lines) {
-                text(line, margin + 12, lineY, regular, 14, textColor);
-                lineY -= 16f;
-            }
-            y -= (dynamicExposureHeight + 12);
-        }
-
-        private void drawExposure(String title, TradingDtos.PartyBalanceSummary b) throws IOException {
-            String summaryLine = String.format("Receivable: %s | Payable: %s | Net: %s",
-                    fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt()));
-            float exposureTextWidth = page.getMediaBox().getWidth() - margin * 2 - 24f;
-            List<String> lines = wrapLines(summaryLine, exposureTextWidth, 14f, 4);
+            List<String> lines = new ArrayList<>();
+            lines.addAll(wrapLines(beforeLine, exposureTextWidth, 14f, 3));
+            lines.addAll(wrapLines(nowLine, exposureTextWidth, 14f, 3));
             float dynamicExposureHeight = Math.max(exposureHeight, 36f + (lines.size() * 16f));
             ensure(dynamicExposureHeight + 18);
             Color cardBg = new Color(5, 84, 90);
