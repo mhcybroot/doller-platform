@@ -31,6 +31,7 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
   Map<int, CustomEntryListModel> _companyDataById = const {};
   bool _loading = true;
   _TimeSort _timeSort = _TimeSort.newestFirst;
+  _EntryTypeFilter _entryTypeFilter = _EntryTypeFilter.all;
 
   @override
   void initState() {
@@ -123,8 +124,12 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
         title: const Text('Delete Entry'),
         content: Text('Delete ${row.itemPurpose}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -141,7 +146,8 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_companies.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
@@ -160,13 +166,32 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     );
     final selectedData = _companyDataById[selectedCompany.id];
     if (selectedData == null) return const Scaffold(body: SizedBox.shrink());
-    final allSummary = _allCompaniesSummary();
-    final displayRows = List<CustomEntryRowModel>.from(selectedData.rows)
+    final displayRows = selectedData.rows.where((row) {
+      switch (_entryTypeFilter) {
+        case _EntryTypeFilter.all:
+          return true;
+        case _EntryTypeFilter.profitOnly:
+          return row.entryType == 'PROFIT';
+        case _EntryTypeFilter.lossOnly:
+          return row.entryType == 'COST';
+      }
+    }).toList()
       ..sort(
         (a, b) => _timeSort == _TimeSort.newestFirst
             ? b.entryTime.compareTo(a.entryTime)
             : a.entryTime.compareTo(b.entryTime),
       );
+    // Calculate filtered summary from displayRows
+    double filteredProfit = 0;
+    double filteredLoss = 0;
+    for (final row in displayRows) {
+      if (row.entryType == 'PROFIT') {
+        filteredProfit += row.amountBdt;
+      } else {
+        filteredLoss += row.amountBdt;
+      }
+    }
+    final filteredNet = filteredProfit - filteredLoss;
     return Scaffold(
       appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
       floatingActionButton: FloatingActionButton(
@@ -243,20 +268,20 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
             children: [
               BalancePill(
                 label: 'Total Profit',
-                value: '+${formatBdt(selectedData.summary.totalProfitBdt)}',
+                value: '+${formatBdt(filteredProfit)}',
                 tone: BalancePillTone.receivable,
               ),
               BalancePill(
                 label: 'Total Cost',
-                value: '-${formatBdt(selectedData.summary.totalLossBdt)}',
+                value: '-${formatBdt(filteredLoss)}',
                 tone: BalancePillTone.payable,
               ),
               BalancePill(
                 label: 'Net',
-                value: selectedData.summary.netBdt >= 0
-                    ? '+${formatBdt(selectedData.summary.netBdt)}'
-                    : '-${formatBdt(selectedData.summary.netBdt.abs())}',
-                tone: selectedData.summary.netBdt >= 0
+                value: filteredNet >= 0
+                    ? '+${formatBdt(filteredNet)}'
+                    : '-${formatBdt(filteredNet.abs())}',
+                tone: filteredNet >= 0
                     ? BalancePillTone.netPositive
                     : BalancePillTone.netNegative,
               ),
@@ -304,6 +329,29 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                   },
                 ),
                 const SizedBox(height: 10),
+                DropdownButtonFormField<_EntryTypeFilter>(
+                  initialValue: _entryTypeFilter,
+                  decoration: const InputDecoration(labelText: 'Entry Type'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: _EntryTypeFilter.all,
+                      child: Text('All'),
+                    ),
+                    DropdownMenuItem(
+                      value: _EntryTypeFilter.profitOnly,
+                      child: Text('Profit Only'),
+                    ),
+                    DropdownMenuItem(
+                      value: _EntryTypeFilter.lossOnly,
+                      child: Text('Cost Only'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _entryTypeFilter = value);
+                  },
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _search,
                   onSubmitted: (_) => _load(),
@@ -336,11 +384,15 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(row.itemPurpose, style: Theme.of(context).textTheme.titleMedium),
+                            child: Text(row.itemPurpose,
+                                style: Theme.of(context).textTheme.titleMedium),
                           ),
                           Text(
                             '${row.entryType == 'PROFIT' ? '+' : '-'}${formatBdt(row.amountBdt)}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
                                   color: row.entryType == 'PROFIT'
                                       ? Colors.green.shade700
                                       : Colors.red.shade700,
@@ -356,13 +408,15 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                             },
                             itemBuilder: (_) => const [
                               PopupMenuItem(value: 'edit', child: Text('Edit')),
-                              PopupMenuItem(value: 'delete', child: Text('Delete')),
+                              PopupMenuItem(
+                                  value: 'delete', child: Text('Delete')),
                             ],
                           )
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text('${row.entryType} • ${formatDateTime(row.entryTime)}'),
+                      Text(
+                          '${row.entryType} • ${formatDateTime(row.entryTime)}'),
                       if ((row.notes ?? '').isNotEmpty) Text(row.notes!),
                     ],
                   ),
@@ -390,3 +444,5 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
 }
 
 enum _TimeSort { newestFirst, oldestFirst }
+
+enum _EntryTypeFilter { all, profitOnly, lossOnly }
