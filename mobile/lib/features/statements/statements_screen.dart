@@ -611,6 +611,109 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
   bool _loading = true;
   bool _networkError = false;
 
+  _TransactionFlowSummary _buildSummary(List<TransactionDetailRowModel> rows) {
+    double dealBuy = 0;
+    double dealSell = 0;
+    double settlementIncoming = 0;
+    double settlementOutgoing = 0;
+    double totalCash = 0;
+    double totalBank = 0;
+    double totalCheque = 0;
+    double receivable = 0;
+    double payable = 0;
+
+    final orderedRows = [...rows]
+      ..sort((a, b) {
+        final byTime = a.occurredAt.compareTo(b.occurredAt);
+        if (byTime != 0) {
+          return byTime;
+        }
+        return a.entryId.compareTo(b.entryId);
+      });
+
+    for (final row in orderedRows) {
+      final amount = row.amountBdt;
+      final direction = (row.directionLabel ?? '').toUpperCase();
+
+      if (row.entryType == 'DEAL') {
+        if (direction.contains('BUY')) {
+          dealBuy += amount;
+          payable += amount;
+        } else if (direction.contains('SELL')) {
+          dealSell += amount;
+          receivable += amount;
+        }
+        continue;
+      }
+
+      if (row.entryType == 'SETTLEMENT') {
+        final isIncoming = direction.contains('INCOMING');
+        final isOutgoing = direction.contains('OUTGOING');
+        final isReceivableBasis = direction.contains('RECEIVABLE');
+        final isPayableBasis = direction.contains('PAYABLE');
+        final paymentMethod = (row.paymentMethod ?? '').toUpperCase();
+
+        if (isIncoming) {
+          settlementIncoming += amount;
+          if (isReceivableBasis) {
+            final applied = amount <= receivable ? amount : receivable;
+            final advance = amount - applied;
+            receivable -= applied;
+            payable += advance;
+          } else if (isPayableBasis) {
+            payable += amount;
+          }
+          if (paymentMethod == 'CASH') {
+            totalCash += amount;
+          } else if (paymentMethod == 'BANK') {
+            totalBank += amount;
+          } else if (paymentMethod == 'CHECK') {
+            totalCheque += amount;
+          }
+        } else if (isOutgoing) {
+          settlementOutgoing += amount;
+          if (isPayableBasis) {
+            final applied = amount <= payable ? amount : payable;
+            final advance = amount - applied;
+            payable -= applied;
+            receivable += advance;
+          } else if (isReceivableBasis) {
+            receivable += amount;
+          }
+          if (paymentMethod == 'CASH') {
+            totalCash -= amount;
+          } else if (paymentMethod == 'BANK') {
+            totalBank -= amount;
+          } else if (paymentMethod == 'CHECK') {
+            totalCheque -= amount;
+          }
+        }
+        continue;
+      }
+
+      if (row.entryType == 'OPENING_BALANCE') {
+        if (direction.contains('OPENING RECEIVABLE')) {
+          receivable += amount;
+        } else if (direction.contains('OPENING PAYABLE')) {
+          payable += amount;
+        }
+      }
+    }
+
+    return _TransactionFlowSummary(
+      dealBuy: dealBuy,
+      dealSell: dealSell,
+      settlementIncoming: settlementIncoming,
+      settlementOutgoing: settlementOutgoing,
+      totalCash: totalCash,
+      totalBank: totalBank,
+      totalCheque: totalCheque,
+      totalBalance: totalCash + totalBank + totalCheque,
+      totalPayable: payable < 0 ? 0 : payable,
+      totalReceivable: receivable < 0 ? 0 : receivable,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1145,6 +1248,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
             : 'Adjust filters and try again.',
       );
     }
+    final summary = _buildSummary(details.rows);
 
     return Column(
       children: [
@@ -1272,6 +1376,28 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
           ),
         ),
         const SizedBox(height: 16),
+        if (details.rows.isNotEmpty) ...[
+          FinanceSection(
+            title: 'Summary',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _summaryMetric('Settlement In', summary.settlementIncoming),
+                _summaryMetric('Settlement Out', summary.settlementOutgoing),
+                _summaryMetric('Deal Buy', summary.dealBuy),
+                _summaryMetric('Deal Sell', summary.dealSell),
+                _summaryMetric('Total Payable', summary.totalPayable),
+                _summaryMetric('Total Receivable', summary.totalReceivable),
+                _summaryMetric('Total Balance', summary.totalBalance),
+                _summaryMetric('Total Cash', summary.totalCash),
+                _summaryMetric('Total Bank', summary.totalBank),
+                _summaryMetric('Total Cheque', summary.totalCheque),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         if (details.rows.isEmpty)
           const EmptyStateCard(
             title: 'No transactions found',
@@ -1370,6 +1496,17 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     );
   }
 
+  Widget _summaryMetric(String label, double value) {
+    return SizedBox(
+      width: 160,
+      child: BalancePill(
+        label: label,
+        value: formatBdt(value),
+        tone: BalancePillTone.neutral,
+      ),
+    );
+  }
+
   String _entryTypeLabel(String entryType) {
     switch (entryType) {
       case 'OPENING_BALANCE':
@@ -1411,6 +1548,32 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
         isOpeningPayable ||
         isSellDeal;
   }
+}
+
+class _TransactionFlowSummary {
+  const _TransactionFlowSummary({
+    required this.dealBuy,
+    required this.dealSell,
+    required this.settlementIncoming,
+    required this.settlementOutgoing,
+    required this.totalCash,
+    required this.totalBank,
+    required this.totalCheque,
+    required this.totalBalance,
+    required this.totalPayable,
+    required this.totalReceivable,
+  });
+
+  final double dealBuy;
+  final double dealSell;
+  final double settlementIncoming;
+  final double settlementOutgoing;
+  final double totalCash;
+  final double totalBank;
+  final double totalCheque;
+  final double totalBalance;
+  final double totalPayable;
+  final double totalReceivable;
 }
 
 class _PdfPreviewScreen extends StatefulWidget {
