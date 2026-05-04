@@ -338,7 +338,6 @@ public class ExportController {
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionSettlementExportRow r : rows) {
-                ensure(tableRowHeight + 2);
                 String[] cells = {
                         safe(r.settlementId()),
                         safe(r.date()),
@@ -349,7 +348,10 @@ public class ExportController {
                         safe(r.relatedDealId()),
                         fmt(r.amountBdt())
                 };
-                tableRow(cells, cols, List.of(7));
+                int wrappedLineCount = wrappedLineCount(cells[5], cols[5], 8f, 2);
+                float rowHeight = tableRowHeight * Math.max(1, wrappedLineCount);
+                ensure(rowHeight + 2);
+                tableRowWithWrappedCell(cells, cols, List.of(7), 5, 2, rowHeight);
             }
             y -= tableToSummaryGap;
             settlementSummary(summary);
@@ -470,6 +472,41 @@ public class ExportController {
             y -= tableRowHeight;
         }
 
+        private void tableRowWithWrappedCell(
+                String[] cells,
+                float[] cols,
+                List<Integer> rightAlignCols,
+                int wrapColIndex,
+                int maxWrapLines,
+                float rowHeight
+        ) throws IOException {
+            float rowTop = y;
+            float x = margin + 2;
+            float defaultTextY = centeredTextBaselineY(y, rowHeight, regular, 8f);
+
+            for (int i = 0; i < cells.length; i++) {
+                if (i == wrapColIndex) {
+                    List<String> lines = wrapLines(cells[i], cols[i] - 4f, 8f, maxWrapLines);
+                    float lineGap = 8.5f;
+                    float firstBaseline = rowTop - 11f;
+                    for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                        text(lines.get(lineIndex), x, firstBaseline - (lineIndex * lineGap), regular, 8, Color.BLACK);
+                    }
+                } else {
+                    String value = truncate(cells[i], cols[i], 8);
+                    if (rightAlignCols.contains(i)) {
+                        textRight(value, x + cols[i] - 3, defaultTextY, regular, 8, Color.BLACK);
+                    } else {
+                        text(value, x, defaultTextY, regular, 8, Color.BLACK);
+                    }
+                }
+                x += cols[i];
+            }
+
+            drawRowBorder(rowTop, rowHeight, cols, new Color(214, 220, 230));
+            y -= rowHeight;
+        }
+
         private float centeredTextY(float topY, float cellHeight, float fontSize) {
             return topY - ((cellHeight - fontSize) / 2f) - 1f;
         }
@@ -578,6 +615,51 @@ public class ExportController {
                 return "-";
             }
             return "CHECK".equalsIgnoreCase(value) ? "CHEQUE" : value;
+        }
+
+        private int wrappedLineCount(String value, float colWidth, float fontSize, int maxLines) throws IOException {
+            return wrapLines(value, colWidth - 4f, fontSize, maxLines).size();
+        }
+
+        private List<String> wrapLines(String value, float colWidth, float fontSize, int maxLines) throws IOException {
+            String text = safe(value);
+            if (text.isBlank()) {
+                return List.of("-");
+            }
+            if (regular.getStringWidth(text) / 1000f * fontSize <= colWidth) {
+                return List.of(text);
+            }
+
+            List<String> lines = new ArrayList<>();
+            StringBuilder current = new StringBuilder();
+            String[] words = text.split("\\s+");
+            for (String word : words) {
+                String candidate = current.isEmpty() ? word : current + " " + word;
+                if (regular.getStringWidth(candidate) / 1000f * fontSize <= colWidth) {
+                    current = new StringBuilder(candidate);
+                } else {
+                    if (!current.isEmpty()) {
+                        lines.add(current.toString());
+                        if (lines.size() >= maxLines) {
+                            break;
+                        }
+                        current = new StringBuilder(word);
+                    } else {
+                        lines.add(truncate(word, colWidth, fontSize));
+                        if (lines.size() >= maxLines) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (lines.size() < maxLines && !current.isEmpty()) {
+                lines.add(current.toString());
+            } else if (lines.size() >= maxLines) {
+                int last = lines.size() - 1;
+                lines.set(last, truncate(lines.get(last), colWidth, fontSize));
+            }
+            return lines.isEmpty() ? List.of(truncate(text, colWidth, fontSize)) : lines;
         }
     }
 }
