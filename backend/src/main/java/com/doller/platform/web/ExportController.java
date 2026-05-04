@@ -545,33 +545,64 @@ public class ExportController {
         }
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
-            float exposureTextWidth = page.getMediaBox().getWidth() - margin * 2 - 24f;
-            String beforeLine = String.format(
-                    "Before Receivable: %s | Before Payable: %s",
+            ensure(100);
+            sectionTitleCard(title);
+            String[] headers = {"Metric", "Receivable", "Payable", "Net"};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{120, 120, 120, 120});
+            float cardWidth = page.getMediaBox().getWidth() - margin * 2;
+            float tableWidth = sum(cols);
+            float headerHeight = 20f;
+            float rowHeight = 22f;
+
+            // Table header
+            fill(margin, y - headerHeight, tableWidth, headerHeight, new Color(225, 233, 246));
+            float x = margin;
+            for (int i = 0; i < headers.length; i++) {
+                textCentered(headers[i], x, cols[i], y - 14, bold, 9f, new Color(32, 47, 82));
+                x += cols[i];
+            }
+            drawRowBorder(y, headerHeight, cols, new Color(184, 196, 214));
+            y -= headerHeight;
+
+            // Before row
+            fill(margin, y - rowHeight, tableWidth, rowHeight, Color.WHITE);
+            x = margin;
+            String[] beforeCells = {
+                    "Before",
                     fmt(b.beforeReceivableBdt()),
-                    fmt(b.beforePayableBdt())
-            );
-            String nowLine = String.format(
-                    "Now Receivable: %s | Now Payable: %s | Net: %s",
+                    fmt(b.beforePayableBdt()),
+                    "-"
+            };
+            for (int i = 0; i < beforeCells.length; i++) {
+                if (i == 0) {
+                    text(beforeCells[i], x + 4, y - 14, bold, 10f, new Color(17, 48, 87));
+                } else {
+                    textRight(beforeCells[i], x + cols[i] - 5, y - 14, regular, 10f, Color.BLACK);
+                }
+                x += cols[i];
+            }
+            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
+            y -= rowHeight;
+
+            // Now row
+            fill(margin, y - rowHeight, tableWidth, rowHeight, new Color(242, 244, 247));
+            x = margin;
+            String[] nowCells = {
+                    "Now",
                     fmt(b.receivableBdt()),
                     fmt(b.payableBdt()),
                     fmt(b.netBalanceBdt())
-            );
-            List<String> lines = new ArrayList<>();
-            lines.addAll(wrapLines(beforeLine, exposureTextWidth, 14f, 3));
-            lines.addAll(wrapLines(nowLine, exposureTextWidth, 14f, 3));
-            float dynamicExposureHeight = Math.max(exposureHeight, 36f + (lines.size() * 16f));
-            ensure(dynamicExposureHeight + 18);
-            Color cardBg = new Color(5, 84, 90);
-            Color textColor = new Color(236, 245, 246);
-            fill(margin, y - dynamicExposureHeight, page.getMediaBox().getWidth() - margin * 2, dynamicExposureHeight, cardBg);
-            text(title, margin + 12, y - 24, bold, 16, textColor);
-            float lineY = y - 50;
-            for (String line : lines) {
-                text(line, margin + 12, lineY, regular, 14, textColor);
-                lineY -= 16f;
+            };
+            for (int i = 0; i < nowCells.length; i++) {
+                if (i == 0) {
+                    text(nowCells[i], x + 4, y - 14, bold, 10f, new Color(17, 48, 87));
+                } else {
+                    textRight(nowCells[i], x + cols[i] - 5, y - 14, regular, 10f, Color.BLACK);
+                }
+                x += cols[i];
             }
-            y -= (dynamicExposureHeight + 12);
+            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
+            y -= (rowHeight + 12);
         }
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
