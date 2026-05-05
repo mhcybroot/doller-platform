@@ -377,8 +377,6 @@ public class ExportController {
                         bdtFormat,
                         boldFont
                 );
-                y -= 78f;
-                text(cs, "Companies: " + response.companies().size(), margin, y, regularFont, 10f, Color.GRAY);
             }
 
             // One page per company section
