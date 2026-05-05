@@ -729,8 +729,8 @@ public class ExportController {
         private void drawDealTable(List<TradingDtos.TransactionDealExportRow> rows, TradingDtos.TransactionDealSummary summary) throws IOException {
             ensure(80);
             sectionTitleCard("Deals");
-            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amount Foreign Currency", "Rate BDT", "Amount BDT"};
-            float[] cols = fitColumnsToAvailableWidth(new float[]{44, 48, 48, 56, 82, 98, 52, 146});
+            String[] headers = {"Deal ID", "Date", "Time", "Direction", "Instrument/Currency", "Amount Foreign Currency", "Rate BDT", "Return Currency", "Amount BDT"};
+            float[] cols = fitColumnsToAvailableWidth(new float[]{40, 46, 46, 54, 76, 92, 48, 70, 122});
             tableHeader(headers, cols);
             y -= firstRowTopGap;
             for (TradingDtos.TransactionDealExportRow r : rows) {
@@ -743,9 +743,10 @@ public class ExportController {
                         safe(r.instrumentCode()),
                         fmt(r.quantity()),
                         fmt(r.bdtRate()),
+                        "BDT",
                         fmt(r.amountBdt())
                 };
-                tableRow(cells, cols, List.of(5, 6, 7));
+                tableRow(cells, cols, List.of(5, 6, 8));
             }
             y -= tableToSummaryGap;
             dealSummary(summary);
