@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shared/models/domain_models.dart';
 import '../../shared/widgets/finance_widgets.dart';
+import 'custom_filters.dart';
 
 class CustomCompanyPage extends StatelessWidget {
   const CustomCompanyPage({
@@ -14,6 +15,21 @@ class CustomCompanyPage extends StatelessWidget {
     required this.onEditCompany,
     required this.onDeleteCompany,
     required this.onContinue,
+    required this.from,
+    required this.to,
+    required this.timeSort,
+    required this.entryTypeFilter,
+    required this.searchController,
+    required this.allCompanyRows,
+    required this.allCompanyProfit,
+    required this.allCompanyCost,
+    required this.exportingAllPdf,
+    required this.onPickDate,
+    required this.onTimeSortChanged,
+    required this.onEntryTypeFilterChanged,
+    required this.onSearchSubmit,
+    required this.onSearchTap,
+    required this.onExportAllPdf,
   });
 
   final List<CompanyModel> companies;
@@ -24,6 +40,21 @@ class CustomCompanyPage extends StatelessWidget {
   final VoidCallback onEditCompany;
   final VoidCallback onDeleteCompany;
   final VoidCallback onContinue;
+  final DateTime from;
+  final DateTime to;
+  final CustomTimeSort timeSort;
+  final CustomEntryTypeFilter entryTypeFilter;
+  final TextEditingController searchController;
+  final List<CustomEntryRowModel> allCompanyRows;
+  final double allCompanyProfit;
+  final double allCompanyCost;
+  final bool exportingAllPdf;
+  final Future<void> Function(bool fromField) onPickDate;
+  final ValueChanged<CustomTimeSort> onTimeSortChanged;
+  final ValueChanged<CustomEntryTypeFilter> onEntryTypeFilterChanged;
+  final Future<void> Function() onSearchSubmit;
+  final Future<void> Function() onSearchTap;
+  final Future<void> Function() onExportAllPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -77,13 +108,31 @@ class CustomCompanyPage extends StatelessWidget {
               netBdt: 0,
             )
         : null;
+    final allCompanyNet = allCompanyProfit - allCompanyCost;
 
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('All Companies Summary',
-              style: Theme.of(context).textTheme.headlineMedium),
+          Row(
+            children: [
+              Expanded(
+                child: Text('All Companies Summary',
+                    style: Theme.of(context).textTheme.headlineMedium),
+              ),
+              IconButton(
+                onPressed: exportingAllPdf ? null : onExportAllPdf,
+                icon: exportingAllPdf
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined),
+                tooltip: 'Export All Companies PDF',
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,
@@ -128,27 +177,12 @@ class CustomCompanyPage extends StatelessWidget {
                 hint: const Text('No company selected'),
                 isExpanded: true,
                 items: companies.map((company) {
-                  final summary = companySummaries[company.id] ??
-                      const CustomEntrySummaryModel(
-                        totalProfitBdt: 0,
-                        totalLossBdt: 0,
-                        netBdt: 0,
-                      );
                   return DropdownMenuItem<int>(
                     value: company.id,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(child: Text(company.name)),
-                        // Text(
-                        //   'P: ${formatBdt(summary.totalProfitBdt)} | L: ${formatBdt(summary.totalLossBdt)}',
-                        //   style:
-                        //       Theme.of(context).textTheme.bodySmall?.copyWith(
-                        //             color: Theme.of(context)
-                        //                 .colorScheme
-                        //                 .onSurfaceVariant,
-                        //           ),
-                        // ),
                       ],
                     ),
                   );
@@ -216,7 +250,175 @@ class CustomCompanyPage extends StatelessWidget {
           ElevatedButton(
             onPressed: selectedCompanyId == null ? null : onContinue,
             child: const Text('Continue'),
-          )
+          ),
+          const SizedBox(height: 18),
+          Text('All Companies Summary (Filtered)',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              BalancePill(
+                label: 'Total Profit',
+                value: '+${formatBdt(allCompanyProfit)}',
+                tone: BalancePillTone.receivable,
+              ),
+              BalancePill(
+                label: 'Total Cost',
+                value: '-${formatBdt(allCompanyCost)}',
+                tone: BalancePillTone.payable,
+              ),
+              BalancePill(
+                label: 'Net',
+                value: allCompanyNet >= 0
+                    ? '+${formatBdt(allCompanyNet)}'
+                    : '-${formatBdt(allCompanyNet.abs())}',
+                tone: allCompanyNet >= 0
+                    ? BalancePillTone.netPositive
+                    : BalancePillTone.netNegative,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FinanceSection(
+            title: 'Filters',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => onPickDate(true),
+                        child: Text('From ${formatDate(from)}'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => onPickDate(false),
+                        child: Text('To ${formatDate(to)}'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<CustomTimeSort>(
+                  initialValue: timeSort,
+                  decoration: const InputDecoration(labelText: 'Time Sort'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: CustomTimeSort.newestFirst,
+                      child: Text('Newest First'),
+                    ),
+                    DropdownMenuItem(
+                      value: CustomTimeSort.oldestFirst,
+                      child: Text('Oldest First'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    onTimeSortChanged(value);
+                  },
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<CustomEntryTypeFilter>(
+                  initialValue: entryTypeFilter,
+                  decoration: const InputDecoration(labelText: 'Entry Type'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: CustomEntryTypeFilter.all,
+                      child: Text('All'),
+                    ),
+                    DropdownMenuItem(
+                      value: CustomEntryTypeFilter.profitOnly,
+                      child: Text('Profit Only'),
+                    ),
+                    DropdownMenuItem(
+                      value: CustomEntryTypeFilter.lossOnly,
+                      child: Text('Cost Only'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    onEntryTypeFilterChanged(value);
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: searchController,
+                  onSubmitted: (_) => onSearchSubmit(),
+                  decoration: InputDecoration(
+                    labelText: 'Search item/purpose or note',
+                    suffixIcon: IconButton(
+                      onPressed: onSearchTap,
+                      icon: const Icon(Icons.search),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (allCompanyRows.isEmpty)
+            const EmptyStateCard(
+              title: 'No entries',
+              message: 'No profit/cost entries found for selected filters.',
+            )
+          else
+            ...allCompanyRows.map(
+              (row) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(row.itemPurpose,
+                                    style:
+                                        Theme.of(context).textTheme.titleMedium),
+                                const SizedBox(height: 4),
+                                Text(
+                                  row.companyName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${row.entryType == 'PROFIT' ? '+' : '-'}${formatBdt(row.amountBdt)}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: row.entryType == 'PROFIT'
+                                      ? Colors.green.shade700
+                                      : Colors.red.shade700,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text('${row.entryType} • ${formatDateTime(row.entryTime)}'),
+                      if ((row.notes ?? '').isNotEmpty) Text(row.notes!),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

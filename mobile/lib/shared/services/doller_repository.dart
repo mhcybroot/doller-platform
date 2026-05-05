@@ -793,6 +793,34 @@ class DollerRepository {
     return PdfExportResult(file: file, filename: filename);
   }
 
+  Future<PdfExportResult> exportAllCustomEntriesPdf({
+    required DateTime from,
+    required DateTime to,
+    String? entryTypeFilter,
+    String? search,
+  }) async {
+    final download = await _api.downloadWithMetadata(
+      '/exports/pdf',
+      query: {
+        'reportType': 'CUSTOM_ENTRIES_ALL',
+        'from': _date(from),
+        'to': _date(to),
+        if (entryTypeFilter != null && entryTypeFilter.isNotEmpty)
+          'entryTypeFilter': entryTypeFilter,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      },
+    );
+    final tempDir = await getTemporaryDirectory();
+    final fallbackName = 'custom_entries_all_${_date(from)}_${_date(to)}.pdf';
+    final filename = _resolveExportFilename(
+      contentDisposition: download.headers['content-disposition'],
+      fallbackName: fallbackName,
+    );
+    final file = File('${tempDir.path}/$filename');
+    await file.writeAsBytes(download.bytes);
+    return PdfExportResult(file: file, filename: filename);
+  }
+
   Future<void> exportAndShare(String kind, DateTime from, DateTime to) async {
     await exportAndShareBalanceSheet(
       mode: 'CUSTOM',

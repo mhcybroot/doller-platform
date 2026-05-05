@@ -5,6 +5,8 @@ import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
 import 'custom_company_page.dart';
+import 'custom_entries_pdf_preview_page.dart';
+import 'custom_filters.dart';
 import 'custom_summary_page.dart';
 
 class CustomProfitCostHome extends StatefulWidget {
@@ -17,45 +19,64 @@ class CustomProfitCostHome extends StatefulWidget {
 }
 
 class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
+  final _search = TextEditingController();
+
   List<CompanyModel> _companies = const [];
   int? _companyId;
-  DateTime? _from;
-  DateTime? _to;
+  late DateTime _from;
+  late DateTime _to;
   Map<int, CustomEntrySummaryModel> _companySummaries = const {};
+  Map<int, CustomEntryListModel> _companyDataById = const {};
   bool _loading = true;
+  bool _exportingAllPdf = false;
+  CustomTimeSort _timeSort = CustomTimeSort.newestFirst;
+  CustomEntryTypeFilter _entryTypeFilter = CustomEntryTypeFilter.all;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _from = DateTime(now.year, now.month, 1);
+    _to = now;
     _loadCompanies();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCompanies() async {
     setState(() => _loading = true);
     try {
-      final now = DateTime.now();
-      _from ??= DateTime(now.year, now.month, 1);
-      _to ??= now;
       final companies = await widget.repository.listCompanies();
       final summaries = <int, CustomEntrySummaryModel>{};
+      final dataByCompany = <int, CustomEntryListModel>{};
       if (companies.isNotEmpty) {
         final responses = await Future.wait(
           companies.map(
             (company) => widget.repository.listCustomEntries(
               companyId: company.id,
-              from: _from!,
-              to: _to!,
+              from: _from,
+              to: _to,
+              search: _search.text,
             ),
           ),
         );
         for (var i = 0; i < companies.length; i++) {
           summaries[companies[i].id] = responses[i].summary;
+          dataByCompany[companies[i].id] = responses[i];
         }
       }
       if (!mounted) return;
       setState(() {
         _companies = companies;
+        if (_companyId != null && !companies.any((c) => c.id == _companyId)) {
+          _companyId = null;
+        }
         _companySummaries = summaries;
+        _companyDataById = dataByCompany;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -63,6 +84,24 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
       showAppMessage(context, e.message, isError: true);
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _pickDate(bool fromField) async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDate: fromField ? _from : _to,
+    );
+    if (picked == null) return;
+    setState(() {
+      if (fromField) {
+        _from = picked;
+      } else {
+        _to = picked;
+      }
+    });
+    await _loadCompanies();
   }
 
   Future<void> _createCompany() async {
@@ -190,6 +229,50 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
     }
   }
 
+  Future<void> _exportAllCompaniesPdf() async {
+    setState(() => _exportingAllPdf = true);
+    try {
+      final result = await widget.repository.exportAllCustomEntriesPdf(
+        from: _from,
+        to: _to,
+        entryTypeFilter: customEntryTypeFilterApiValue(_entryTypeFilter),
+        search: _search.text,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CustomEntriesPdfPreviewPage(
+            filePath: result.file.path,
+            fileName: result.filename,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showAppMessage(context, e.message, isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _exportingAllPdf = false);
+      }
+    }
+  }
+
+  List<CustomEntryRowModel> get _allRows {
+    final rows = <CustomEntryRowModel>[];
+    for (final data in _companyDataById.values) {
+      rows.addAll(data.rows);
+    }
+    rows.removeWhere(
+      (row) => !matchesEntryTypeFilter(row.entryType, _entryTypeFilter),
+    );
+    rows.sort(
+      (a, b) => _timeSort == CustomTimeSort.newestFirst
+          ? b.entryTime.compareTo(a.entryTime)
+          : a.entryTime.compareTo(b.entryTime),
+    );
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -198,6 +281,17 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
       if (c.id == _companyId) {
         selected = c;
         break;
+      }
+    }
+
+    final allRows = _allRows;
+    var filteredProfit = 0.0;
+    var filteredLoss = 0.0;
+    for (final row in allRows) {
+      if (row.entryType == 'PROFIT') {
+        filteredProfit += row.amountBdt;
+      } else {
+        filteredLoss += row.amountBdt;
       }
     }
 
@@ -225,6 +319,22 @@ class _CustomProfitCostHomeState extends State<CustomProfitCostHome> {
           ),
         );
       },
+      from: _from,
+      to: _to,
+      timeSort: _timeSort,
+      entryTypeFilter: _entryTypeFilter,
+      searchController: _search,
+      allCompanyRows: allRows,
+      allCompanyProfit: filteredProfit,
+      allCompanyCost: filteredLoss,
+      exportingAllPdf: _exportingAllPdf,
+      onPickDate: _pickDate,
+      onTimeSortChanged: (value) => setState(() => _timeSort = value),
+      onEntryTypeFilterChanged: (value) =>
+          setState(() => _entryTypeFilter = value),
+      onSearchSubmit: _loadCompanies,
+      onSearchTap: _loadCompanies,
+      onExportAllPdf: _exportAllCompaniesPdf,
     );
   }
 }

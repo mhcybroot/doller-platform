@@ -442,6 +442,77 @@ public class TradingService {
         );
     }
 
+    public TradingDtos.CustomEntryAllExportReport customEntriesAllExportReport(
+            LocalDate from,
+            LocalDate to,
+            String entryTypeFilter,
+            String search
+    ) {
+        LocalDate safeFrom = from == null ? businessToday().withDayOfMonth(1) : from;
+        LocalDate safeTo = to == null ? businessToday() : to;
+        String safeSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        LocalDateTime[] range = dayRange(safeFrom, safeTo);
+
+        List<TradingDtos.CustomEntryAllCompanySection> sections = new ArrayList<>();
+        BigDecimal allProfit = BigDecimal.ZERO;
+        BigDecimal allLoss = BigDecimal.ZERO;
+
+        List<Company> companies = companyRepo.findByDeletedFalseOrderByNameAsc();
+
+        for (Company company : companies) {
+            List<OwnerCustomEntry> entries = ownerCustomEntryRepo
+                    .findByCompanyIdAndDeletedFalseAndEntryTimeBetween(company.getId(), range[0], range[1])
+                    .stream()
+                    .filter(entry -> safeSearch.isEmpty()
+                            || containsIgnoreCase(entry.getItemPurpose(), safeSearch)
+                            || containsIgnoreCase(entry.getNotes(), safeSearch))
+                    .sorted(Comparator.comparing(OwnerCustomEntry::getEntryTime).reversed()
+                            .thenComparing(OwnerCustomEntry::getId).reversed())
+                    .toList();
+
+            if (entryTypeFilter != null && !entryTypeFilter.isBlank()) {
+                String filter = entryTypeFilter.trim().toUpperCase(Locale.ROOT);
+                if ("PROFIT_ONLY".equals(filter)) {
+                    entries = entries.stream().filter(e -> e.getEntryType() == CustomEntryType.PROFIT).toList();
+                } else if ("LOSS_ONLY".equals(filter)) {
+                    entries = entries.stream().filter(e -> e.getEntryType() == CustomEntryType.COST).toList();
+                }
+            }
+
+            BigDecimal totalProfit = entries.stream()
+                    .filter(e -> e.getEntryType() == CustomEntryType.PROFIT)
+                    .map(OwnerCustomEntry::getAmountBdt)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalLoss = entries.stream()
+                    .filter(e -> e.getEntryType() == CustomEntryType.COST)
+                    .map(OwnerCustomEntry::getAmountBdt)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal net = totalProfit.subtract(totalLoss);
+
+            allProfit = allProfit.add(totalProfit);
+            allLoss = allLoss.add(totalLoss);
+            sections.add(new TradingDtos.CustomEntryAllCompanySection(
+                    company.getId(),
+                    company.getName(),
+                    bdt(totalProfit),
+                    bdt(totalLoss),
+                    bdt(net),
+                    entries.stream().map(this::toCustomEntryRow).toList()
+            ));
+        }
+
+        return new TradingDtos.CustomEntryAllExportReport(
+                safeFrom,
+                safeTo,
+                entryTypeFilter,
+                search,
+                bdt(allProfit),
+                bdt(allLoss),
+                bdt(allProfit.subtract(allLoss)),
+                sections
+        );
+    }
+
     public TradingDtos.DayClosePreview previewDayClose(LocalDate date) {
         var range = dayRange(date);
         PnlMetrics metrics = pnlMetrics(date, date);

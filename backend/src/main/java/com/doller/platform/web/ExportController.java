@@ -83,6 +83,11 @@ public class ExportController {
             out = renderTransactionPdf(response);
             filename = transactionPdfFilename(response);
             rangeHeader = response.from() + "_" + response.to();
+        } else if ("CUSTOM_ENTRIES_ALL".equals(normalizedType)) {
+            TradingDtos.CustomEntryAllExportReport response = service.customEntriesAllExportReport(from, to, entryTypeFilter, search);
+            out = renderAllCustomEntriesPdf(response);
+            filename = customEntriesAllPdfFilename(response);
+            rangeHeader = response.from() + "_" + response.to();
         } else if ("CUSTOM_ENTRIES".equals(normalizedType)) {
             TradingDtos.CustomEntryExportReport response = service.customEntriesExportReport(companyId, from, to, entryTypeFilter);
             out = renderCustomEntriesPdf(response);
@@ -108,6 +113,10 @@ public class ExportController {
             return companySlug + "_custom_entries_" + dateRange + ".pdf";
         }
         return "custom_entries_" + dateRange + ".pdf";
+    }
+
+    private String customEntriesAllPdfFilename(TradingDtos.CustomEntryAllExportReport report) {
+        return "custom_entries_all_" + report.from() + "_" + report.to() + ".pdf";
     }
 
     private String transactionPdfFilename(TradingDtos.TransactionExportReport report) {
@@ -328,6 +337,229 @@ public class ExportController {
             doc.save(baos);
             return baos.toByteArray();
         }
+    }
+
+    private byte[] renderAllCustomEntriesPdf(TradingDtos.CustomEntryAllExportReport response) throws Exception {
+        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            PDType1Font boldFont = new PDType1Font(Standard14Fonts.FontName.COURIER_BOLD);
+            PDType1Font regularFont = new PDType1Font(Standard14Fonts.FontName.COURIER);
+            DecimalFormat bdtFormat = new DecimalFormat("#,##0.00");
+            byte[] logo = loadLogoBytes();
+
+            // Page 1: overall summary
+            PDPage summaryPage = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
+            doc.addPage(summaryPage);
+            try (PDPageContentStream cs = new PDPageContentStream(doc, summaryPage)) {
+                float margin = 50f;
+                float y = summaryPage.getMediaBox().getHeight() - 50f;
+                y = drawCustomEntriesHeader(doc, cs, y, margin, logo, boldFont, regularFont);
+                text(cs, "Company: All Companies", margin, y, boldFont, 12f, new Color(17, 48, 87));
+                y -= 18f;
+                text(cs, "Period: " + response.from() + " to " + response.to(), margin, y, regularFont, 10f, Color.GRAY);
+                y -= 18f;
+                if (response.entryTypeFilter() != null && !response.entryTypeFilter().isBlank()) {
+                    text(cs, "Filter: " + entryFilterLabel(response.entryTypeFilter()), margin, y, regularFont, 10f, Color.GRAY);
+                    y -= 18f;
+                }
+                if (response.search() != null && !response.search().trim().isBlank()) {
+                    text(cs, "Search: " + response.search().trim(), margin, y, regularFont, 10f, Color.GRAY);
+                    y -= 18f;
+                }
+                y -= 10f;
+                drawCustomEntriesSummaryCards(
+                        cs,
+                        summaryPage.getMediaBox().getWidth(),
+                        margin,
+                        y,
+                        response.totalProfitBdt(),
+                        response.totalLossBdt(),
+                        response.netBdt(),
+                        bdtFormat,
+                        boldFont
+                );
+                y -= 78f;
+                text(cs, "Companies: " + response.companies().size(), margin, y, regularFont, 10f, Color.GRAY);
+            }
+
+            // One page per company section
+            for (TradingDtos.CustomEntryAllCompanySection company : response.companies()) {
+                PDPage companyPage = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
+                doc.addPage(companyPage);
+                PDPageContentStream cs = new PDPageContentStream(doc, companyPage);
+                try {
+                    float margin = 50f;
+                    float y = companyPage.getMediaBox().getHeight() - 50f;
+                    y = drawCustomEntriesHeader(doc, cs, y, margin, logo, boldFont, regularFont);
+
+                    text(cs, "Company: " + safe(company.companyName()), margin, y, boldFont, 12f, new Color(17, 48, 87));
+                    y -= 18f;
+                    text(cs, "Period: " + response.from() + " to " + response.to(), margin, y, regularFont, 10f, Color.GRAY);
+                    y -= 18f;
+                    if (response.entryTypeFilter() != null && !response.entryTypeFilter().isBlank()) {
+                        text(cs, "Filter: " + entryFilterLabel(response.entryTypeFilter()), margin, y, regularFont, 10f, Color.GRAY);
+                        y -= 18f;
+                    }
+                    if (response.search() != null && !response.search().trim().isBlank()) {
+                        text(cs, "Search: " + response.search().trim(), margin, y, regularFont, 10f, Color.GRAY);
+                        y -= 18f;
+                    }
+                    y -= 10f;
+
+                    drawCustomEntriesSummaryCards(
+                            cs,
+                            companyPage.getMediaBox().getWidth(),
+                            margin,
+                            y,
+                            company.totalProfitBdt(),
+                            company.totalLossBdt(),
+                            company.netBdt(),
+                            bdtFormat,
+                            boldFont
+                    );
+                    y -= (50f + 25f);
+
+                    String[] headers = {"Date", "Purpose", "Type", "Amount", "Notes"};
+                    float availableWidth = companyPage.getMediaBox().getWidth() - margin * 2;
+                    float[] cols = fitColumnsToAvailableWidth(new float[]{80, 140, 60, 100, 180}, availableWidth);
+                    float headerHeight = 20f;
+                    float tableWidth = sum(cols);
+                    y = drawCustomEntriesTableHeader(cs, margin, y, tableWidth, cols, headers, boldFont);
+
+                    float rowHeight = 18f;
+                    for (TradingDtos.CustomEntryRow row : company.entries()) {
+                        if (y < 60) {
+                            cs.close();
+                            PDPage continuedPage = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
+                            doc.addPage(continuedPage);
+                            cs = new PDPageContentStream(doc, continuedPage);
+                            y = continuedPage.getMediaBox().getHeight() - 50f;
+                            y = drawCustomEntriesHeader(doc, cs, y, margin, logo, boldFont, regularFont);
+                            text(cs, "Company: " + safe(company.companyName()) + " (continued)", margin, y, boldFont, 11f, new Color(17, 48, 87));
+                            y -= 24f;
+                            y = drawCustomEntriesTableHeader(cs, margin, y, tableWidth, cols, headers, boldFont);
+                        }
+                        fill(cs, margin, y - rowHeight, tableWidth, rowHeight, Color.WHITE);
+                        float x = margin;
+                        String[] cells = {
+                                safe(row.entryTime() != null ? row.entryTime().toLocalDate().toString() : "-"),
+                                safe(row.itemPurpose()),
+                                safe(row.entryType() != null ? row.entryType().name() : "-"),
+                                bdtFormat.format(row.amountBdt()),
+                                safe(row.notes())
+                        };
+                        for (int i = 0; i < cells.length; i++) {
+                            if (i == 3) {
+                                textRight(cs, cells[i], x + cols[i] - 5, y - 12, regularFont, 8f, Color.BLACK);
+                            } else {
+                                text(cs, cells[i], x + 3, y - 12, regularFont, 8f, Color.BLACK);
+                            }
+                            x += cols[i];
+                        }
+                        drawRowBorder(cs, margin, y, tableWidth, rowHeight, cols, new Color(214, 220, 230));
+                        y -= rowHeight;
+                    }
+                } finally {
+                    cs.close();
+                }
+            }
+
+            doc.save(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    private float drawCustomEntriesTableHeader(
+            PDPageContentStream cs,
+            float margin,
+            float y,
+            float tableWidth,
+            float[] cols,
+            String[] headers,
+            PDType1Font boldFont
+    ) throws IOException {
+        float headerHeight = 20f;
+        fill(cs, margin, y - headerHeight, tableWidth, headerHeight, new Color(225, 233, 246));
+        float x = margin;
+        for (int i = 0; i < headers.length; i++) {
+            textCentered(cs, headers[i], x, cols[i], y - 14, boldFont, 8f, new Color(32, 47, 82));
+            x += cols[i];
+        }
+        drawRowBorder(cs, margin, y, tableWidth, headerHeight, cols, new Color(184, 196, 214));
+        return y - headerHeight;
+    }
+
+    private byte[] loadLogoBytes() {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("pdf/logo.jpeg")) {
+            if (in != null) {
+                return in.readAllBytes();
+            }
+        } catch (IOException ignored) {
+            // text-only fallback
+        }
+        return null;
+    }
+
+    private float drawCustomEntriesHeader(
+            PDDocument doc,
+            PDPageContentStream cs,
+            float y,
+            float margin,
+            byte[] logo,
+            PDType1Font boldFont,
+            PDType1Font regularFont
+    ) throws IOException {
+        float logoSize = 34f;
+        float brandY = y - 16;
+        if (logo != null) {
+            try {
+                PDImageXObject img = PDImageXObject.createFromByteArray(doc, logo, "logo");
+                cs.drawImage(img, margin, y - logoSize, logoSize, logoSize);
+            } catch (IOException ignored) {
+                // text-only fallback
+            }
+        }
+        text(cs, "NexPay", margin + logoSize + 8, brandY, boldFont, 21f, new Color(17, 48, 87));
+        text(cs, "Custom Profit/Cost Report", margin + logoSize + 8, brandY - 22, regularFont, 12f, new Color(60, 60, 60));
+        return y - 70f;
+    }
+
+    private void drawCustomEntriesSummaryCards(
+            PDPageContentStream cs,
+            float pageWidth,
+            float margin,
+            float y,
+            BigDecimal totalProfit,
+            BigDecimal totalLoss,
+            BigDecimal net,
+            DecimalFormat bdtFormat,
+            PDType1Font boldFont
+    ) throws IOException {
+        float cardWidth = (pageWidth - margin * 2 - 20f) / 3;
+        float cardHeight = 50f;
+        float profitCardX = margin;
+        float costCardX = margin + cardWidth + 10f;
+        float netCardX = margin + (cardWidth + 10f) * 2;
+
+        fill(cs, profitCardX, y - cardHeight, cardWidth, cardHeight, new Color(222, 244, 235));
+        text(cs, "Total Profit", profitCardX + 10, y - 18, boldFont, 9f, new Color(25, 109, 73));
+        text(cs, "+" + bdtFormat.format(totalProfit), profitCardX + 10, y - 38, boldFont, 14f, new Color(25, 109, 73));
+
+        fill(cs, costCardX, y - cardHeight, cardWidth, cardHeight, new Color(249, 229, 232));
+        text(cs, "Total Cost", costCardX + 10, y - 18, boldFont, 9f, new Color(153, 39, 48));
+        text(cs, "-" + bdtFormat.format(totalLoss), costCardX + 10, y - 38, boldFont, 14f, new Color(153, 39, 48));
+
+        Color netBgColor = net.compareTo(BigDecimal.ZERO) >= 0 ? new Color(226, 236, 249) : new Color(249, 229, 232);
+        Color netTextColor = net.compareTo(BigDecimal.ZERO) >= 0 ? new Color(27, 61, 107) : new Color(153, 39, 48);
+        fill(cs, netCardX, y - cardHeight, cardWidth, cardHeight, netBgColor);
+        text(cs, "Net", netCardX + 10, y - 18, boldFont, 9f, netTextColor);
+        String netPrefix = net.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "-";
+        text(cs, netPrefix + bdtFormat.format(net.abs()), netCardX + 10, y - 38, boldFont, 14f, netTextColor);
+    }
+
+    private String entryFilterLabel(String entryTypeFilter) {
+        if ("PROFIT_ONLY".equalsIgnoreCase(entryTypeFilter)) return "Profit Only";
+        if ("LOSS_ONLY".equalsIgnoreCase(entryTypeFilter)) return "Loss Only";
+        return entryTypeFilter;
     }
 
     private void text(PDPageContentStream cs, String value, float x, float y, PDType1Font font, float size, Color color) throws IOException {

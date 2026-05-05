@@ -1,14 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 import '../../shared/models/domain_models.dart';
 import '../../shared/services/api_client.dart';
 import '../../shared/services/doller_repository.dart';
 import '../../shared/widgets/finance_widgets.dart';
+import 'custom_entries_pdf_preview_page.dart';
 import 'custom_entry_form_page.dart';
+import 'custom_filters.dart';
 
 class CustomSummaryPage extends StatefulWidget {
   const CustomSummaryPage({
@@ -34,8 +32,8 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
   int? _selectedCompanyId;
   Map<int, CustomEntryListModel> _companyDataById = const {};
   bool _loading = true;
-  _TimeSort _timeSort = _TimeSort.newestFirst;
-  _EntryTypeFilter _entryTypeFilter = _EntryTypeFilter.all;
+  CustomTimeSort _timeSort = CustomTimeSort.newestFirst;
+  CustomEntryTypeFilter _entryTypeFilter = CustomEntryTypeFilter.all;
 
   @override
   void initState() {
@@ -152,14 +150,9 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
 
   Future<void> _exportPdf() async {
     final selectedId = widget.companyId;
-    if (selectedId == null) return;
     setState(() => _exporting = true);
     try {
-      final entryTypeFilter = switch (_entryTypeFilter) {
-        _EntryTypeFilter.all => null,
-        _EntryTypeFilter.profitOnly => 'PROFIT_ONLY',
-        _EntryTypeFilter.lossOnly => 'LOSS_ONLY',
-      };
+      final entryTypeFilter = customEntryTypeFilterApiValue(_entryTypeFilter);
       final result = await widget.repository.exportCustomEntriesPdf(
         companyId: selectedId,
         from: _from,
@@ -169,7 +162,7 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => _CustomEntriesPdfPreviewScreen(
+          builder: (_) => CustomEntriesPdfPreviewPage(
             filePath: result.file.path,
             fileName: result.filename,
           ),
@@ -187,8 +180,9 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     if (_companies.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Custom Profit/Cost Summary')),
@@ -207,18 +201,11 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     );
     final selectedData = _companyDataById[selectedCompany.id];
     if (selectedData == null) return const Scaffold(body: SizedBox.shrink());
-    final displayRows = selectedData.rows.where((row) {
-      switch (_entryTypeFilter) {
-        case _EntryTypeFilter.all:
-          return true;
-        case _EntryTypeFilter.profitOnly:
-          return row.entryType == 'PROFIT';
-        case _EntryTypeFilter.lossOnly:
-          return row.entryType == 'COST';
-      }
-    }).toList()
+    final displayRows = selectedData.rows
+        .where((row) => matchesEntryTypeFilter(row.entryType, _entryTypeFilter))
+        .toList()
       ..sort(
-        (a, b) => _timeSort == _TimeSort.newestFirst
+        (a, b) => _timeSort == CustomTimeSort.newestFirst
             ? b.entryTime.compareTo(a.entryTime)
             : a.entryTime.compareTo(b.entryTime),
       );
@@ -366,16 +353,16 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<_TimeSort>(
+                DropdownButtonFormField<CustomTimeSort>(
                   initialValue: _timeSort,
                   decoration: const InputDecoration(labelText: 'Time Sort'),
                   items: const [
                     DropdownMenuItem(
-                      value: _TimeSort.newestFirst,
+                      value: CustomTimeSort.newestFirst,
                       child: Text('Newest First'),
                     ),
                     DropdownMenuItem(
-                      value: _TimeSort.oldestFirst,
+                      value: CustomTimeSort.oldestFirst,
                       child: Text('Oldest First'),
                     ),
                   ],
@@ -385,20 +372,20 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
                   },
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<_EntryTypeFilter>(
+                DropdownButtonFormField<CustomEntryTypeFilter>(
                   initialValue: _entryTypeFilter,
                   decoration: const InputDecoration(labelText: 'Entry Type'),
                   items: const [
                     DropdownMenuItem(
-                      value: _EntryTypeFilter.all,
+                      value: CustomEntryTypeFilter.all,
                       child: Text('All'),
                     ),
                     DropdownMenuItem(
-                      value: _EntryTypeFilter.profitOnly,
+                      value: CustomEntryTypeFilter.profitOnly,
                       child: Text('Profit Only'),
                     ),
                     DropdownMenuItem(
-                      value: _EntryTypeFilter.lossOnly,
+                      value: CustomEntryTypeFilter.lossOnly,
                       child: Text('Cost Only'),
                     ),
                   ],
@@ -484,73 +471,4 @@ class _CustomSummaryPageState extends State<CustomSummaryPage> {
     );
   }
 
-  CustomEntrySummaryModel _allCompaniesSummary() {
-    var totalProfit = 0.0;
-    var totalLoss = 0.0;
-    for (final data in _companyDataById.values) {
-      totalProfit += data.summary.totalProfitBdt;
-      totalLoss += data.summary.totalLossBdt;
-    }
-    return CustomEntrySummaryModel(
-      totalProfitBdt: totalProfit,
-      totalLossBdt: totalLoss,
-      netBdt: totalProfit - totalLoss,
-    );
-  }
-}
-
-enum _TimeSort { newestFirst, oldestFirst }
-
-enum _EntryTypeFilter { all, profitOnly, lossOnly }
-
-class _CustomEntriesPdfPreviewScreen extends StatefulWidget {
-  const _CustomEntriesPdfPreviewScreen({
-    required this.filePath,
-    required this.fileName,
-  });
-
-  final String filePath;
-  final String fileName;
-
-  @override
-  State<_CustomEntriesPdfPreviewScreen> createState() =>
-      _CustomEntriesPdfPreviewScreenState();
-}
-
-class _CustomEntriesPdfPreviewScreenState
-    extends State<_CustomEntriesPdfPreviewScreen> {
-  bool _sharing = false;
-
-  Future<void> _share() async {
-    setState(() => _sharing = true);
-    try {
-      await Share.shareXFiles(
-        [XFile(widget.filePath)],
-        fileNameOverrides: [widget.fileName],
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _sharing = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.fileName),
-        actions: [
-          IconButton(
-            onPressed: _sharing ? null : _share,
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share PDF',
-          ),
-        ],
-      ),
-      body: SfPdfViewer.file(
-        File(widget.filePath),
-      ),
-    );
-  }
 }
