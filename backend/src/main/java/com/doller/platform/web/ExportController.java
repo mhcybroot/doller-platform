@@ -719,8 +719,10 @@ public class ExportController {
             drawDealTable(section.deals(), section.dealSummary());
             y -= sectionGap;
             drawSettlementTable(section.settlements(), section.settlementSummary());
-            y -= sectionGap;
-            drawExposure("Party Exposure Summary", section.exposureSummary());
+            if (hasMultiplePartySections()) {
+                y -= sectionGap;
+                drawExposure("Party Balance Snapshot", section.exposureSummary());
+            }
             y -= 14;
         }
 
@@ -777,7 +779,6 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
             ensure(80);
-            title = "Party Balance Snapshot";
             float pageWidth = page.getMediaBox().getWidth() - (margin * 2);
             float titleWidth = bold.getStringWidth(title) / 1000f * 11f;
             float centeredX = margin + (pageWidth - titleWidth) / 2f;
@@ -945,7 +946,13 @@ public class ExportController {
             y -= 10;
             dealSummary(report.grandDealSummary());
             settlementSummary(report.grandSettlementSummary());
-            drawExposure("Grand Exposure Summary", report.grandExposureSummary());
+            if (hasMultiplePartySections()) {
+                drawExposure("Grand Balance Snapshot", report.grandExposureSummary());
+            }
+        }
+
+        private boolean hasMultiplePartySections() {
+            return report.partySections() != null && report.partySections().size() > 1;
         }
 
         private void tableHeader(String[] headers, float[] cols) throws IOException {
