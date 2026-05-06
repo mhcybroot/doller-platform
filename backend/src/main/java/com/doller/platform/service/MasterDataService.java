@@ -1,12 +1,15 @@
 package com.doller.platform.service;
 
 import com.doller.platform.common.ApiException;
+import com.doller.platform.domain.Currency;
 import com.doller.platform.domain.Party;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.Role;
+import com.doller.platform.repo.CurrencyRepository;
 import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.RefreshTokenRepository;
+import com.doller.platform.repo.TradeDealRepository;
 import com.doller.platform.repo.UserAccountRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;
@@ -21,14 +24,18 @@ import java.util.List;
 public class MasterDataService {
     private final UserAccountRepository userRepo;
     private final PartyRepository partyRepo;
+    private final CurrencyRepository currencyRepo;
+    private final TradeDealRepository tradeDealRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final LedgerService ledgerService;
 
-    public MasterDataService(UserAccountRepository userRepo, PartyRepository partyRepo, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, AuditService auditService, LedgerService ledgerService) {
+    public MasterDataService(UserAccountRepository userRepo, PartyRepository partyRepo, CurrencyRepository currencyRepo, TradeDealRepository tradeDealRepository, RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder, AuditService auditService, LedgerService ledgerService) {
         this.userRepo = userRepo;
         this.partyRepo = partyRepo;
+        this.currencyRepo = currencyRepo;
+        this.tradeDealRepository = tradeDealRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
@@ -88,6 +95,59 @@ public class MasterDataService {
 
     public List<Party> parties() { return partyRepo.findByDeletedFalse(); }
 
+    public List<MasterDataDtos.CurrencyResponse> currencies() {
+        return currencyRepo.findByDeletedFalseOrderByCodeAsc().stream()
+                .map(this::toCurrencyResponse)
+                .toList();
+    }
+
+    public MasterDataDtos.CurrencyResponse createCurrency(MasterDataDtos.CurrencyCreateRequest req) {
+        String code = normalizeCurrencyCode(req.code());
+        if (currencyRepo.existsByCodeAndDeletedFalse(code)) {
+            throw new ApiException("Currency code already exists");
+        }
+        Currency saved = currencyRepo.save(Currency.builder()
+                .code(code)
+                .displayName(req.displayName().trim())
+                .notes(normalizeOptional(req.notes()))
+                .deleted(false)
+                .build());
+        auditService.log("CREATE_CURRENCY", "/owner/currencies", "code=" + code, null, null, "currency:" + saved.getId());
+        return toCurrencyResponse(saved);
+    }
+
+    public MasterDataDtos.CurrencyResponse updateCurrency(Long id, MasterDataDtos.CurrencyUpdateRequest req) {
+        Currency currency = currencyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Currency not found"));
+        String code = normalizeCurrencyCode(req.code());
+        currencyRepo.findByCodeAndDeletedFalse(code)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new ApiException("Currency code already exists");
+                });
+        String before = "id=" + currency.getId() + ",code=" + currency.getCode() + ",displayName=" + currency.getDisplayName() + ",notes=" + currency.getNotes();
+        currency.setCode(code);
+        currency.setDisplayName(req.displayName().trim());
+        currency.setNotes(normalizeOptional(req.notes()));
+        Currency saved = currencyRepo.save(currency);
+        String after = "id=" + saved.getId() + ",code=" + saved.getCode() + ",displayName=" + saved.getDisplayName() + ",notes=" + saved.getNotes();
+        auditService.log("UPDATE_CURRENCY", "/owner/currencies/" + id, null, null, before, after);
+        return toCurrencyResponse(saved);
+    }
+
+    @Transactional
+    public void deleteCurrency(Long id) {
+        Currency currency = currencyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Currency not found"));
+        if (tradeDealUsesCurrency(currency.getCode())) {
+            throw new ApiException("Currency is already used by deals and cannot be deleted");
+        }
+        String before = "id=" + currency.getId() + ",code=" + currency.getCode() + ",displayName=" + currency.getDisplayName() + ",notes=" + currency.getNotes();
+        currency.setDeleted(true);
+        currency.setDeletedAt(LocalDateTime.now());
+        currency.setDeletedBy(currentActor());
+        currencyRepo.save(currency);
+        auditService.log("DELETE_CURRENCY", "/owner/currencies/" + id, null, null, before, null);
+    }
+
     public Party updateParty(Long id, MasterDataDtos.PartyUpdateRequest req) {
         Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
         String before = "party:" + party.getId() + ':' + party.getName() + '|' + party.getPhone() + '|' + party.getAddress() + '|' + party.getNotes();
@@ -134,6 +194,35 @@ public class MasterDataService {
                 user.isActive(),
                 user.isMustChangePassword()
         );
+    }
+
+    private MasterDataDtos.CurrencyResponse toCurrencyResponse(Currency currency) {
+        return new MasterDataDtos.CurrencyResponse(
+                currency.getId(),
+                currency.getCode(),
+                currency.getDisplayName(),
+                currency.getNotes()
+        );
+    }
+
+    private boolean tradeDealUsesCurrency(String code) {
+        return tradeDealRepository.existsByCurrencyCode(code);
+    }
+
+    private String normalizeCurrencyCode(String code) {
+        String normalized = code == null ? "" : code.trim().toUpperCase();
+        if (normalized.isBlank() || !normalized.matches("^[A-Z0-9_]+$")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Currency code contains invalid characters");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void validateUsername(String username) {

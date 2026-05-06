@@ -2,6 +2,7 @@ package com.doller.platform;
 
 import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.repo.AuditLogRepository;
+import com.doller.platform.repo.CurrencyRepository;
 import com.doller.platform.repo.DailyCloseRepository;
 import com.doller.platform.repo.ExpenseRepository;
 import com.doller.platform.repo.LedgerEntryRepository;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,6 +31,7 @@ class MasterDataServiceTest {
     @Autowired MasterDataService masterDataService;
     @Autowired PartyRepository partyRepository;
     @Autowired UserAccountRepository userAccountRepository;
+    @Autowired CurrencyRepository currencyRepository;
     @Autowired TradeDealRepository tradeDealRepository;
     @Autowired SettlementRepository settlementRepository;
     @Autowired ExpenseRepository expenseRepository;
@@ -39,6 +43,7 @@ class MasterDataServiceTest {
 
     @BeforeEach
     void reset() {
+        SecurityContextHolder.clearContext();
         auditLogRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         dailyCloseRepository.deleteAll();
@@ -101,5 +106,66 @@ class MasterDataServiceTest {
         masterDataService.deleteParty(created.getId());
 
         assertEquals(0, ledgerEntryRepository.findByReferenceTypeAndReferenceId("OPENING_BALANCE", created.getId()).size());
+    }
+
+    @Test
+    void currencyCrudSupportsCreateUpdateAndDeleteWhenUnused() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("owner", null)
+        );
+
+        var created = masterDataService.createCurrency(
+                new MasterDataDtos.CurrencyCreateRequest("jpy", "Japanese Yen", "asia")
+        );
+
+        assertEquals("JPY", created.code());
+        assertEquals("Japanese Yen", created.displayName());
+
+        var updated = masterDataService.updateCurrency(
+                created.id(),
+                new MasterDataDtos.CurrencyUpdateRequest("jpy_cash", "Japanese Yen Cash", null)
+        );
+
+        assertEquals("JPY_CASH", updated.code());
+        assertEquals("Japanese Yen Cash", updated.displayName());
+
+        masterDataService.deleteCurrency(updated.id());
+
+        assertTrue(currencyRepository.findByIdAndDeletedFalse(updated.id()).isEmpty());
+    }
+
+    @Test
+    void deleteCurrencyRejectsInUseCode() {
+        var actor = userAccountRepository.save(com.doller.platform.domain.UserAccount.builder()
+                .username("owner")
+                .passwordHash("hash")
+                .role(com.doller.platform.domain.enums.Role.OWNER)
+                .active(true)
+                .mustChangePassword(false)
+                .build());
+        var party = partyRepository.save(com.doller.platform.domain.Party.builder()
+                .name("Alpha")
+                .deleted(false)
+                .build());
+        var usd = currencyRepository.findByCodeAndDeletedFalse("USD").orElseThrow();
+        tradeDealRepository.save(com.doller.platform.domain.TradeDeal.builder()
+                .dealType(com.doller.platform.domain.enums.DealType.BUY)
+                .party(party)
+                .createdBy(actor)
+                .currencyCode("USD")
+                .quantity(new BigDecimal("10"))
+                .bdtRate(new BigDecimal("120"))
+                .bdtGross(new BigDecimal("1200"))
+                .dealTime(LocalDateTime.now())
+                .lockedByDayClose(false)
+                .deleted(false)
+                .build());
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.doller.platform.common.ApiException.class,
+                () -> masterDataService.deleteCurrency(usd.getId())
+        );
+
+        assertEquals("Currency is already used by deals and cannot be deleted", ex.getMessage());
     }
 }

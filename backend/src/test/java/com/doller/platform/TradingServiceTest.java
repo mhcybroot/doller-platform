@@ -5,7 +5,6 @@ import com.doller.platform.domain.StatementSnapshot;
 import com.doller.platform.domain.TradeDeal;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
-import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.SettlementPaymentMethod;
 import com.doller.platform.domain.enums.Role;
 import com.doller.platform.dto.TradingDtos;
@@ -83,8 +82,8 @@ class TradingServiceTest {
         LocalDate businessDate = LocalDate.now().plusDays(30);
         LocalDateTime stamp = businessDate.atTime(10, 0);
 
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
-        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.BUY, p.getId(), "USD", new BigDecimal("100"), new BigDecimal("120"), stamp, "buy"));
+        tradingService.createDeal(new TradingDtos.DealCreateRequest(DealType.SELL, p.getId(), "USD", new BigDecimal("50"), new BigDecimal("122"), stamp.plusMinutes(30), "sell"));
         tradingService.createExpense(new TradingDtos.ExpenseCreateRequest(com.doller.platform.domain.enums.ExpenseType.OFFICE_MANAGEMENT, null, new BigDecimal("100"), stamp.plusHours(1), "staff", ""));
 
         var preview = tradingService.previewDayClose(businessDate);
@@ -101,15 +100,15 @@ class TradingServiceTest {
         LocalDateTime t3 = baseDate.atTime(10, 0);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("100"),
+                DealType.BUY, p.getId(), "USD", new BigDecimal("8"), new BigDecimal("100"),
                 t1, "old stock"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, p.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 t2, "new buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("120"),
+                DealType.SELL, p.getId(), "USD", new BigDecimal("2"), new BigDecimal("120"),
                 t3, "sell"
         ));
 
@@ -128,11 +127,11 @@ class TradingServiceTest {
         LocalDateTime buyAt = baseDate.atTime(11, 0);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("5"), new BigDecimal("120"),
+                DealType.SELL, p.getId(), "USD", new BigDecimal("5"), new BigDecimal("120"),
                 sellAt, "short open"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                DealType.BUY, p.getId(), "USD", new BigDecimal("3"), new BigDecimal("100"),
                 buyAt, "partial cover"
         ));
 
@@ -166,11 +165,11 @@ class TradingServiceTest {
         LocalDateTime stamp = businessDate.atTime(9, 0);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("120"),
+                DealType.BUY, p.getId(), "USD", new BigDecimal("10"), new BigDecimal("120"),
                 stamp, "buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("5"), new BigDecimal("130"),
+                DealType.SELL, p.getId(), "USD", new BigDecimal("5"), new BigDecimal("130"),
                 stamp.plusMinutes(30), "sell"
         ));
 
@@ -189,7 +188,7 @@ class TradingServiceTest {
         Party p = partyRepository.save(Party.builder().name("Customer A").build());
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"),
+                DealType.SELL, p.getId(), "USD", new BigDecimal("100"), new BigDecimal("120"),
                 LocalDateTime.now(), "sell"
         ));
 
@@ -215,7 +214,7 @@ class TradingServiceTest {
         Party p = partyRepository.save(Party.builder().name("Supplier B").build());
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("130"),
+                DealType.BUY, p.getId(), "USD", new BigDecimal("50"), new BigDecimal("130"),
                 LocalDateTime.now(), "buy"
         ));
 
@@ -243,11 +242,11 @@ class TradingServiceTest {
         LocalDateTime t3 = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, customer.getId(), InstrumentCode.USD, new BigDecimal("100"), new BigDecimal("120"),
+                DealType.SELL, customer.getId(), "USD", new BigDecimal("100"), new BigDecimal("120"),
                 t1, "sell receivable"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, supplier.getId(), InstrumentCode.USD, new BigDecimal("50"), new BigDecimal("130"),
+                DealType.BUY, supplier.getId(), "USD", new BigDecimal("50"), new BigDecimal("130"),
                 t2, "buy payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
@@ -280,7 +279,7 @@ class TradingServiceTest {
         LocalDateTime stamp = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 stamp, "buy only"
         ));
 
@@ -304,7 +303,7 @@ class TradingServiceTest {
         LocalDateTime stamp = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 stamp, "sell only"
         ));
 
@@ -330,14 +329,14 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("10"),
                 t0, "seed receivable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "incoming advance", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("20"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("20"),
                 t2, "sell against advance"
         ));
 
@@ -364,14 +363,14 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("10"),
                 t0, "seed receivable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "incoming advance", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("80"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("80"),
                 t2, "sell larger than advance"
         ));
 
@@ -390,14 +389,14 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("10"),
                 t0, "seed payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "outgoing advance", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("20"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("20"),
                 t2, "buy against advance"
         ));
 
@@ -424,14 +423,14 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("10"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("10"),
                 t0, "seed payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("510"), t1, SettlementPaymentMethod.CASH, null, "outgoing advance", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("80"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("80"),
                 t2, "buy larger than advance"
         ));
 
@@ -449,11 +448,11 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("20"), new BigDecimal("100"),
                 t1, "existing payable 2000"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("15"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("15"), new BigDecimal("100"),
                 t2, "sell 1500"
         ));
 
@@ -471,11 +470,11 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("20"), new BigDecimal("100"),
                 t1, "existing payable 2000"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("25"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("25"), new BigDecimal("100"),
                 t2, "sell 2500"
         ));
 
@@ -500,11 +499,11 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("20"), new BigDecimal("100"),
                 t1, "existing receivable 2000"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("15"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("15"), new BigDecimal("100"),
                 t2, "buy 1500"
         ));
 
@@ -522,11 +521,11 @@ class TradingServiceTest {
         LocalDateTime t2 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("20"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("20"), new BigDecimal("100"),
                 t1, "existing receivable 2000"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("25"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("25"), new BigDecimal("100"),
                 t2, "buy 2500"
         ));
 
@@ -553,18 +552,18 @@ class TradingServiceTest {
         LocalDateTime t3 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("100"),
                 t0, "seed receivable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("250"), t1, SettlementPaymentMethod.CASH, null, "advance in 150", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("3"), new BigDecimal("100"),
                 t2, "create payable 300"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("2"), new BigDecimal("100"),
                 t3, "sell 200 should consume advance 150 then payable 50"
         ));
 
@@ -584,18 +583,18 @@ class TradingServiceTest {
         LocalDateTime t3 = LocalDateTime.now().minusMinutes(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("100"),
                 t0, "seed payable"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
                 party.getId(), null, new BigDecimal("250"), t1, SettlementPaymentMethod.CASH, null, "advance out 150", true
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("3"), new BigDecimal("100"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("3"), new BigDecimal("100"),
                 t2, "create receivable 300"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("2"), new BigDecimal("100"),
                 t3, "buy 200 should consume advance 150 then receivable 50"
         ));
 
@@ -612,7 +611,7 @@ class TradingServiceTest {
         LocalDateTime stamp = LocalDateTime.now();
 
         TradeDeal deal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 stamp, "buy then delete"
         ));
         tradingService.deleteDeal(deal.getId());
@@ -633,7 +632,7 @@ class TradingServiceTest {
         LocalDateTime stamp = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 stamp, "buy first"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
@@ -657,11 +656,11 @@ class TradingServiceTest {
         LocalDateTime stamp = LocalDateTime.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, buyParty.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, buyParty.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 stamp, "buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, sellParty.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("125"),
+                DealType.SELL, sellParty.getId(), "USD", new BigDecimal("8"), new BigDecimal("125"),
                 stamp, "sell"
         ));
 
@@ -693,11 +692,11 @@ class TradingServiceTest {
         LocalDate day = LocalDate.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, buyParty.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("100"),
+                DealType.BUY, buyParty.getId(), "USD", new BigDecimal("10"), new BigDecimal("100"),
                 day.atTime(10, 0), "buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, sellParty.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("125"),
+                DealType.SELL, sellParty.getId(), "USD", new BigDecimal("8"), new BigDecimal("125"),
                 day.atTime(11, 0), "sell"
         ));
 
@@ -785,7 +784,7 @@ class TradingServiceTest {
         LocalDate day = LocalDate.now().minusDays(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("10"), new BigDecimal("110"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("10"), new BigDecimal("110"),
                 day.atTime(10, 0), "sell"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
@@ -815,11 +814,11 @@ class TradingServiceTest {
         LocalDate to = from.plusDays(1);
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, supplier.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("120"),
+                DealType.BUY, supplier.getId(), "USD", new BigDecimal("8"), new BigDecimal("120"),
                 from.atTime(9, 0), "buy"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, customer.getId(), InstrumentCode.USD, new BigDecimal("8"), new BigDecimal("130"),
+                DealType.SELL, customer.getId(), "USD", new BigDecimal("8"), new BigDecimal("130"),
                 to.atTime(11, 0), "sell"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
@@ -880,11 +879,11 @@ class TradingServiceTest {
         LocalDate day = LocalDate.now();
 
         TradeDeal buyDeal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, party.getId(), InstrumentCode.USD, new BigDecimal("2"), new BigDecimal("120"),
+                DealType.BUY, party.getId(), "USD", new BigDecimal("2"), new BigDecimal("120"),
                 day.atTime(10, 0), "buy"
         ));
         TradeDeal sellDeal = tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, party.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("130"),
+                DealType.SELL, party.getId(), "USD", new BigDecimal("1"), new BigDecimal("130"),
                 day.atTime(11, 0), "sell"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(
@@ -912,11 +911,11 @@ class TradingServiceTest {
         LocalDate day = LocalDate.now();
 
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.SELL, p1.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("100"),
+                DealType.SELL, p1.getId(), "USD", new BigDecimal("1"), new BigDecimal("100"),
                 day.atTime(9, 0), "sell"
         ));
         tradingService.createDeal(new TradingDtos.DealCreateRequest(
-                DealType.BUY, p2.getId(), InstrumentCode.USD, new BigDecimal("1"), new BigDecimal("80"),
+                DealType.BUY, p2.getId(), "USD", new BigDecimal("1"), new BigDecimal("80"),
                 day.atTime(10, 0), "buy"
         ));
         tradingService.createSettlement(new TradingDtos.SettlementCreateRequest(

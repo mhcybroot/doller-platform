@@ -28,7 +28,7 @@ class DealSummary {
   final int id;
   final String partyName;
   final String dealType;
-  final String instrumentCode;
+  final String currencyCode;
   final double quantity;
   final double bdtGross;
   final DateTime dealTime;
@@ -38,7 +38,7 @@ class DealSummary {
     required this.id,
     required this.partyName,
     required this.dealType,
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.quantity,
     required this.bdtGross,
     required this.dealTime,
@@ -50,7 +50,7 @@ class DealSummary {
       id: (json["id"] as num).toInt(),
       partyName: json["partyName"] as String,
       dealType: json["dealType"] as String,
-      instrumentCode: json["instrumentCode"] as String? ?? 'USD',
+      currencyCode: json["currencyCode"] as String? ?? 'USD',
       quantity: (json["quantity"] as num?)?.toDouble() ??
           (json["usdAmount"] as num).toDouble(),
       bdtGross: (json["bdtGross"] as num).toDouble(),
@@ -253,14 +253,14 @@ class PnlExplainSectionModel {
 }
 
 class PnlOpenInstrumentRowModel {
-  final String instrumentCode;
+  final String currencyCode;
   final double openLongQty;
   final double openLongValueBdt;
   final double openShortQty;
   final double openShortProceedsBdt;
 
   const PnlOpenInstrumentRowModel({
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.openLongQty,
     required this.openLongValueBdt,
     required this.openShortQty,
@@ -269,7 +269,7 @@ class PnlOpenInstrumentRowModel {
 
   factory PnlOpenInstrumentRowModel.fromJson(Map<String, dynamic> json) {
     return PnlOpenInstrumentRowModel(
-      instrumentCode: json["instrumentCode"] as String,
+      currencyCode: json["currencyCode"] as String,
       openLongQty: (json["openLongQty"] as num?)?.toDouble() ?? 0,
       openLongValueBdt: (json["openLongValueBdt"] as num?)?.toDouble() ?? 0,
       openShortQty: (json["openShortQty"] as num?)?.toDouble() ?? 0,
@@ -283,7 +283,7 @@ class PnlDealRowModel {
   final int dealId;
   final DateTime time;
   final String dealType;
-  final String instrumentCode;
+  final String currencyCode;
   final double quantity;
   final double bdtRate;
   final double bdtAmount;
@@ -295,7 +295,7 @@ class PnlDealRowModel {
     required this.dealId,
     required this.time,
     required this.dealType,
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.quantity,
     required this.bdtRate,
     required this.bdtAmount,
@@ -309,7 +309,7 @@ class PnlDealRowModel {
       dealId: (json["dealId"] as num).toInt(),
       time: DateTime.parse(json["time"] as String),
       dealType: json["dealType"] as String,
-      instrumentCode: json["instrumentCode"] as String,
+      currencyCode: json["currencyCode"] as String,
       quantity: (json["quantity"] as num).toDouble(),
       bdtRate: (json["bdtRate"] as num).toDouble(),
       bdtAmount: (json["bdtAmount"] as num).toDouble(),
@@ -376,19 +376,19 @@ class PnlExpenseRowModel {
 }
 
 class InstrumentPositionModel {
-  final String instrumentCode;
+  final String currencyCode;
   final double quantity;
   final double valuationBdt;
 
   const InstrumentPositionModel({
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.quantity,
     required this.valuationBdt,
   });
 
   factory InstrumentPositionModel.fromJson(Map<String, dynamic> json) {
     return InstrumentPositionModel(
-      instrumentCode: json["instrumentCode"] as String,
+      currencyCode: json["currencyCode"] as String,
       quantity: (json["quantity"] as num).toDouble(),
       valuationBdt: (json["valuationBdt"] as num).toDouble(),
     );
@@ -642,19 +642,19 @@ class BalanceSheetModel {
 }
 
 class InstrumentBalanceRowModel {
-  final String instrumentCode;
+  final String currencyCode;
   final double openingQty;
   final double closingQty;
 
   const InstrumentBalanceRowModel({
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.openingQty,
     required this.closingQty,
   });
 
   factory InstrumentBalanceRowModel.fromJson(Map<String, dynamic> json) {
     return InstrumentBalanceRowModel(
-      instrumentCode: json["instrumentCode"] as String? ?? 'USD',
+      currencyCode: json["currencyCode"] as String? ?? 'USD',
       openingQty: (json["openingQty"] as num? ?? 0).toDouble(),
       closingQty: (json["closingQty"] as num? ?? 0).toDouble(),
     );
@@ -706,7 +706,7 @@ class TransactionDetailRowModel {
   final int? partyId;
   final String? partyName;
   final int? tradeDealId;
-  final String? instrumentCode;
+  final String? currencyCode;
   final double? quantity;
   final double amountBdt;
   final double? bdtRate;
@@ -725,7 +725,7 @@ class TransactionDetailRowModel {
     required this.partyId,
     required this.partyName,
     required this.tradeDealId,
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.quantity,
     required this.amountBdt,
     required this.bdtRate,
@@ -746,7 +746,7 @@ class TransactionDetailRowModel {
       partyId: (json["partyId"] as num?)?.toInt(),
       partyName: json["partyName"] as String?,
       tradeDealId: (json["tradeDealId"] as num?)?.toInt(),
-      instrumentCode: json["instrumentCode"] as String?,
+      currencyCode: json["currencyCode"] as String?,
       quantity: (json["quantity"] as num?)?.toDouble(),
       amountBdt: (json["amountBdt"] as num).toDouble(),
       bdtRate: (json["bdtRate"] as num?)?.toDouble(),
@@ -836,7 +836,7 @@ class PartyLedgerLineModel {
   final int? partyId;
   final String? partyName;
   final int? tradeDealId;
-  final String? instrumentCode;
+  final String? currencyCode;
   final double? quantity;
   final double amountBdt;
   final double? bdtRate;
@@ -859,7 +859,7 @@ class PartyLedgerLineModel {
     required this.partyId,
     required this.partyName,
     required this.tradeDealId,
-    required this.instrumentCode,
+    required this.currencyCode,
     required this.quantity,
     required this.amountBdt,
     required this.bdtRate,
@@ -885,7 +885,7 @@ class PartyLedgerLineModel {
       partyId: (json["partyId"] as num?)?.toInt(),
       partyName: json["partyName"] as String?,
       tradeDealId: (json["tradeDealId"] as num?)?.toInt(),
-      instrumentCode: json["instrumentCode"] as String?,
+      currencyCode: json["currencyCode"] as String?,
       quantity: (json["quantity"] as num?)?.toDouble(),
       amountBdt: (json["amountBdt"] as num?)?.toDouble() ??
           ((json["amount"] as num?)?.toDouble().abs() ?? 0),
@@ -1015,6 +1015,29 @@ class CompanyModel {
     return CompanyModel(
       id: (json["id"] as num).toInt(),
       name: json["name"] as String,
+      notes: json["notes"] as String?,
+    );
+  }
+}
+
+class CurrencyModel {
+  final int id;
+  final String code;
+  final String displayName;
+  final String? notes;
+
+  const CurrencyModel({
+    required this.id,
+    required this.code,
+    required this.displayName,
+    required this.notes,
+  });
+
+  factory CurrencyModel.fromJson(Map<String, dynamic> json) {
+    return CurrencyModel(
+      id: (json["id"] as num).toInt(),
+      code: json["code"] as String,
+      displayName: json["displayName"] as String,
       notes: json["notes"] as String?,
     );
   }

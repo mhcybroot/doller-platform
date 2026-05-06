@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/currencies/currency_management_screen.dart';
 import '../features/custom/custom_profit_cost_home.dart';
 import '../features/dues/dues_screen.dart';
 import '../features/pnl/pnl_explain_screen.dart';
@@ -120,6 +121,29 @@ class MoreScreen extends StatelessWidget {
             },
           ),
         ),
+        if (session.isOwner)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.currency_exchange_outlined),
+              title: const Text('Currency Management'),
+              subtitle:
+                  const Text('Add, edit, and delete deal currencies'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => Scaffold(
+                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                      appBar: AppBar(title: const Text('Currency Management')),
+                      body: SafeArea(
+                        child: CurrencyManagementScreen(repository: repository),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         if (session.isOwner)
           Card(
             child: ListTile(

@@ -71,8 +71,11 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
   late int _selectedMonth;
   late int _selectedYear;
   BalanceSheetModel? _report;
+  List<CurrencyModel> _currencies = const [];
   bool _loading = true;
   bool _networkError = false;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   @override
   void initState() {
@@ -97,11 +100,13 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
         from: _mode == 'CUSTOM' ? _from : null,
         to: _mode == 'CUSTOM' ? _to : null,
       );
+      final currencies = await widget.repository.listCurrencies();
       if (!mounted) {
         return;
       }
       setState(() {
         _report = report;
+        _currencies = currencies;
         _networkError = false;
         _loading = false;
       });
@@ -112,6 +117,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _report = null;
+        _currencies = const [];
         _networkError = error.isNetworkError;
         _loading = false;
       });
@@ -313,7 +319,7 @@ class _BalanceSheetTabState extends State<_BalanceSheetTab> {
                   children: report.instrumentBalances
                       .map(
                         (row) => _summaryPill(
-                          instrumentDisplayName(row.instrumentCode),
+                          currencyDisplayName(row.currencyCode, labels: _currencyLabels),
                           _formatFxFlow(row.openingQty, row.closingQty),
                           BalancePillTone.neutral,
                         ),
@@ -607,9 +613,12 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
   String _sortField = 'occurredAt';
   String _sortDirection = 'desc';
   List<PartyModel> _parties = const [];
+  List<CurrencyModel> _currencies = const [];
   TransactionDetailsModel? _details;
   bool _loading = true;
   bool _networkError = false;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   _TransactionFlowSummary _buildSummary(List<TransactionDetailRowModel> rows) {
     double dealBuy = 0;
@@ -727,6 +736,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     setState(() => _loading = true);
     try {
       final parties = await widget.repository.listParties();
+      final currencies = await widget.repository.listCurrencies();
       final details = await widget.repository.transactionDetails(
         from: _from,
         to: _to,
@@ -741,6 +751,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       }
       setState(() {
         _parties = parties;
+        _currencies = currencies;
         _details = details;
         _networkError = false;
         _loading = false;
@@ -752,6 +763,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _parties = const [];
+        _currencies = const [];
         _details = null;
         _networkError = error.isNetworkError;
         _loading = false;
@@ -880,7 +892,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
 
   Future<void> _editDeal(TransactionDetailRowModel row) async {
     if (row.partyId == null ||
-        row.instrumentCode == null ||
+        row.currencyCode == null ||
         row.quantity == null ||
         row.bdtRate == null ||
         row.directionLabel == null) {
@@ -892,7 +904,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
     final rate = TextEditingController(text: row.bdtRate!.toString());
     final notes = TextEditingController(text: row.notes ?? '');
     int selectedPartyId = row.partyId!;
-    String selectedInstrument = row.instrumentCode!;
+    String selectedCurrency = row.currencyCode!;
     String dealType =
         row.directionLabel!.toUpperCase().contains('SELL') ? 'SELL' : 'BUY';
     await showModalBottomSheet<void>(
@@ -939,16 +951,19 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedInstrument,
-                  items: supportedInstrumentCodes
-                      .map((code) => DropdownMenuItem<String>(
-                            value: code,
-                            child: Text(instrumentDisplayName(code)),
+                  value: selectedCurrency,
+                  items: _currencies
+                      .map((currency) => DropdownMenuItem<String>(
+                            value: currency.code,
+                            child: Text(currencyDisplayName(
+                              currency.code,
+                              labels: _currencyLabels,
+                            )),
                           ))
                       .toList(),
                   onChanged: (value) => setModalState(
-                      () => selectedInstrument = value ?? selectedInstrument),
-                  decoration: const InputDecoration(labelText: 'Instrument'),
+                      () => selectedCurrency = value ?? selectedCurrency),
+                  decoration: const InputDecoration(labelText: 'Currency'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -972,7 +987,7 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                         id: row.entryId,
                         dealType: dealType,
                         partyId: selectedPartyId,
-                        instrumentCode: selectedInstrument,
+                        currencyCode: selectedCurrency,
                         quantity: double.parse(qty.text),
                         bdtRate: double.parse(rate.text),
                         dealTime: row.occurredAt,
@@ -1471,9 +1486,9 @@ class _TransactionDetailsTabState extends State<_TransactionDetailsTab> {
                                   'Payment: ${row.paymentMethod == 'CHECK' ? 'CHEQUE' : row.paymentMethod}'),
                             if ((row.paymentReference ?? '').isNotEmpty)
                               Text('Reference: ${row.paymentReference}'),
-                            if ((row.instrumentCode ?? '').isNotEmpty)
+                            if ((row.currencyCode ?? '').isNotEmpty)
                               Text(
-                                  'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),
+                                  'Currency: ${currencyDisplayName(row.currencyCode!, labels: _currencyLabels)}'),
                             if (row.quantity != null)
                               Text('Amount: ${row.quantity}'),
                             if (row.bdtRate != null)

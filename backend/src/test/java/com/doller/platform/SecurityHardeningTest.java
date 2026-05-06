@@ -178,7 +178,7 @@ class SecurityHardeningTest {
                                 {
                                   "dealType":"BUY",
                                   "partyId":%d,
-                                  "instrumentCode":"USD",
+                                  "currencyCode":"USD",
                                   "quantity":10,
                                   "bdtRate":120,
                                   "dealTime":"2026-05-06T10:15:30",

@@ -1,48 +1,19 @@
-const List<String> supportedInstrumentCodes = [
-  'USD',
-  'USD_SA',
-  'USD_ID',
-  'USD_MY',
-  'USD_HK',
-  'USD_CN',
-  'USD_MV',
-  'EXCHANGE_FEE',
-  'RMB',
-  'MYR',
-  'AED',
-  'SGD',
-  'GBP',
-  'AUD',
-  'CAD',
-  'SAR',
-  'HKD',
-  'EUR',
-  'INR',
-];
+import '../models/domain_models.dart';
 
-const Map<String, String> _instrumentDisplayNames = {
-  'USD': 'US DOLLAR 🇺🇸',
-  'USD_SA': 'US DOLLAR SAUDI 🇺🇸🇸🇦',
-  'USD_ID': 'US DOLLAR INDONESIA 🇺🇸🇮🇩',
-  'USD_MY': 'US DOLLAR MALAYSIA 🇺🇸🇲🇾',
-  'USD_HK': 'US DOLLAR HONGKONG 🇺🇸🇭🇰',
-  'USD_CN': 'US DOLLAR CHINA 🇺🇸🇨🇳',
-  'USD_MV': 'US DOLLAR MALDIVES 🇺🇸🇲🇻',
-  'EXCHANGE_FEE': 'EXCHANGE FEE',
-  'RMB': 'RMB 🇨🇳',
-  'MYR': 'RINGGIT 🇲🇾',
-  'AED': 'DIRHAM 🇦🇪',
-  'SGD': 'SIN DOLLAR 🇸🇬',
-  'GBP': 'POUND 🇬🇧',
-  'AUD': 'AUS DOLLAR 🇦🇺',
-  'CAD': 'CANADIAN DOLLAR 🇨🇦',
-  'SAR': 'SAUDI RIYAL 🇸🇦',
-  'HKD': 'HONGKONG DOLLAR 🇭🇰',
-  'EUR': 'EURO 🇪🇺',
-  'INR': 'INDIAN RUPEE 🇮🇳',
-};
-
-String instrumentDisplayName(String code) {
+String currencyDisplayName(
+  String code, {
+  Map<String, String> labels = const {},
+}) {
   final normalized = code.trim().toUpperCase();
-  return _instrumentDisplayNames[normalized] ?? normalized;
+  if (normalized.isEmpty) {
+    return '';
+  }
+  return labels[normalized] ?? normalized.replaceAll('_', ' ');
+}
+
+Map<String, String> currencyLabelMap(Iterable<CurrencyModel> currencies) {
+  return {
+    for (final currency in currencies)
+      currency.code.trim().toUpperCase(): currency.displayName.trim(),
+  };
 }

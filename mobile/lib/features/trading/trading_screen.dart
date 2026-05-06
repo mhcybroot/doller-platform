@@ -27,7 +27,7 @@ class _TradingScreenState extends State<TradingScreen> {
   final _paymentReferenceController = TextEditingController();
   final _noteController = TextEditingController();
   String _dealType = 'BUY';
-  String _instrumentCode = 'USD';
+  String _currencyCode = 'USD';
   String _expenseType = 'OFFICE_MANAGEMENT';
   String _paymentMethod = 'CASH';
   bool _allowAdvance = false;
@@ -38,9 +38,12 @@ class _TradingScreenState extends State<TradingScreen> {
   String? _inferenceError;
   List<PartyModel> _parties = const [];
   List<DealSummary> _deals = const [];
+  List<CurrencyModel> _currencies = const [];
   bool _loading = true;
   bool _networkError = false;
   int _inferenceVersion = 0;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   @override
   void initState() {
@@ -54,6 +57,7 @@ class _TradingScreenState extends State<TradingScreen> {
     try {
       final parties = await widget.repository.listParties();
       final deals = await widget.repository.listDeals();
+      final currencies = await widget.repository.listCurrencies();
       if (!mounted) {
         return;
       }
@@ -66,7 +70,14 @@ class _TradingScreenState extends State<TradingScreen> {
       setState(() {
         _parties = parties;
         _deals = deals;
+        _currencies = currencies;
         _networkError = false;
+        final allowedCodes = currencies.map((currency) => currency.code).toSet();
+        if (_currencyCode.isEmpty && currencies.isNotEmpty) {
+          _currencyCode = currencies.first.code;
+        } else if (!allowedCodes.contains(_currencyCode) && currencies.isNotEmpty) {
+          _currencyCode = currencies.first.code;
+        }
         if (parties.isEmpty) {
           _selectedPartyId = null;
           _selectedDealId = null;
@@ -99,6 +110,7 @@ class _TradingScreenState extends State<TradingScreen> {
       setState(() {
         _parties = const [];
         _deals = const [];
+        _currencies = const [];
         _inference = null;
         _inferenceError = null;
         _networkError = error.isNetworkError;
@@ -172,14 +184,14 @@ class _TradingScreenState extends State<TradingScreen> {
         AppLogger.log('screen:trading', 'submit:deal:start', fields: {
           'partyId': _selectedParty!.id,
           'dealType': _dealType,
-          'instrumentCode': _instrumentCode,
+          'currencyCode': _currencyCode,
           'quantity': _quantityController.text,
           'bdtRate': _rateController.text,
         });
         await widget.repository.createDeal(
           dealType: _dealType,
           partyId: _selectedParty!.id,
-          instrumentCode: _instrumentCode,
+          currencyCode: _currencyCode,
           quantity: double.parse(_quantityController.text),
           bdtRate: double.parse(_rateController.text),
           notes: _noteController.text.trim(),
@@ -187,7 +199,7 @@ class _TradingScreenState extends State<TradingScreen> {
         AppLogger.log('screen:trading', 'submit:deal:success', fields: {
           'partyId': _selectedParty!.id,
           'dealType': _dealType,
-          'instrumentCode': _instrumentCode,
+          'currencyCode': _currencyCode,
         });
         showAppMessage(context, 'Deal saved');
       } else if (_mode == 1) {
@@ -254,6 +266,12 @@ class _TradingScreenState extends State<TradingScreen> {
         message: _networkError
             ? 'Please check your network and try again.'
             : 'Create at least one party so deal and settlement forms can use proper selectors.',
+      );
+    }
+    if (_mode == 0 && _currencies.isEmpty) {
+      return const EmptyStateCard(
+        title: 'No currencies configured',
+        message: 'An owner needs to add at least one currency before deals can be captured.',
       );
     }
 
@@ -329,16 +347,22 @@ class _TradingScreenState extends State<TradingScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: _instrumentCode,
-                  items: supportedInstrumentCodes
-                      .map((instrument) => DropdownMenuItem(
-                            value: instrument,
-                            child: Text(instrumentDisplayName(instrument)),
+                  initialValue:
+                      _currencies.any((currency) => currency.code == _currencyCode)
+                          ? _currencyCode
+                          : (_currencies.isNotEmpty ? _currencies.first.code : null),
+                  items: _currencies
+                      .map((currency) => DropdownMenuItem(
+                            value: currency.code,
+                            child: Text(currencyDisplayName(
+                              currency.code,
+                              labels: _currencyLabels,
+                            )),
                           ))
                       .toList(),
                   onChanged: (value) =>
-                      setState(() => _instrumentCode = value ?? 'USD'),
-                  decoration: const InputDecoration(labelText: 'Instrument'),
+                      setState(() => _currencyCode = value ?? 'USD'),
+                  decoration: const InputDecoration(labelText: 'Currency'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -364,7 +388,7 @@ class _TradingScreenState extends State<TradingScreen> {
                         (deal) => DropdownMenuItem(
                           value: deal.id,
                           child: Text(
-                              '#${deal.id} ${deal.dealType} ${instrumentDisplayName(deal.instrumentCode)} ${deal.quantity}'),
+                              '#${deal.id} ${deal.dealType} ${currencyDisplayName(deal.currencyCode, labels: _currencyLabels)} ${deal.quantity}'),
                         ),
                       ),
                     ],

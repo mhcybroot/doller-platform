@@ -22,8 +22,11 @@ class PartiesScreen extends StatefulWidget {
 class _PartiesScreenState extends State<PartiesScreen> {
   final _search = TextEditingController();
   List<PartyModel> _parties = const [];
+  List<CurrencyModel> _currencies = const [];
   bool _loading = true;
   bool _networkError = false;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   @override
   void initState() {
@@ -35,11 +38,13 @@ class _PartiesScreenState extends State<PartiesScreen> {
     setState(() => _loading = true);
     try {
       final parties = await widget.repository.listParties();
+      final currencies = await widget.repository.listCurrencies();
       if (!mounted) {
         return;
       }
       setState(() {
         _parties = parties;
+        _currencies = currencies;
         _networkError = false;
         _loading = false;
       });
@@ -50,6 +55,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
       showAppMessage(context, error.message, isError: true);
       setState(() {
         _parties = const [];
+        _currencies = const [];
         _networkError = error.isNetworkError;
         _loading = false;
       });
@@ -497,10 +503,10 @@ class _PartiesScreenState extends State<PartiesScreen> {
                                                     .isNotEmpty)
                                                   Text(
                                                       'Reference: ${row.paymentReference}'),
-                                                if ((row.instrumentCode ?? '')
+                                                if ((row.currencyCode ?? '')
                                                     .isNotEmpty)
                                                   Text(
-                                                      'Instrument: ${instrumentDisplayName(row.instrumentCode!)}'),
+                                                      'Currency: ${currencyDisplayName(row.currencyCode!, labels: _currencyLabels)}'),
                                                 if (row.quantity != null)
                                                   Text('Amount: ${row.quantity}'),
                                                 if (row.bdtRate != null)
@@ -622,7 +628,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
     Future<void> Function() reload,
   ) async {
     if (row.partyId == null ||
-        row.instrumentCode == null ||
+        row.currencyCode == null ||
         row.quantity == null ||
         row.bdtRate == null ||
         row.directionLabel == null) {
@@ -634,7 +640,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
     final rate = TextEditingController(text: row.bdtRate!.toString());
     final notes = TextEditingController(text: row.notes ?? '');
     int selectedPartyId = row.partyId!;
-    String selectedInstrument = row.instrumentCode!;
+    String selectedCurrency = row.currencyCode!;
     String dealType =
         row.directionLabel!.toUpperCase().contains('SELL') ? 'SELL' : 'BUY';
     await showModalBottomSheet<void>(
@@ -679,16 +685,19 @@ class _PartiesScreenState extends State<PartiesScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: selectedInstrument,
-                items: supportedInstrumentCodes
-                    .map((code) => DropdownMenuItem<String>(
-                          value: code,
-                          child: Text(instrumentDisplayName(code)),
+                value: selectedCurrency,
+                items: _currencies
+                    .map((currency) => DropdownMenuItem<String>(
+                          value: currency.code,
+                          child: Text(currencyDisplayName(
+                            currency.code,
+                            labels: _currencyLabels,
+                          )),
                         ))
                     .toList(),
                 onChanged: (value) => setModalState(
-                    () => selectedInstrument = value ?? selectedInstrument),
-                decoration: const InputDecoration(labelText: 'Instrument'),
+                    () => selectedCurrency = value ?? selectedCurrency),
+                decoration: const InputDecoration(labelText: 'Currency'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -712,7 +721,7 @@ class _PartiesScreenState extends State<PartiesScreen> {
                       id: row.entryId,
                       dealType: dealType,
                       partyId: selectedPartyId,
-                      instrumentCode: selectedInstrument,
+                      currencyCode: selectedCurrency,
                       quantity: double.parse(qty.text),
                       bdtRate: double.parse(rate.text),
                       dealTime: row.occurredAt,

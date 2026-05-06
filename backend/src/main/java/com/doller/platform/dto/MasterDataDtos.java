@@ -49,6 +49,25 @@ public class MasterDataDtos {
             String notes
     ) {}
 
+    public record CurrencyCreateRequest(
+            @NotBlank @Size(min = 2, max = 32) String code,
+            @NotBlank @Size(max = 255) String displayName,
+            String notes
+    ) {}
+
+    public record CurrencyUpdateRequest(
+            @NotBlank @Size(min = 2, max = 32) String code,
+            @NotBlank @Size(max = 255) String displayName,
+            String notes
+    ) {}
+
+    public record CurrencyResponse(
+            Long id,
+            String code,
+            String displayName,
+            String notes
+    ) {}
+
     public record AuditLogResponse(
             Long id,
             String action,

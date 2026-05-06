@@ -5,7 +5,6 @@ import com.doller.platform.domain.Settlement;
 import com.doller.platform.domain.TradeDeal;
 import com.doller.platform.domain.UserAccount;
 import com.doller.platform.domain.enums.DealType;
-import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.Role;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
@@ -99,7 +98,7 @@ class TradingServiceAgingBucketsTest {
                 .dealType(DealType.SELL)
                 .party(party)
                 .createdBy(actor)
-                .instrumentCode(InstrumentCode.USD)
+                .currencyCode("USD")
                 .quantity(BigDecimal.ONE)
                 .bdtRate(BigDecimal.valueOf(amount))
                 .bdtGross(BigDecimal.valueOf(amount).setScale(2))

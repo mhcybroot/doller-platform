@@ -126,10 +126,19 @@ class DollerRepository {
     );
   }
 
+  Future<List<CurrencyModel>> listCurrencies() async {
+    return _api.get<List<CurrencyModel>>(
+      '/currencies',
+      parser: (json) => (json as List<dynamic>)
+          .map((item) => CurrencyModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
   Future<void> createDeal({
     required String dealType,
     required int partyId,
-    required String instrumentCode,
+    required String currencyCode,
     required double quantity,
     required double bdtRate,
     required String notes,
@@ -137,7 +146,7 @@ class DollerRepository {
     AppLogger.log('repo', 'createDeal:start', fields: {
       'dealType': dealType,
       'partyId': partyId,
-      'instrumentCode': instrumentCode,
+      'currencyCode': currencyCode,
       'quantity': quantity,
       'bdtRate': bdtRate,
       'notes': notes,
@@ -147,7 +156,7 @@ class DollerRepository {
       data: {
         'dealType': dealType,
         'partyId': partyId,
-        'instrumentCode': instrumentCode,
+        'currencyCode': currencyCode,
         'quantity': quantity,
         'bdtRate': bdtRate,
         'dealTime': DateTime.now().toIso8601String(),
@@ -158,7 +167,7 @@ class DollerRepository {
     AppLogger.log('repo', 'createDeal:success', fields: {
       'dealType': dealType,
       'partyId': partyId,
-      'instrumentCode': instrumentCode,
+      'currencyCode': currencyCode,
       'quantity': quantity,
       'bdtRate': bdtRate,
     });
@@ -168,7 +177,7 @@ class DollerRepository {
     required int id,
     required String dealType,
     required int partyId,
-    required String instrumentCode,
+    required String currencyCode,
     required double quantity,
     required double bdtRate,
     required DateTime dealTime,
@@ -179,7 +188,7 @@ class DollerRepository {
       data: {
         'dealType': dealType,
         'partyId': partyId,
-        'instrumentCode': instrumentCode,
+        'currencyCode': currencyCode,
         'quantity': quantity,
         'bdtRate': bdtRate,
         'dealTime': dealTime.toIso8601String(),
@@ -342,6 +351,55 @@ class DollerRepository {
       parser: (json) => (json as List<dynamic>)
           .map((item) => CompanyModel.fromJson(item as Map<String, dynamic>))
           .toList(),
+    );
+  }
+
+  Future<List<CurrencyModel>> listOwnerCurrencies() async {
+    return _api.get<List<CurrencyModel>>(
+      '/owner/currencies',
+      parser: (json) => (json as List<dynamic>)
+          .map((item) => CurrencyModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<CurrencyModel> createCurrency({
+    required String code,
+    required String displayName,
+    String? notes,
+  }) async {
+    return _api.post<CurrencyModel>(
+      '/owner/currencies',
+      data: {
+        'code': code,
+        'displayName': displayName,
+        'notes': notes,
+      },
+      parser: (json) => CurrencyModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<CurrencyModel> updateCurrency({
+    required int id,
+    required String code,
+    required String displayName,
+    String? notes,
+  }) async {
+    return _api.put<CurrencyModel>(
+      '/owner/currencies/$id',
+      data: {
+        'code': code,
+        'displayName': displayName,
+        'notes': notes,
+      },
+      parser: (json) => CurrencyModel.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> deleteCurrency(int id) async {
+    await _api.delete<void>(
+      '/owner/currencies/$id',
+      parser: (_) {},
     );
   }
 

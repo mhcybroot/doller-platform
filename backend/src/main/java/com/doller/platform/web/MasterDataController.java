@@ -34,6 +34,11 @@ public class MasterDataController {
                 .toList();
     }
 
+    @GetMapping("/currencies")
+    public List<MasterDataDtos.CurrencyResponse> currencies() {
+        return service.currencies();
+    }
+
     @PostMapping("/parties")
     @PreAuthorize("hasAnyRole('OWNER','STAFF')")
     public MasterDataDtos.PartyResponse createParty(@Valid @RequestBody MasterDataDtos.PartyCreateRequest req) {
@@ -50,6 +55,30 @@ public class MasterDataController {
     @PreAuthorize("hasRole('OWNER')")
     public void deleteParty(@PathVariable("id") Long id) {
         service.deleteParty(id);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @GetMapping("/owner/currencies")
+    public List<MasterDataDtos.CurrencyResponse> ownerCurrencies() {
+        return service.currencies();
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PostMapping("/owner/currencies")
+    public MasterDataDtos.CurrencyResponse createCurrency(@Valid @RequestBody MasterDataDtos.CurrencyCreateRequest req) {
+        return service.createCurrency(req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/owner/currencies/{id}")
+    public MasterDataDtos.CurrencyResponse updateCurrency(@PathVariable("id") Long id, @Valid @RequestBody MasterDataDtos.CurrencyUpdateRequest req) {
+        return service.updateCurrency(id, req);
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/owner/currencies/{id}")
+    public void deleteCurrency(@PathVariable("id") Long id) {
+        service.deleteCurrency(id);
     }
 
     private MasterDataDtos.PartyResponse toPartyResponse(com.doller.platform.domain.Party party) {

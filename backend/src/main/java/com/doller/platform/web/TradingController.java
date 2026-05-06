@@ -195,7 +195,7 @@ public class TradingController {
                 deal.getParty().getId(),
                 deal.getParty().getName(),
                 deal.getDealType().name(),
-                deal.getInstrumentCode().name(),
+                deal.getCurrencyCode(),
                 deal.getQuantity(),
                 deal.getBdtRate(),
                 deal.getBdtGross(),

@@ -23,7 +23,10 @@ class _PnlExplainScreenState extends State<PnlExplainScreen> {
   late int _selectedMonth;
   late int _selectedYear;
   DashboardPnlExplainModel? _data;
+  List<CurrencyModel> _currencies = const [];
   bool _loading = true;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   @override
   void initState() {
@@ -48,9 +51,11 @@ class _PnlExplainScreenState extends State<PnlExplainScreen> {
         from: _mode == 'CUSTOM' ? _from : null,
         to: _mode == 'CUSTOM' ? _to : null,
       );
+      final currencies = await widget.repository.listCurrencies();
       if (!mounted) return;
       setState(() {
         _data = data;
+        _currencies = currencies;
         _loading = false;
       });
     } on ApiException catch (error) {
@@ -210,13 +215,19 @@ class _PnlExplainScreenState extends State<PnlExplainScreen> {
         const SizedBox(height: 16),
         FinanceSection(
           title: 'Today',
-          child: _ExplainSection(section: data.today),
+          child: _ExplainSection(
+            section: data.today,
+            currencyLabels: _currencyLabels,
+          ),
         ),
         const SizedBox(height: 16),
         FinanceSection(
           title:
               'Selected Period (${formatDate(data.periodFrom)} - ${formatDate(data.periodTo)})',
-          child: _ExplainSection(section: data.period),
+          child: _ExplainSection(
+            section: data.period,
+            currencyLabels: _currencyLabels,
+          ),
         ),
       ],
     );
@@ -224,9 +235,13 @@ class _PnlExplainScreenState extends State<PnlExplainScreen> {
 }
 
 class _ExplainSection extends StatelessWidget {
-  const _ExplainSection({required this.section});
+  const _ExplainSection({
+    required this.section,
+    required this.currencyLabels,
+  });
 
   final PnlExplainSectionModel section;
+  final Map<String, String> currencyLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +255,7 @@ class _ExplainSection extends StatelessWidget {
       'Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}',
       ...section.openInstruments.map(
         (row) =>
-            '${instrumentDisplayName(row.instrumentCode)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            '${currencyDisplayName(row.currencyCode, labels: currencyLabels)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
             ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
       ),
       'Expense: ${formatBdt(section.expenseBdt)}',
@@ -319,7 +334,7 @@ class _ExplainSection extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(row.referenceLabel ?? 'Deal #${row.dealId}'),
                     subtitle: Text(
-                        '${formatDateTime(row.time)} • ${instrumentDisplayName(row.instrumentCode)} ${row.quantity} @ ${row.bdtRate}'),
+                        '${formatDateTime(row.time)} • ${currencyDisplayName(row.currencyCode, labels: currencyLabels)} ${row.quantity} @ ${row.bdtRate}'),
                     trailing: Text(formatBdt(row.bdtAmount)),
                   ),
                 ),
@@ -341,7 +356,7 @@ class _ExplainSection extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(row.referenceLabel ?? 'Deal #${row.dealId}'),
                     subtitle: Text(
-                        '${formatDateTime(row.time)} • ${instrumentDisplayName(row.instrumentCode)} ${row.quantity} @ ${row.bdtRate}'),
+                        '${formatDateTime(row.time)} • ${currencyDisplayName(row.currencyCode, labels: currencyLabels)} ${row.quantity} @ ${row.bdtRate}'),
                     trailing: Text(formatBdt(row.bdtAmount)),
                   ),
                 ),

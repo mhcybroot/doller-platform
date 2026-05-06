@@ -738,7 +738,7 @@ public class ExportController {
                         safe(r.date()),
                         safe(r.time()),
                         safe(r.direction()),
-                        safe(r.instrumentCode()),
+                        safe(r.currencyCode()),
                         fmt(r.quantity()),
                         fmt(r.bdtRate()),
                         "BDT",

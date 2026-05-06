@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../shared/instruments/instrument_labels.dart';
-import '../../services/api_client.dart';
+import '../../shared/models/domain_models.dart';
+import '../../shared/services/api_client.dart';
 
 class DealsTab extends StatefulWidget {
   final ApiClient api;
@@ -14,8 +15,36 @@ class _DealsTabState extends State<DealsTab> {
   final partyId = TextEditingController();
   final usd = TextEditingController();
   final rate = TextEditingController();
-  String instrument = 'USD';
+  List<CurrencyModel> currencies = const [];
+  String currencyCode = 'USD';
   String type = 'BUY';
+
+  Map<String, String> get currencyLabels => currencyLabelMap(currencies);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrencies();
+  }
+
+  Future<void> _loadCurrencies() async {
+    final data = await widget.api.get<List<CurrencyModel>>(
+      '/currencies',
+      parser: (json) => (json as List<dynamic>)
+          .map((item) => CurrencyModel.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      currencies = data;
+      if (currencies.any((currency) => currency.code == currencyCode)) {
+        return;
+      }
+      currencyCode = currencies.isEmpty ? '' : currencies.first.code;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,15 +63,20 @@ class _DealsTabState extends State<DealsTab> {
             controller: partyId,
             decoration: const InputDecoration(labelText: 'Party ID')),
         DropdownButtonFormField<String>(
-          value: instrument,
-          items: supportedInstrumentCodes
-              .map((code) => DropdownMenuItem(
-                    value: code,
-                    child: Text(instrumentDisplayName(code)),
+          value: currencies.any((currency) => currency.code == currencyCode)
+              ? currencyCode
+              : null,
+          items: currencies
+              .map((currency) => DropdownMenuItem(
+                    value: currency.code,
+                    child: Text(currencyDisplayName(
+                      currency.code,
+                      labels: currencyLabels,
+                    )),
                   ))
               .toList(),
-          onChanged: (value) => setState(() => instrument = value ?? 'USD'),
-          decoration: const InputDecoration(labelText: 'Instrument'),
+          onChanged: (value) => setState(() => currencyCode = value ?? 'USD'),
+          decoration: const InputDecoration(labelText: 'Currency'),
         ),
         TextField(
             controller: usd,
@@ -53,15 +87,19 @@ class _DealsTabState extends State<DealsTab> {
         const SizedBox(height: 16),
         ElevatedButton(
           onPressed: () async {
-            await widget.api.post('/deals', {
-              'dealType': type,
-              'partyId': int.parse(partyId.text),
-              'instrumentCode': instrument,
-              'quantity': usd.text,
-              'bdtRate': rate.text,
-              'dealTime': DateTime.now().toIso8601String(),
-              'notes': ''
-            });
+            await widget.api.post<void>(
+              '/deals',
+              data: {
+                'dealType': type,
+                'partyId': int.parse(partyId.text),
+                'currencyCode': currencyCode,
+                'quantity': usd.text,
+                'bdtRate': rate.text,
+                'dealTime': DateTime.now().toIso8601String(),
+                'notes': ''
+              },
+              parser: (_) {},
+            );
             if (!context.mounted) return;
             ScaffoldMessenger.of(context)
                 .showSnackBar(const SnackBar(content: Text('Deal saved')));

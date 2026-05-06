@@ -3,7 +3,6 @@ package com.doller.platform.dto;
 import com.doller.platform.domain.enums.DealType;
 import com.doller.platform.domain.enums.CustomEntryType;
 import com.doller.platform.domain.enums.ExpenseType;
-import com.doller.platform.domain.enums.InstrumentCode;
 import com.doller.platform.domain.enums.SettlementBasis;
 import com.doller.platform.domain.enums.SettlementDirection;
 import com.doller.platform.domain.enums.SettlementPaymentMethod;
@@ -17,18 +16,18 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class TradingDtos {
-    public record DealCreateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull InstrumentCode instrumentCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
+    public record DealCreateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotBlank String currencyCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
                                     @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
-    public record DealUpdateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotNull InstrumentCode instrumentCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
+    public record DealUpdateRequest(@NotNull DealType dealType, @NotNull Long partyId, @NotBlank String currencyCode, @NotNull @DecimalMin("0.000001") BigDecimal quantity,
                                     @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
-    public record DealSummary(Long id, String partyName, DealType dealType, InstrumentCode instrumentCode, BigDecimal quantity, BigDecimal bdtGross,
+    public record DealSummary(Long id, String partyName, DealType dealType, String currencyCode, BigDecimal quantity, BigDecimal bdtGross,
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
     public record DealResponse(
             Long id,
             Long partyId,
             String partyName,
             String dealType,
-            String instrumentCode,
+            String currencyCode,
             BigDecimal quantity,
             BigDecimal bdtRate,
             BigDecimal bdtGross,
@@ -156,7 +155,7 @@ public class TradingDtos {
             List<CustomEntryAllCompanySection> companies
     ) {}
     public record DayClosePreview(LocalDate date, BigDecimal totalBuyBdt, BigDecimal totalSellBdt, BigDecimal totalExpenseBdt, BigDecimal realizedProfitLossBdt, boolean closed) {}
-    public record InstrumentPosition(String instrumentCode, BigDecimal quantity, BigDecimal valuationBdt) {}
+    public record InstrumentPosition(String currencyCode, BigDecimal quantity, BigDecimal valuationBdt) {}
     public record DashboardResponse(
             BigDecimal receivableBdt,
             BigDecimal payableBdt,
@@ -193,7 +192,7 @@ public class TradingDtos {
             Long dealId,
             LocalDateTime time,
             String dealType,
-            String instrumentCode,
+            String currencyCode,
             BigDecimal quantity,
             BigDecimal bdtRate,
             BigDecimal bdtAmount,
@@ -202,7 +201,7 @@ public class TradingDtos {
             String referenceLabel
     ) {}
     public record PnlOpenInstrumentRow(
-            String instrumentCode,
+            String currencyCode,
             BigDecimal openLongQty,
             BigDecimal openLongValueBdt,
             BigDecimal openShortQty,
@@ -306,7 +305,7 @@ public class TradingDtos {
             List<StatementLine> lines
     ) {}
     public record InstrumentBalanceRow(
-            String instrumentCode,
+            String currencyCode,
             BigDecimal openingQty,
             BigDecimal closingQty
     ) {}
@@ -317,7 +316,7 @@ public class TradingDtos {
             Long partyId,
             String partyName,
             Long tradeDealId,
-            String instrumentCode,
+            String currencyCode,
             BigDecimal quantity,
             BigDecimal amountBdt,
             BigDecimal bdtRate,
@@ -344,7 +343,7 @@ public class TradingDtos {
             LocalDate date,
             String time,
             String direction,
-            String instrumentCode,
+            String currencyCode,
             BigDecimal quantity,
             BigDecimal bdtRate,
             BigDecimal amountBdt
@@ -418,7 +417,7 @@ public class TradingDtos {
             Long partyId,
             String partyName,
             Long tradeDealId,
-            String instrumentCode,
+            String currencyCode,
             BigDecimal quantity,
             BigDecimal amountBdt,
             BigDecimal bdtRate,

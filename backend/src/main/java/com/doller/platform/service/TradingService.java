@@ -31,6 +31,7 @@ public class TradingService {
     private final TradeDealRepository dealRepo;
     private final PartyRepository partyRepo;
     private final UserAccountRepository userRepo;
+    private final CurrencyRepository currencyRepo;
     private final SettlementRepository settlementRepo;
     private final ExpenseRepository expenseRepo;
     private final CompanyRepository companyRepo;
@@ -44,6 +45,7 @@ public class TradingService {
     private final ZoneId businessZone;
 
     public TradingService(TradeDealRepository dealRepo, PartyRepository partyRepo, UserAccountRepository userRepo,
+                          CurrencyRepository currencyRepo,
                           SettlementRepository settlementRepo, ExpenseRepository expenseRepo,
                           CompanyRepository companyRepo, OwnerCustomEntryRepository ownerCustomEntryRepo,
                           DailyCloseRepository dailyCloseRepo, StatementSnapshotRepository snapshotRepo,
@@ -53,6 +55,7 @@ public class TradingService {
         this.dealRepo = dealRepo;
         this.partyRepo = partyRepo;
         this.userRepo = userRepo;
+        this.currencyRepo = currencyRepo;
         this.settlementRepo = settlementRepo;
         this.expenseRepo = expenseRepo;
         this.companyRepo = companyRepo;
@@ -70,12 +73,13 @@ public class TradingService {
     public TradeDeal createDeal(TradingDtos.DealCreateRequest req) {
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
         UserAccount by = getCurrentUser();
+        String currencyCode = requireActiveCurrency(req.currencyCode());
         BigDecimal gross = req.quantity().multiply(req.bdtRate());
         TradeDeal deal = dealRepo.save(TradeDeal.builder()
                 .dealType(req.dealType())
                 .party(party)
                 .createdBy(by)
-                .instrumentCode(req.instrumentCode())
+                .currencyCode(currencyCode)
                 .quantity(req.quantity())
                 .bdtRate(req.bdtRate())
                 .bdtGross(gross)
@@ -87,11 +91,11 @@ public class TradingService {
 
         postDealLedger(deal, req.dealTime());
         if (tradingDebug) {
-            log.info("deal_created dealId={} partyId={} type={} instrument={} quantity={} rate={} gross={} dealTime={} notes={}",
+            log.info("deal_created dealId={} partyId={} type={} currency={} quantity={} rate={} gross={} dealTime={} notes={}",
                     deal.getId(),
                     party.getId(),
                     req.dealType(),
-                    req.instrumentCode(),
+                    currencyCode,
                     req.quantity(),
                     req.bdtRate(),
                     gross,
@@ -110,7 +114,7 @@ public class TradingService {
                         d.getId(),
                         d.getParty().getName(),
                         d.getDealType(),
-                        d.getInstrumentCode(),
+                        d.getCurrencyCode(),
                         d.getQuantity(),
                         d.getBdtGross(),
                         d.getDealTime(),
@@ -178,12 +182,13 @@ public class TradingService {
     public TradeDeal updateDeal(Long id, TradingDtos.DealUpdateRequest req) {
         TradeDeal deal = dealRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Deal not found"));
         Party party = partyRepo.findByIdAndDeletedFalse(req.partyId()).orElseThrow(() -> new ApiException("Party not found"));
+        String currencyCode = requireActiveCurrency(req.currencyCode());
         String before = serializeDeal(deal);
         reverseDealLedger(deal, businessNow());
         BigDecimal gross = req.quantity().multiply(req.bdtRate());
         deal.setDealType(req.dealType());
         deal.setParty(party);
-        deal.setInstrumentCode(req.instrumentCode());
+        deal.setCurrencyCode(currencyCode);
         deal.setQuantity(req.quantity());
         deal.setBdtRate(req.bdtRate());
         deal.setBdtGross(gross);
@@ -590,16 +595,16 @@ public class TradingService {
     public TradingDtos.DashboardResponse dashboard(LocalDate from, LocalDate to) {
         BalancePosition balances = projectBusinessBalance(null);
         var range = new LocalDateTime[]{from.atStartOfDay(), to.plusDays(1).atStartOfDay().minusNanos(1)};
-        Map<String, BigDecimal> positionByInstrument = new HashMap<>();
+        Map<String, BigDecimal> positionByCurrency = new HashMap<>();
         for (TradeDeal deal : dealRepo.findByDeletedFalse()) {
-            String code = deal.getInstrumentCode().name();
+            String code = deal.getCurrencyCode();
             BigDecimal signedQty = deal.getDealType() == DealType.BUY ? deal.getQuantity() : deal.getQuantity().negate();
-            positionByInstrument.merge(code, signedQty, BigDecimal::add);
+            positionByCurrency.merge(code, signedQty, BigDecimal::add);
         }
-        List<TradingDtos.InstrumentPosition> positions = positionByInstrument.entrySet().stream()
+        List<TradingDtos.InstrumentPosition> positions = positionByCurrency.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> {
-                    BigDecimal latestRate = latestRateForInstrument(entry.getKey());
+                    BigDecimal latestRate = latestRateForCurrency(entry.getKey());
                     BigDecimal valuation = entry.getValue().multiply(latestRate);
                     return new TradingDtos.InstrumentPosition(entry.getKey(), entry.getValue(), valuation);
                 })
@@ -780,7 +785,7 @@ public class TradingService {
                         deal.getParty().getId(),
                         deal.getParty().getName(),
                         deal.getId(),
-                        deal.getInstrumentCode().name(),
+                        deal.getCurrencyCode(),
                         deal.getQuantity(),
                         deal.getBdtGross(),
                         deal.getBdtRate(),
@@ -804,7 +809,7 @@ public class TradingService {
                         settlement.getParty().getId(),
                         settlement.getParty().getName(),
                         settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getId(),
-                        settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getInstrumentCode().name(),
+                        settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getCurrencyCode(),
                         settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getQuantity(),
                         settlement.getBdtAmount(),
                         null,
@@ -828,7 +833,7 @@ public class TradingService {
                         expensePartyId(expense),
                         expensePartyName(expense),
                         expense.getTradeDeal() == null ? null : expense.getTradeDeal().getId(),
-                        expense.getTradeDeal() == null ? null : expense.getTradeDeal().getInstrumentCode().name(),
+                        expense.getTradeDeal() == null ? null : expense.getTradeDeal().getCurrencyCode(),
                         expense.getTradeDeal() == null ? null : expense.getTradeDeal().getQuantity(),
                         expense.getAmountBdt(),
                         null,
@@ -927,7 +932,7 @@ public class TradingService {
                             r.occurredAt().toLocalDate(),
                             r.occurredAt().toLocalTime().withNano(0).toString(),
                             r.directionLabel(),
-                            r.instrumentCode(),
+                            r.currencyCode(),
                             r.quantity() == null ? BigDecimal.ZERO : r.quantity(),
                             r.bdtRate() == null ? BigDecimal.ZERO : r.bdtRate(),
                             r.amountBdt() == null ? BigDecimal.ZERO : r.amountBdt()
@@ -1032,7 +1037,7 @@ public class TradingService {
                         row.partyId(),
                         row.partyName(),
                         row.tradeDealId(),
-                        row.instrumentCode(),
+                        row.currencyCode(),
                         row.quantity(),
                         row.amountBdt(),
                         row.bdtRate(),
@@ -1062,7 +1067,7 @@ public class TradingService {
 
     private String partyLedgerKind(TradingDtos.TransactionDetailRow row) {
         if ("DEAL".equals(row.entryType())) {
-            return "DEAL-" + row.directionLabel() + "-" + row.instrumentCode();
+            return "DEAL-" + row.directionLabel() + "-" + row.currencyCode();
         }
         if ("SETTLEMENT".equals(row.entryType())) {
             return "SETTLEMENT-" + (row.directionLabel() == null ? "" : row.directionLabel().replace(" / ", "-"));
@@ -1630,9 +1635,9 @@ public class TradingService {
         String referenceType = "DEAL";
         Long referenceId = deal.getId();
         Long partyId = deal.getParty().getId();
-        String inventoryAccount = fxInventoryAccount(deal.getInstrumentCode().name());
+        String inventoryAccount = fxInventoryAccount(deal.getCurrencyCode());
         if (deal.getDealType() == DealType.BUY) {
-            ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Buy " + deal.getInstrumentCode().name());
+            ledgerService.post(at, inventoryAccount, deal.getQuantity(), BigDecimal.ZERO, referenceType, referenceId, "Buy " + deal.getCurrencyCode());
             DealConsumeResult consumeResult = consumeForDeal(
                     DealType.BUY,
                     deal.getBdtGross(),
@@ -1668,7 +1673,7 @@ public class TradingService {
             if (consumeResult.remainingExposure().compareTo(BigDecimal.ZERO) > 0) {
                 ledgerService.post(at, "RECEIVABLE_" + partyId, consumeResult.remainingExposure(), BigDecimal.ZERO, referenceType, referenceId, "Receivable from party");
             }
-            ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Sell " + deal.getInstrumentCode().name());
+            ledgerService.post(at, inventoryAccount, BigDecimal.ZERO, deal.getQuantity(), referenceType, referenceId, "Sell " + deal.getCurrencyCode());
         }
     }
 
@@ -2027,13 +2032,13 @@ public class TradingService {
         return null;
     }
 
-    private String fxInventoryAccount(String instrumentCode) {
-        return "FX_INVENTORY_" + instrumentCode;
+    private String fxInventoryAccount(String currencyCode) {
+        return "FX_INVENTORY_" + currencyCode;
     }
 
-    private BigDecimal latestRateForInstrument(String instrumentCode) {
+    private BigDecimal latestRateForCurrency(String currencyCode) {
         return dealRepo.findByDeletedFalse().stream()
-                .filter(deal -> deal.getInstrumentCode().name().equals(instrumentCode))
+                .filter(deal -> deal.getCurrencyCode().equals(currencyCode))
                 .max(Comparator.comparing(TradeDeal::getDealTime))
                 .map(TradeDeal::getBdtRate)
                 .orElse(BigDecimal.ZERO);
@@ -2119,7 +2124,7 @@ public class TradingService {
                 deal.getId(),
                 deal.getDealTime(),
                 deal.getDealType().name(),
-                deal.getInstrumentCode().name(),
+                deal.getCurrencyCode(),
                 deal.getQuantity(),
                 deal.getBdtRate(),
                 deal.getBdtGross(),
@@ -2151,10 +2156,10 @@ public class TradingService {
         BigDecimal shortSellProceeds = BigDecimal.ZERO;
         BigDecimal shortCoverBuyCost = BigDecimal.ZERO;
 
-        Map<String, InstrumentState> stateByInstrument = new HashMap<>();
+        Map<String, InstrumentState> stateByCurrency = new HashMap<>();
         for (TradeDeal deal : allDealsUntilTo) {
-            String instrument = deal.getInstrumentCode().name();
-            InstrumentState state = stateByInstrument.computeIfAbsent(instrument, ignored -> new InstrumentState());
+            String currency = deal.getCurrencyCode();
+            InstrumentState state = stateByCurrency.computeIfAbsent(currency, ignored -> new InstrumentState());
             BigDecimal qty = deal.getQuantity();
             BigDecimal rate = deal.getBdtRate();
 
@@ -2219,35 +2224,35 @@ public class TradingService {
         BigDecimal openShortQty = BigDecimal.ZERO;
         BigDecimal openShortProceeds = BigDecimal.ZERO;
         List<TradingDtos.PnlOpenInstrumentRow> openInstruments = new ArrayList<>();
-        for (Map.Entry<String, InstrumentState> instrumentEntry : stateByInstrument.entrySet()) {
-            InstrumentState state = instrumentEntry.getValue();
-            BigDecimal instrumentLongQty = BigDecimal.ZERO;
-            BigDecimal instrumentLongValue = BigDecimal.ZERO;
-            BigDecimal instrumentShortQty = BigDecimal.ZERO;
-            BigDecimal instrumentShortProceeds = BigDecimal.ZERO;
+        for (Map.Entry<String, InstrumentState> currencyEntry : stateByCurrency.entrySet()) {
+            InstrumentState state = currencyEntry.getValue();
+            BigDecimal currencyLongQty = BigDecimal.ZERO;
+            BigDecimal currencyLongValue = BigDecimal.ZERO;
+            BigDecimal currencyShortQty = BigDecimal.ZERO;
+            BigDecimal currencyShortProceeds = BigDecimal.ZERO;
             for (Lot lot : state.longLots) {
                 openLongQty = openLongQty.add(lot.quantity());
                 openLongValue = openLongValue.add(lot.quantity().multiply(lot.unitRate()));
-                instrumentLongQty = instrumentLongQty.add(lot.quantity());
-                instrumentLongValue = instrumentLongValue.add(lot.quantity().multiply(lot.unitRate()));
+                currencyLongQty = currencyLongQty.add(lot.quantity());
+                currencyLongValue = currencyLongValue.add(lot.quantity().multiply(lot.unitRate()));
             }
             for (Lot lot : state.shortLots) {
                 openShortQty = openShortQty.add(lot.quantity());
                 openShortProceeds = openShortProceeds.add(lot.quantity().multiply(lot.unitRate()));
-                instrumentShortQty = instrumentShortQty.add(lot.quantity());
-                instrumentShortProceeds = instrumentShortProceeds.add(lot.quantity().multiply(lot.unitRate()));
+                currencyShortQty = currencyShortQty.add(lot.quantity());
+                currencyShortProceeds = currencyShortProceeds.add(lot.quantity().multiply(lot.unitRate()));
             }
-            if (instrumentLongQty.compareTo(BigDecimal.ZERO) > 0 || instrumentShortQty.compareTo(BigDecimal.ZERO) > 0) {
+            if (currencyLongQty.compareTo(BigDecimal.ZERO) > 0 || currencyShortQty.compareTo(BigDecimal.ZERO) > 0) {
                 openInstruments.add(new TradingDtos.PnlOpenInstrumentRow(
-                        instrumentEntry.getKey(),
-                        instrumentLongQty,
-                        instrumentLongValue,
-                        instrumentShortQty,
-                        instrumentShortProceeds
+                        currencyEntry.getKey(),
+                        currencyLongQty,
+                        currencyLongValue,
+                        currencyShortQty,
+                        currencyShortProceeds
                 ));
             }
         }
-        openInstruments.sort(Comparator.comparing(TradingDtos.PnlOpenInstrumentRow::instrumentCode));
+        openInstruments.sort(Comparator.comparing(TradingDtos.PnlOpenInstrumentRow::currencyCode));
 
         BigDecimal expense = expenseRepo.findByExpenseTimeBetweenAndDeletedFalse(range[0], range[1]).stream()
                 .map(Expense::getAmountBdt)
@@ -2325,7 +2330,7 @@ public class TradingService {
             if (deal.getDealTime().toLocalDate().isAfter(asOfDate)) {
                 continue;
             }
-            String code = deal.getInstrumentCode().name();
+            String code = deal.getCurrencyCode();
             BigDecimal signedQty = deal.getDealType() == DealType.BUY
                     ? deal.getQuantity()
                     : deal.getQuantity().negate();
@@ -2436,12 +2441,20 @@ public class TradingService {
         return "id=" + deal.getId()
                 + ",partyId=" + deal.getParty().getId()
                 + ",dealType=" + deal.getDealType()
-                + ",instrument=" + deal.getInstrumentCode()
+                + ",currency=" + deal.getCurrencyCode()
                 + ",qty=" + deal.getQuantity()
                 + ",rate=" + deal.getBdtRate()
                 + ",gross=" + deal.getBdtGross()
                 + ",time=" + deal.getDealTime()
                 + ",notes=" + deal.getNotes();
+    }
+
+    private String requireActiveCurrency(String currencyCode) {
+        String normalized = currencyCode == null ? "" : currencyCode.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty() || currencyRepo.findByCodeAndDeletedFalse(normalized).isEmpty()) {
+            throw new ApiException("Currency not found");
+        }
+        return normalized;
     }
 
     private String serializeSettlement(Settlement settlement) {

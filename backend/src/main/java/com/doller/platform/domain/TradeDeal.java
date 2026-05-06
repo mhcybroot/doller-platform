@@ -1,7 +1,6 @@
 package com.doller.platform.domain;
 
 import com.doller.platform.domain.enums.DealType;
-import com.doller.platform.domain.enums.InstrumentCode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,9 +20,8 @@ public class TradeDeal {
     private Party party;
     @ManyToOne(optional = false)
     private UserAccount createdBy;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private InstrumentCode instrumentCode;
+    @Column(name = "currency_code", nullable = false, length = 32)
+    private String currencyCode;
     @Column(name = "usd_amount", nullable = false, precision = 19, scale = 6)
     private BigDecimal quantity;
     @Column(nullable = false, precision = 19, scale = 6)

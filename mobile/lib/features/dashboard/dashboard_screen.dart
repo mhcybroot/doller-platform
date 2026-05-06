@@ -19,8 +19,11 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   DashboardMetrics? _metrics;
   DashboardPnlExplainModel? _pnlExplain;
+  List<CurrencyModel> _currencies = const [];
   bool _loading = true;
   bool _networkError = false;
+
+  Map<String, String> get _currencyLabels => currencyLabelMap(_currencies);
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final metrics = await widget.repository.dashboard(from, now);
       final explain = await widget.repository.dashboardPnlExplain(from, now);
+      final currencies = await widget.repository.listCurrencies();
       if (!mounted) {
         return;
       }
@@ -50,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _metrics = metrics;
         _pnlExplain = explain;
+        _currencies = currencies;
         _networkError = false;
         _loading = false;
       });
@@ -65,6 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _metrics = null;
         _pnlExplain = null;
+        _currencies = const [];
         _networkError = error.isNetworkError;
         _loading = false;
       });
@@ -176,14 +182,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           if (_metrics!.positions.isNotEmpty)
             FinanceSection(
-              title: 'Per Instrument Positions',
+              title: 'Per Currency Positions',
               child: Column(
                 children: _metrics!.positions
                     .map(
                       (position) => ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                            instrumentDisplayName(position.instrumentCode)),
+                            currencyDisplayName(position.currencyCode, labels: _currencyLabels)),
                         subtitle: Text('Amt ${position.quantity}'),
                         trailing: Text(
                           formatBdt(position.valuationBdt),
@@ -220,9 +226,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
-                _PnlExplainSection(section: explain.today),
+                _PnlExplainSection(
+                  section: explain.today,
+                  currencyLabels: _currencyLabels,
+                ),
                 const SizedBox(height: 16),
-                _PnlExplainSection(section: explain.period),
+                _PnlExplainSection(
+                  section: explain.period,
+                  currencyLabels: _currencyLabels,
+                ),
               ],
             ),
           ),
@@ -239,9 +251,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _PnlExplainSection extends StatelessWidget {
-  const _PnlExplainSection({required this.section});
+  const _PnlExplainSection({
+    required this.section,
+    required this.currencyLabels,
+  });
 
   final PnlExplainSectionModel section;
+  final Map<String, String> currencyLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +271,7 @@ class _PnlExplainSection extends StatelessWidget {
       'Open short total proceeds: ${formatBdt(section.openShortProceedsBdt)}',
       ...section.openInstruments.map(
         (row) =>
-            '${instrumentDisplayName(row.instrumentCode)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
+            '${currencyDisplayName(row.currencyCode, labels: currencyLabels)}: Long ${row.openLongQty} (${formatBdt(row.openLongValueBdt)})'
             ' | Short ${row.openShortQty} (${formatBdt(row.openShortProceedsBdt)})',
       ),
       'Expense: ${formatBdt(section.expenseBdt)}',
