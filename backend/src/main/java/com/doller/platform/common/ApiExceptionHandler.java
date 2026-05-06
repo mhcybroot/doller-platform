@@ -20,12 +20,14 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<?> handle(ApiException ex, HttpServletRequest request) {
-        log.warn("api_exception path={} method={} traceId={} message={}",
+        log.warn("api_exception path={} method={} traceId={} status={} message={}",
                 request.getRequestURI(),
                 request.getMethod(),
                 MDC.get(TraceLoggingFilter.TRACE_ID_MDC_KEY),
+                ex.getStatus().value(),
                 ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("code", "BUSINESS_ERROR", "message", ex.getMessage()));
+        return ResponseEntity.status(ex.getStatus())
+                .body(Map.of("code", codeFor(ex.getStatus()), "message", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -40,5 +42,26 @@ public class ApiExceptionHandler {
                 MDC.get(TraceLoggingFilter.TRACE_ID_MDC_KEY),
                 fields.keySet());
         return ResponseEntity.badRequest().body(Map.of("code", "VALIDATION_ERROR", "message", "Invalid request", "fields", fields));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> unexpected(Exception ex, HttpServletRequest request) {
+        log.error("unhandled_exception path={} method={} traceId={}",
+                request.getRequestURI(),
+                request.getMethod(),
+                MDC.get(TraceLoggingFilter.TRACE_ID_MDC_KEY),
+                ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("code", "INTERNAL_ERROR", "message", "Request failed"));
+    }
+
+    private String codeFor(HttpStatus status) {
+        return switch (status) {
+            case UNAUTHORIZED -> "UNAUTHORIZED";
+            case FORBIDDEN -> "FORBIDDEN";
+            case TOO_MANY_REQUESTS -> "RATE_LIMITED";
+            case NOT_FOUND -> "NOT_FOUND";
+            default -> "BUSINESS_ERROR";
+        };
     }
 }

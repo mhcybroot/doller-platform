@@ -1,6 +1,6 @@
 package com.doller.platform.web;
 
-import com.doller.platform.domain.AuditLog;
+import com.doller.platform.dto.MasterDataDtos;
 import com.doller.platform.repo.AuditLogRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +20,17 @@ public class AuditController {
     }
 
     @GetMapping("/logs")
-    public List<AuditLog> logs() {
-        return auditLogRepository.findAll();
+    public List<MasterDataDtos.AuditLogResponse> logs() {
+        return auditLogRepository.findAll().stream()
+                .map(log -> new MasterDataDtos.AuditLogResponse(
+                        log.getId(),
+                        log.getAction(),
+                        log.getActor(),
+                        log.getRequestPath(),
+                        log.getMetadata(),
+                        log.getReason(),
+                        log.getCreatedAt()
+                ))
+                .toList();
     }
 }

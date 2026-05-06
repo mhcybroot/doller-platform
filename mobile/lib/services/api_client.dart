@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../shared/config/app_env.dart';
-import 'auth_store.dart';
+import '../shared/services/auth_store.dart';
 import 'outbox_store.dart';
 
 class ApiClient {
@@ -16,7 +16,8 @@ class ApiClient {
   ApiClient(this._store) {
     _dio.interceptors
         .add(InterceptorsWrapper(onRequest: (options, handler) async {
-      final token = await _store.getToken();
+      final session = await _store.readSession();
+      final token = session?.accessToken;
       if (token != null) {
         options.headers['Authorization'] = 'Bearer $token';
       }

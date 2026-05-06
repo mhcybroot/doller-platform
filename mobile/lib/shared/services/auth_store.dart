@@ -1,19 +1,34 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/auth_models.dart';
 
 class AuthStore {
   static const _sessionKey = 'auth_session';
+  static const _androidOptions = AndroidOptions(
+    encryptedSharedPreferences: true,
+    resetOnError: true,
+  );
+  static const _iosOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  );
+
+  AuthStore({FlutterSecureStorage? secureStorage})
+      : _secureStorage = secureStorage ??
+            const FlutterSecureStorage(
+              aOptions: _androidOptions,
+              iOptions: _iosOptions,
+            );
+
+  final FlutterSecureStorage _secureStorage;
 
   Future<void> saveSession(
     AuthSession session, {
     bool rememberMe = true,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (!rememberMe) {
-      await prefs.remove(_sessionKey);
+      await clear();
       return;
     }
     final expiresAt = DateTime.now().add(const Duration(hours: 24));
@@ -22,12 +37,11 @@ class AuthStore {
       'rememberMe': true,
       'expiresAt': expiresAt.toIso8601String(),
     };
-    await prefs.setString(_sessionKey, jsonEncode(payload));
+    await _secureStorage.write(key: _sessionKey, value: jsonEncode(payload));
   }
 
   Future<AuthSession?> readSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_sessionKey);
+    final raw = await _secureStorage.read(key: _sessionKey);
     if (raw == null || raw.isEmpty) {
       return null;
     }
@@ -54,7 +68,6 @@ class AuthStore {
   }
 
   Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_sessionKey);
+    await _secureStorage.delete(key: _sessionKey);
   }
 }

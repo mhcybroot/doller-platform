@@ -5,3 +5,6 @@ mobile/.flutter-plugins
 mobile/.flutter-plugins-dependencies
 mobile/.packages
 mobile/pubspec.lock
+.env
+*.env
+!*.env.example

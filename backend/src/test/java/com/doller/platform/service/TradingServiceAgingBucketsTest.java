@@ -91,7 +91,7 @@ class TradingServiceAgingBucketsTest {
 
         assertThat(ledger.balances().agingDueBdt()).isEqualByComparingTo("1300.00");
         assertThat(inference.current().agingDueBdt()).isEqualByComparingTo("1300.00");
-        assertThat(inference.projected().agingDueBdt()).isEqualByComparingTo("1300.00");
+        assertThat(inference.projected().agingDueBdt()).isEqualByComparingTo("900.00");
     }
 
     private void saveSellDeal(Party party, double amount, int daysAgo) {

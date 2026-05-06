@@ -27,10 +27,10 @@ public class TradingController {
     }
 
     @PreAuthorize("hasAnyRole('OWNER','STAFF')")
-    @PostMapping("/deals") public TradeDeal createDeal(@Valid @RequestBody TradingDtos.DealCreateRequest req) { return service.createDeal(req); }
+    @PostMapping("/deals") public TradingDtos.DealResponse createDeal(@Valid @RequestBody TradingDtos.DealCreateRequest req) { return toDealResponse(service.createDeal(req)); }
     @PreAuthorize("hasRole('OWNER')")
     @PutMapping("/deals/{id}")
-    public TradeDeal updateDeal(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.DealUpdateRequest req) { return service.updateDeal(id, req); }
+    public TradingDtos.DealResponse updateDeal(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.DealUpdateRequest req) { return toDealResponse(service.updateDeal(id, req)); }
     @PreAuthorize("hasRole('OWNER')")
     @DeleteMapping("/deals/{id}")
     public void deleteDeal(@PathVariable("id") Long id) { service.deleteDeal(id); }
@@ -43,18 +43,18 @@ public class TradingController {
         return service.settlementInference(partyId, tradeDealId, amount);
     }
     @PreAuthorize("hasAnyRole('OWNER','STAFF')")
-    @PostMapping("/settlements") public Settlement createSettlement(@Valid @RequestBody TradingDtos.SettlementCreateRequest req) { return service.createSettlement(req); }
+    @PostMapping("/settlements") public TradingDtos.SettlementResponse createSettlement(@Valid @RequestBody TradingDtos.SettlementCreateRequest req) { return toSettlementResponse(service.createSettlement(req)); }
     @PreAuthorize("hasRole('OWNER')")
     @PutMapping("/settlements/{id}")
-    public Settlement updateSettlement(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.SettlementUpdateRequest req) { return service.updateSettlement(id, req); }
+    public TradingDtos.SettlementResponse updateSettlement(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.SettlementUpdateRequest req) { return toSettlementResponse(service.updateSettlement(id, req)); }
     @PreAuthorize("hasRole('OWNER')")
     @DeleteMapping("/settlements/{id}")
     public void deleteSettlement(@PathVariable("id") Long id) { service.deleteSettlement(id); }
     @PreAuthorize("hasAnyRole('OWNER','STAFF')")
-    @PostMapping("/expenses") public Expense createExpense(@Valid @RequestBody TradingDtos.ExpenseCreateRequest req) { return service.createExpense(req); }
+    @PostMapping("/expenses") public TradingDtos.ExpenseResponse createExpense(@Valid @RequestBody TradingDtos.ExpenseCreateRequest req) { return toExpenseResponse(service.createExpense(req)); }
     @PreAuthorize("hasRole('OWNER')")
     @PutMapping("/expenses/{id}")
-    public Expense updateExpense(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.ExpenseUpdateRequest req) { return service.updateExpense(id, req); }
+    public TradingDtos.ExpenseResponse updateExpense(@PathVariable("id") Long id, @Valid @RequestBody TradingDtos.ExpenseUpdateRequest req) { return toExpenseResponse(service.updateExpense(id, req)); }
     @PreAuthorize("hasRole('OWNER')")
     @DeleteMapping("/expenses/{id}")
     public void deleteExpense(@PathVariable("id") Long id) { service.deleteExpense(id); }
@@ -187,5 +187,51 @@ public class TradingController {
     @GetMapping("/dues/snapshot")
     public TradingDtos.DuesSnapshotResponse duesSnapshot() {
         return service.duesSnapshot();
+    }
+
+    private TradingDtos.DealResponse toDealResponse(TradeDeal deal) {
+        return new TradingDtos.DealResponse(
+                deal.getId(),
+                deal.getParty().getId(),
+                deal.getParty().getName(),
+                deal.getDealType().name(),
+                deal.getInstrumentCode().name(),
+                deal.getQuantity(),
+                deal.getBdtRate(),
+                deal.getBdtGross(),
+                deal.getDealTime(),
+                deal.getNotes(),
+                deal.isLockedByDayClose()
+        );
+    }
+
+    private TradingDtos.SettlementResponse toSettlementResponse(Settlement settlement) {
+        return new TradingDtos.SettlementResponse(
+                settlement.getId(),
+                settlement.getParty().getId(),
+                settlement.getParty().getName(),
+                settlement.getTradeDeal() == null ? null : settlement.getTradeDeal().getId(),
+                settlement.getDirection(),
+                settlement.getBasis(),
+                settlement.getBdtAmount(),
+                settlement.getAppliedAmount(),
+                settlement.getAdvanceAmount(),
+                settlement.getPaymentMethod(),
+                settlement.getPaymentReference(),
+                settlement.getSettlementTime(),
+                settlement.getNotes()
+        );
+    }
+
+    private TradingDtos.ExpenseResponse toExpenseResponse(Expense expense) {
+        return new TradingDtos.ExpenseResponse(
+                expense.getId(),
+                expense.getExpenseType().name(),
+                expense.getTradeDeal() == null ? null : expense.getTradeDeal().getId(),
+                expense.getAmountBdt(),
+                expense.getExpenseTime(),
+                expense.getCategory(),
+                expense.getNotes()
+        );
     }
 }

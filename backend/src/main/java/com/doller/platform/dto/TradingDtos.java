@@ -23,6 +23,19 @@ public class TradingDtos {
                                     @NotNull @DecimalMin("0.000001") BigDecimal bdtRate, @NotNull LocalDateTime dealTime, String notes) {}
     public record DealSummary(Long id, String partyName, DealType dealType, InstrumentCode instrumentCode, BigDecimal quantity, BigDecimal bdtGross,
                               LocalDateTime dealTime, boolean lockedByDayClose) {}
+    public record DealResponse(
+            Long id,
+            Long partyId,
+            String partyName,
+            String dealType,
+            String instrumentCode,
+            BigDecimal quantity,
+            BigDecimal bdtRate,
+            BigDecimal bdtGross,
+            LocalDateTime dealTime,
+            String notes,
+            boolean lockedByDayClose
+    ) {}
     public record SettlementCreateRequest(@NotNull Long partyId, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal bdtAmount,
                                           @NotNull LocalDateTime settlementTime, @NotNull SettlementPaymentMethod paymentMethod,
                                           String paymentReference, String notes, boolean allowAdvance) {}
@@ -43,10 +56,34 @@ public class TradingDtos {
             String amountLabel,
             String summary
     ) {}
+    public record SettlementResponse(
+            Long id,
+            Long partyId,
+            String partyName,
+            Long tradeDealId,
+            SettlementDirection direction,
+            SettlementBasis basis,
+            BigDecimal bdtAmount,
+            BigDecimal appliedAmount,
+            BigDecimal advanceAmount,
+            SettlementPaymentMethod paymentMethod,
+            String paymentReference,
+            LocalDateTime settlementTime,
+            String notes
+    ) {}
     public record ExpenseCreateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
     public record ExpenseUpdateRequest(@NotNull ExpenseType expenseType, Long tradeDealId, @NotNull @DecimalMin("0.01") BigDecimal amountBdt,
                                        @NotNull LocalDateTime expenseTime, @NotBlank String category, String notes) {}
+    public record ExpenseResponse(
+            Long id,
+            String expenseType,
+            Long tradeDealId,
+            BigDecimal amountBdt,
+            LocalDateTime expenseTime,
+            String category,
+            String notes
+    ) {}
     public record CompanyCreateRequest(@NotBlank String name, String notes) {}
     public record CompanyUpdateRequest(@NotBlank String name, String notes) {}
     public record CompanyResponse(Long id, String name, String notes) {}

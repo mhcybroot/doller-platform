@@ -5,9 +5,9 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [%X{traceId}] %logger - %msg%n"
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/doller}
-    username: ${DB_USER:mhcybroot}
-    password: ${DB_PASS:MhR@2025}
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -17,16 +17,28 @@ spring:
     open-in-view: false
   jackson:
     time-zone: ${APP_TIMEZONE:Asia/Dhaka}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
 app:
   timezone: ${APP_TIMEZONE:Asia/Dhaka}
   init:
-    enabled: ${APP_INIT_ENABLED:true}
+    enabled: ${APP_INIT_ENABLED:false}
+    bootstrap-token: ${APP_INIT_BOOTSTRAP_TOKEN:}
+    owner-username: ${APP_INIT_OWNER_USERNAME:}
+    owner-password: ${APP_INIT_OWNER_PASSWORD:}
   logging:
     trading-debug: ${APP_LOGGING_TRADING_DEBUG:false}
+  security:
+    docs-enabled: ${APP_SECURITY_DOCS_ENABLED:false}
+  audit:
+    store-payloads: ${APP_AUDIT_STORE_PAYLOADS:false}
   jwt:
-    issuer: ${JWT_ISSUER:doller-platform}
-    active-secret: ${JWT_ACTIVE_SECRET:change-this-very-long-active-secret-please-change-in-prod}
+    issuer: ${JWT_ISSUER}
+    active-secret: ${JWT_ACTIVE_SECRET}
     previous-secret: ${JWT_PREVIOUS_SECRET:}
     access-expiry-minutes: ${JWT_ACCESS_EXP_MIN:30}
     refresh-expiry-days: ${JWT_REFRESH_EXP_DAYS:30}

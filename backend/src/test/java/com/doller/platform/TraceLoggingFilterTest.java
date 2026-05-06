@@ -6,8 +6,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,16 +20,16 @@ class TraceLoggingFilterTest {
 
     @Test
     void preservesIncomingTraceId() throws Exception {
-        mockMvc.perform(get("/swagger-ui.html")
+        mockMvc.perform(get("/actuator/health")
                         .header("X-Trace-Id", "trace-test-123"))
-                .andExpect(status().is3xxRedirection())
+                .andExpect(status().isOk())
                 .andExpect(header().string("X-Trace-Id", "trace-test-123"));
     }
 
     @Test
     void generatesTraceIdWhenMissing() throws Exception {
-        mockMvc.perform(get("/swagger-ui.html"))
-                .andExpect(status().is3xxRedirection())
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
                 .andExpect(header().string("X-Trace-Id", not(blankOrNullString())));
     }
 }

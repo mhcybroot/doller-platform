@@ -11,6 +11,7 @@ import com.doller.platform.security.JwtService;
 import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.Objects;
 
 @Service
 public class AuthService {
@@ -27,71 +29,133 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuditService auditService;
+    private final AuthRateLimitService authRateLimitService;
     private final boolean initEnabled;
+    private final String bootstrapToken;
 
-    public AuthService(UserAccountRepository userRepo, RefreshTokenRepository refreshRepo, PasswordEncoder passwordEncoder,
-                       JwtService jwtService, AuditService auditService, @Value("${app.init.enabled:true}") boolean initEnabled) {
+    public AuthService(
+            UserAccountRepository userRepo,
+            RefreshTokenRepository refreshRepo,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            AuditService auditService,
+            AuthRateLimitService authRateLimitService,
+            @Value("${app.init.enabled:false}") boolean initEnabled,
+            @Value("${app.init.bootstrap-token:}") String bootstrapToken
+    ) {
         this.userRepo = userRepo;
         this.refreshRepo = refreshRepo;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.auditService = auditService;
+        this.authRateLimitService = authRateLimitService;
         this.initEnabled = initEnabled;
+        this.bootstrapToken = bootstrapToken == null ? "" : bootstrapToken.trim();
     }
 
     @Transactional
-    public AuthDtos.AuthResponse initOwner(AuthDtos.InitOwnerRequest req) {
-        if (!initEnabled || userRepo.count() > 0) throw new ApiException("Owner initialization disabled");
-        UserAccount u = userRepo.save(UserAccount.builder()
-                .username(req.username())
-                .passwordHash(passwordEncoder.encode(req.password()))
-                .role(Role.OWNER)
-                .active(true)
-                .mustChangePassword(true)
-                .build());
-        auditService.log("INIT_OWNER", "/auth/init-owner", "username=" + req.username(), null, null, "owner-created:" + u.getId());
-        return createAuthResponse(u);
+    public AuthDtos.AuthResponse initOwner(AuthDtos.InitOwnerRequest req, String providedBootstrapToken, String clientKey) {
+        String rateKey = safeRateKey(clientKey);
+        authRateLimitService.checkAllowed("init-owner", rateKey);
+        try {
+            if (!initEnabled || userRepo.count() > 0) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Owner initialization disabled");
+            }
+            if (bootstrapToken.isBlank() || !Objects.equals(bootstrapToken, safeHeader(providedBootstrapToken))) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Bootstrap token required");
+            }
+            validatePasswordStrength(req.password());
+            UserAccount u = userRepo.save(UserAccount.builder()
+                    .username(req.username().trim())
+                    .passwordHash(passwordEncoder.encode(req.password()))
+                    .role(Role.OWNER)
+                    .active(true)
+                    .mustChangePassword(true)
+                    .build());
+            auditService.log("INIT_OWNER", "/auth/init-owner", "username=" + req.username(), null, null, "owner-created:" + u.getId());
+            authRateLimitService.recordSuccess("init-owner", rateKey);
+            return createAuthResponse(u);
+        } catch (ApiException ex) {
+            authRateLimitService.recordFailure("init-owner", rateKey);
+            throw ex;
+        }
     }
 
     @Transactional
-    public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req) {
-        UserAccount u = userRepo.findByUsernameAndActiveTrue(req.username())
-                .orElseThrow(() -> new ApiException("Invalid credentials"));
-        if (!passwordEncoder.matches(req.password(), u.getPasswordHash())) throw new ApiException("Invalid credentials");
-        refreshRepo.deleteByUser(u);
-        return createAuthResponse(u);
+    public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req, String clientKey) {
+        String username = req.username().trim();
+        String rateKey = username + '|' + safeRateKey(clientKey);
+        authRateLimitService.checkAllowed("login", rateKey);
+        try {
+            UserAccount u = userRepo.findByUsernameAndActiveTrue(username)
+                    .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+            if (!passwordEncoder.matches(req.password(), u.getPasswordHash())) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+            }
+            refreshRepo.deleteByUser(u);
+            authRateLimitService.recordSuccess("login", rateKey);
+            return createAuthResponse(u);
+        } catch (ApiException ex) {
+            authRateLimitService.recordFailure("login", rateKey);
+            throw ex;
+        }
     }
 
     @Transactional
-    public AuthDtos.AuthResponse refresh(AuthDtos.RefreshRequest req) {
-        Claims claims = jwtService.parse(req.refreshToken());
-        if (!"refresh".equals(claims.get("typ", String.class))) throw new ApiException("Invalid refresh token type");
-        String tokenHash = hash(req.refreshToken());
-        RefreshToken stored = refreshRepo.findByTokenHashAndRevokedFalse(tokenHash)
-                .orElseThrow(() -> new ApiException("Refresh token revoked or unknown"));
-        if (stored.getExpiresAt().isBefore(LocalDateTime.now())) throw new ApiException("Refresh token expired");
+    public AuthDtos.AuthResponse refresh(AuthDtos.RefreshRequest req, String clientKey) {
+        String rateKey = hash(req.refreshToken()) + '|' + safeRateKey(clientKey);
+        authRateLimitService.checkAllowed("refresh", rateKey);
+        try {
+            Claims claims = jwtService.parse(req.refreshToken());
+            if (!"refresh".equals(claims.get("typ", String.class))) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid refresh token");
+            }
+            String tokenHash = hash(req.refreshToken());
+            RefreshToken stored = refreshRepo.findByTokenHashAndRevokedFalse(tokenHash)
+                    .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Refresh token revoked or unknown"));
+            if (stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "Refresh token expired");
+            }
 
-        stored.setRevoked(true);
-        stored.setRevokedAt(LocalDateTime.now());
+            stored.setRevoked(true);
+            stored.setRevokedAt(LocalDateTime.now());
 
-        UserAccount user = stored.getUser();
-        if (!user.isActive()) throw new ApiException("User disabled");
+            UserAccount user = stored.getUser();
+            if (!user.isActive()) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "User disabled");
+            }
 
-        AuthDtos.AuthResponse out = createAuthResponse(user);
-        stored.setReplacedByHash(hash(out.refreshToken()));
-        refreshRepo.save(stored);
-        return out;
+            AuthDtos.AuthResponse out = createAuthResponse(user);
+            stored.setReplacedByHash(hash(out.refreshToken()));
+            refreshRepo.save(stored);
+            authRateLimitService.recordSuccess("refresh", rateKey);
+            return out;
+        } catch (ApiException ex) {
+            authRateLimitService.recordFailure("refresh", rateKey);
+            throw ex;
+        }
     }
 
     @Transactional
-    public void changePassword(AuthDtos.ChangePasswordRequest req) {
+    public void changePassword(AuthDtos.ChangePasswordRequest req, String clientKey) {
         UserAccount user = currentUser();
-        if (!passwordEncoder.matches(req.oldPassword(), user.getPasswordHash())) throw new ApiException("Old password mismatch");
-        user.setPasswordHash(passwordEncoder.encode(req.newPassword()));
-        user.setMustChangePassword(false);
-        userRepo.save(user);
-        refreshRepo.deleteByUser(user);
-        auditService.log("CHANGE_PASSWORD", "/auth/change-password", null, null, null, "user:" + user.getId());
+        String rateKey = user.getUsername() + '|' + safeRateKey(clientKey);
+        authRateLimitService.checkAllowed("change-password", rateKey);
+        try {
+            if (!passwordEncoder.matches(req.oldPassword(), user.getPasswordHash())) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "Old password mismatch");
+            }
+            validatePasswordStrength(req.newPassword());
+            user.setPasswordHash(passwordEncoder.encode(req.newPassword()));
+            user.setMustChangePassword(false);
+            userRepo.save(user);
+            refreshRepo.deleteByUser(user);
+            auditService.log("CHANGE_PASSWORD", "/auth/change-password", null, null, null, "user:" + user.getId());
+            authRateLimitService.recordSuccess("change-password", rateKey);
+        } catch (ApiException ex) {
+            authRateLimitService.recordFailure("change-password", rateKey);
+            throw ex;
+        }
     }
 
     private AuthDtos.AuthResponse createAuthResponse(UserAccount u) {
@@ -108,8 +172,12 @@ public class AuthService {
     }
 
     private UserAccount currentUser() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepo.findByUsernameAndActiveTrue(username).orElseThrow(() -> new ApiException("User not found"));
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        String username = authentication.getName();
+        return userRepo.findByUsernameAndActiveTrue(username).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
     private String hash(String value) {
@@ -119,5 +187,25 @@ public class AuthService {
         } catch (Exception e) {
             throw new ApiException("Hashing failed");
         }
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null
+                || password.length() < 12
+                || password.chars().noneMatch(Character::isUpperCase)
+                || password.chars().noneMatch(Character::isLowerCase)
+                || password.chars().noneMatch(Character::isDigit)
+                || password.chars().allMatch(Character::isLetterOrDigit)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Password must be at least 12 characters and include upper, lower, number, and special character");
+        }
+    }
+
+    private String safeRateKey(String value) {
+        return (value == null || value.isBlank()) ? "unknown" : value.trim();
+    }
+
+    private String safeHeader(String value) {
+        return value == null ? "" : value.trim();
     }
 }

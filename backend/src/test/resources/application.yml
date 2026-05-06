@@ -8,9 +8,19 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 app:
   init:
     enabled: true
+    bootstrap-token: test-bootstrap-token
+  security:
+    docs-enabled: false
+  audit:
+    store-payloads: false
   jwt:
     issuer: test-issuer
     active-secret: test-secret-test-secret-test-secret-test-secret

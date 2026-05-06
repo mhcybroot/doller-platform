@@ -24,6 +24,12 @@ class AppLogger {
       head.write('[$traceId]');
     }
     head.write('[$area] $message');
+
+    if (kReleaseMode) {
+      debugPrint(head.toString());
+      return;
+    }
+
     final payload = fields.isEmpty ? '' : ' ${jsonEncode(_sanitize(fields))}';
     debugPrint('$head$payload');
   }

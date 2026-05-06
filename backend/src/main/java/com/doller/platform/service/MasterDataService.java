@@ -9,6 +9,7 @@ import com.doller.platform.repo.PartyRepository;
 import com.doller.platform.repo.RefreshTokenRepository;
 import com.doller.platform.repo.UserAccountRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -34,20 +35,26 @@ public class MasterDataService {
         this.ledgerService = ledgerService;
     }
 
-    public UserAccount createUser(String username, String password, Role role) {
-        if (userRepo.findByUsernameAndActiveTrue(username).isPresent()) throw new ApiException("Username exists");
+    public MasterDataDtos.UserResponse createUser(String username, String password, Role role) {
+        String normalizedUsername = username == null ? "" : username.trim();
+        validateUsername(normalizedUsername);
+        validatePasswordStrength(password);
+        if (userRepo.findByUsernameAndActiveTrue(normalizedUsername).isPresent()) throw new ApiException("Username exists");
         UserAccount u = userRepo.save(UserAccount.builder()
-                .username(username)
+                .username(normalizedUsername)
                 .passwordHash(passwordEncoder.encode(password))
                 .role(role)
                 .active(true)
                 .mustChangePassword(true)
                 .build());
         auditService.log("CREATE_USER", "/users", "role=" + role, null, null, "user:" + u.getId());
-        return u;
+        return toUserResponse(u);
     }
 
-    public List<UserAccount> users() { return userRepo.findAll(); }
+    public List<MasterDataDtos.UserResponse> users() {
+        return userRepo.findAll().stream().map(this::toUserResponse).toList();
+    }
+
     public Party createParty(MasterDataDtos.PartyCreateRequest req) {
         BigDecimal openingReceivable = req.openingReceivableBdt() == null ? BigDecimal.ZERO : req.openingReceivableBdt();
         BigDecimal openingPayable = req.openingPayableBdt() == null ? BigDecimal.ZERO : req.openingPayableBdt();
@@ -78,17 +85,18 @@ public class MasterDataService {
         auditService.log("CREATE_PARTY", "/parties", metadata, null, null, "party:" + out.getId());
         return out;
     }
+
     public List<Party> parties() { return partyRepo.findByDeletedFalse(); }
 
     public Party updateParty(Long id, MasterDataDtos.PartyUpdateRequest req) {
         Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
-        String before = "party:" + party.getId() + ":" + party.getName() + "|" + party.getPhone() + "|" + party.getAddress() + "|" + party.getNotes();
+        String before = "party:" + party.getId() + ':' + party.getName() + '|' + party.getPhone() + '|' + party.getAddress() + '|' + party.getNotes();
         party.setName(req.name().trim());
         party.setPhone(req.phone());
         party.setAddress(req.address());
         party.setNotes(req.notes());
         Party saved = partyRepo.save(party);
-        String after = "party:" + saved.getId() + ":" + saved.getName() + "|" + saved.getPhone() + "|" + saved.getAddress() + "|" + saved.getNotes();
+        String after = "party:" + saved.getId() + ':' + saved.getName() + '|' + saved.getPhone() + '|' + saved.getAddress() + '|' + saved.getNotes();
         auditService.log("UPDATE_PARTY", "/parties/" + id, null, null, before, after);
         return saved;
     }
@@ -96,7 +104,7 @@ public class MasterDataService {
     @Transactional
     public void deleteParty(Long id) {
         Party party = partyRepo.findByIdAndDeletedFalse(id).orElseThrow(() -> new ApiException("Party not found"));
-        String before = "party:" + party.getId() + ":" + party.getName() + "|" + party.getPhone() + "|" + party.getAddress() + "|" + party.getNotes();
+        String before = "party:" + party.getId() + ':' + party.getName() + '|' + party.getPhone() + '|' + party.getAddress() + '|' + party.getNotes();
         ledgerService.deleteOpeningBalanceEntries(party.getId());
         party.setDeleted(true);
         party.setDeletedAt(LocalDateTime.now());
@@ -116,5 +124,33 @@ public class MasterDataService {
     private String currentActor() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         return auth == null ? "system" : auth.getName();
+    }
+
+    private MasterDataDtos.UserResponse toUserResponse(UserAccount user) {
+        return new MasterDataDtos.UserResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getRole().name(),
+                user.isActive(),
+                user.isMustChangePassword()
+        );
+    }
+
+    private void validateUsername(String username) {
+        if (username.isBlank() || username.length() < 3 || username.length() > 64 || !username.matches("^[A-Za-z0-9._-]+$")) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Username contains invalid characters");
+        }
+    }
+
+    private void validatePasswordStrength(String password) {
+        if (password == null
+                || password.length() < 12
+                || password.chars().noneMatch(Character::isUpperCase)
+                || password.chars().noneMatch(Character::isLowerCase)
+                || password.chars().noneMatch(Character::isDigit)
+                || password.chars().allMatch(Character::isLetterOrDigit)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Password must be at least 12 characters and include upper, lower, number, and special character");
+        }
     }
 }
