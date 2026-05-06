@@ -719,10 +719,8 @@ public class ExportController {
             drawDealTable(section.deals(), section.dealSummary());
             y -= sectionGap;
             drawSettlementTable(section.settlements(), section.settlementSummary());
-            if (hasMultiplePartySections()) {
-                y -= sectionGap;
-                drawExposure("Party Balance Snapshot", section.exposureSummary());
-            }
+            y -= sectionGap;
+            drawExposure("Party Balance Snapshot", section.exposureSummary());
             y -= 14;
         }
 
