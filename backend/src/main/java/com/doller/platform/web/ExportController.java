@@ -777,59 +777,75 @@ public class ExportController {
 
         private void drawExposure(String title, TradingDtos.TransactionPartyExposureSummary b) throws IOException {
             ensure(80);
-            // Title centered across full width
+            title = "Party Balance Snapshot";
             float pageWidth = page.getMediaBox().getWidth() - (margin * 2);
             float titleWidth = bold.getStringWidth(title) / 1000f * 11f;
             float centeredX = margin + (pageWidth - titleWidth) / 2f;
             text(title, centeredX, y - 14, bold, 11, new Color(17, 48, 87));
             y -= (22f + sectionTitleGap);
-            float[] cols = fitColumnsToAvailableWidth(new float[]{100, 120, 120, 120});
-            float rowHeight = 20f;
+            float[] cols = fitColumnsToAvailableWidth(new float[]{126, 126, 126, 126, 110});
+            float headerHeight = 26f;
+            float valueHeight = 24f;
+            float tableWidth = sum(cols);
+            String[] headers = {
+                    "Before Receivable",
+                    "Before Payable",
+                    "Now Receivable",
+                    "Now Payable",
+                    "Net"
+            };
+            String[] values = {
+                    fmt(b.beforeReceivableBdt()),
+                    fmt(b.beforePayableBdt()),
+                    fmt(b.receivableBdt()),
+                    fmt(b.payableBdt()),
+                    fmt(b.netBalanceBdt())
+            };
+            Color[] backgrounds = {
+                    new Color(235, 246, 238),
+                    new Color(251, 238, 240),
+                    new Color(228, 243, 233),
+                    new Color(249, 232, 236),
+                    new Color(235, 240, 247)
+            };
 
-            // Table header row
-            fill(margin, y - rowHeight, sum(cols), rowHeight, new Color(225, 233, 246));
             float x = margin;
-            String[] headers = {"Metric", "Receivable", "Payable", "Net"};
-            for (int i = 0; i < headers.length; i++) {
-                if (i == 0) {
-                    text(headers[i], x + 4, y - 14, bold, 9f, new Color(32, 47, 82));
-                } else {
-                    textRight(headers[i], x + cols[i] - 5, y - 14, bold, 9f, new Color(32, 47, 82));
+            for (int i = 0; i < cols.length; i++) {
+                fill(x, y - headerHeight, cols[i], headerHeight, backgrounds[i]);
+                List<String> lines = wrapLines(headers[i], cols[i] - 8f, 8f, 2);
+                float lineGap = 8.5f;
+                float firstBaseline = y - 11f;
+                for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+                    textCentered(
+                            lines.get(lineIndex),
+                            x,
+                            cols[i],
+                            firstBaseline - (lineIndex * lineGap),
+                            bold,
+                            8,
+                            new Color(32, 47, 82)
+                    );
                 }
                 x += cols[i];
             }
-            drawRowBorder(y, rowHeight, cols, new Color(184, 196, 214));
-            y -= rowHeight;
+            drawRowBorder(y, headerHeight, cols, new Color(184, 196, 214));
+            y -= headerHeight;
 
-            // Before row
-            fill(margin, y - rowHeight, sum(cols), rowHeight, Color.WHITE);
             x = margin;
-            String[] beforeCells = {"Before", fmt(b.beforeReceivableBdt()), fmt(b.beforePayableBdt()), "-"};
-            for (int i = 0; i < beforeCells.length; i++) {
-                if (i == 0) {
-                    text(beforeCells[i], x + 4, y - 14, regular, 9f, Color.BLACK);
-                } else {
-                    textRight(beforeCells[i], x + cols[i] - 5, y - 14, regular, 9f, Color.BLACK);
-                }
+            for (int i = 0; i < cols.length; i++) {
+                fill(x, y - valueHeight, cols[i], valueHeight, Color.WHITE);
+                textRight(
+                        values[i],
+                        x + cols[i] - 6,
+                        centeredTextBaselineY(y, valueHeight, bold, 9f),
+                        bold,
+                        9f,
+                        new Color(45, 52, 64)
+                );
                 x += cols[i];
             }
-            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
-            y -= rowHeight;
-
-            // Now row
-            fill(margin, y - rowHeight, sum(cols), rowHeight, Color.WHITE);
-            x = margin;
-            String[] nowCells = {"Now", fmt(b.receivableBdt()), fmt(b.payableBdt()), fmt(b.netBalanceBdt())};
-            for (int i = 0; i < nowCells.length; i++) {
-                if (i == 0) {
-                    text(nowCells[i], x + 4, y - 14, regular, 9f, Color.BLACK);
-                } else {
-                    textRight(nowCells[i], x + cols[i] - 5, y - 14, regular, 9f, Color.BLACK);
-                }
-                x += cols[i];
-            }
-            drawRowBorder(y, rowHeight, cols, new Color(214, 220, 230));
-            y -= (rowHeight + 10);
+            drawRowBorder(y, valueHeight, cols, new Color(214, 220, 230));
+            y -= (valueHeight + 10);
         }
 
         private void dealSummary(TradingDtos.TransactionDealSummary s) throws IOException {
