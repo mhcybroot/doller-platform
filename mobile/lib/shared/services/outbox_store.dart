@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class OutboxItem {
   final int? id;
@@ -45,6 +47,12 @@ class OutboxStore {
     if (_db != null) {
       return _db!;
     }
+
+    if (Platform.isWindows || Platform.isLinux) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+
     final path = join(await getDatabasesPath(), 'doller_outbox.db');
     _db = await openDatabase(
       path,

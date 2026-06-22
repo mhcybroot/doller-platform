@@ -14,10 +14,12 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.5
   share_plus: ^10.1.4
-  syncfusion_flutter_pdfviewer: ^27.2.5
+  syncfusion_flutter_pdfviewer: ^33.2.13
   google_fonts: ^6.2.1
   flutter_dotenv: ^5.2.1
   flutter_secure_storage: ^9.2.2
+  sqflite_common_ffi: ^2.4.0+3
+  device_info_plus: ^12.4.0
 
 dev_dependencies:
   flutter_test:
